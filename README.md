@@ -1,4 +1,15 @@
-# 校园网连接管家 (CampusNet Manager)
+# 校园网连接管家 (CampusNetManager)
+
+[![Release](https://img.shields.io/badge/下载-v2.0.0-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
+
+> Dr.COM 校园网自动保活 · 多设备共享上网 · 免安装 Windows 桌面工具
+
+## ⬇️ 下载
+
+**桌面版（Windows，双击即用，无需安装 Python）**：👉 [Releases 页面下载 exe](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
+
+- 单文件便携版，绿色免安装，放在桌面/任意目录即可
+- 首次运行在「连接档案」里填校园网账号密码即可 (CampusNet Manager)
 
 校园网自动连接与保活桌面工具。基于 MIT 协议项目 [csaslu/LidaNetDaemon](https://github.com/csaslu/LidaNetDaemon)（Go 版，作者 Bigsk）的接口思路，Python 重写并大幅增强。
 
