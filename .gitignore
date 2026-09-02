@@ -1,0 +1,14 @@
+# 敏感文件 - 包含账号密码, 严禁提交
+config.json
+keepalive.log
+*.lock
+
+# 构建产物
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+
+# 诊断导出
+校园网连接管家诊断_*.txt

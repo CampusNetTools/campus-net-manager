@@ -1,0 +1,17 @@
+{
+  "active_profile": "示例档案",
+  "auth_history": ["http://192.168.16.3/"],
+  "profiles": [
+    {
+      "name": "示例档案",
+      "ssid": "你的校园网WiFi名",
+      "gateway": "",
+      "username": "你的校园网账号",
+      "password": "你的校园网密码",
+      "login_type": "cmcc",
+      "auth_url": "http://192.168.16.3/",
+      "interval": 1800
+    }
+  ],
+  "tunnel_allow": []
+}
