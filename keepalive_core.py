@@ -1028,8 +1028,17 @@ def get_connection_mode():
     return "none", None
 
 
+def profile_has_credentials(profile):
+    """档案是否已填写账号密码 (具备登录能力)。"""
+    return bool(profile and profile.get("username") and profile.get("password"))
+
+
 def match_profile(cfg, ssid, gateway=None):
-    """匹配档案: SSID 精确匹配 > 网关精确匹配(有线) > 默认档案(ssid/gateway都空) > 第一个"""
+    """匹配档案: SSID 精确匹配 > 网关精确匹配(有线) > 默认档案 > 首个有账号档案。
+
+    中继/校园网场景下, 若按 SSID/网关只命中空账号的默认档案, 但存在已填写账号且
+    认证地址相同(指向校园网)的档案, 则优先返回该有账号档案 —— 否则会因账号为空
+    而永久登录失败。"""
     profiles = cfg.get("profiles", [])
     if ssid:
         for p in profiles:
@@ -1039,8 +1048,16 @@ def match_profile(cfg, ssid, gateway=None):
         for p in profiles:
             if p.get("gateway") and p["gateway"] == gateway:
                 return p
+    # 默认档案: ssid / gateway 均为空
     for p in profiles:
         if not p.get("ssid") and not p.get("gateway"):
+            # 若该默认档案没有账号, 且存在有账号的校园网档案, 则优先用后者
+            if not profile_has_credentials(p):
+                with_account = next((x for x in profiles
+                                     if profile_has_credentials(x)
+                                     and x.get("auth_url") == p.get("auth_url")), None)
+                if with_account:
+                    return with_account
             return p
     return profiles[0] if profiles else None
 
@@ -1339,8 +1356,16 @@ class KeepAliveDaemon(threading.Thread):
                 profile = match_profile(self.cfg, ssid, gw)
                 auth_url = profile.get("auth_url", DEFAULT_AUTH_URL) if profile else DEFAULT_AUTH_URL
 
-                # 环境判定: 认证服务器可达?
+                # 环境判定: 认证服务器可达 = 校园网环境; 不可达 = 非校园网。
                 in_campus = auth_reachable(auth_url)
+                # --- 增强: 中继/直连校园网场景, 认证服务器可能暂时探测不到(如路由器链路抖动、
+                # 交换机短暂隔离), 但档案已明确绑定当前 SSID (直连 LIDA 或中继路由器) ——
+                # 仍应视为校园网环境, 进入检测并尝试重登, 而不是误判非校园网后静止休眠。
+                ssid_locked = bool(profile and profile.get("ssid")) and profile.get("ssid") == ssid
+                if not in_campus and ssid_locked:
+                    self._log("认证服务器暂时不可达, 但处于已绑定档案 [%s] 的 %s 环境, 按校园网处理 (尝试检测/重登)"
+                              % (profile["name"], ssid))
+                    in_campus = True
                 if self.on_env:
                     self.on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
 
@@ -1407,8 +1432,57 @@ class KeepAliveDaemon(threading.Thread):
         self._log("守护已停止")
 
 
+# ---------- 合盖/休眠保持运行 ----------
+# macOS 笔记本合盖或系统空闲会自动进入睡眠, 守护线程随之暂停, 导致掉线后无法自动重登。
+# caffeinate 是 macOS 自带命令, 可通过电源断言阻止系统睡眠/空闲睡眠, 让程序在合盖/休眠
+# 状态下继续联网保活。仅 macOS 有效, Windows 用 nvidia/电源计划由系统管理, 此处返回 False。
+_keep_awake_proc = None
+_keep_awake_lock = threading.Lock()
+
+
+def keep_awake_start():
+    """启动 caffeinate 电源断言, 阻止系统睡眠/空闲睡眠/显示器睡眠。返回 True 表示已启动。
+    仅 macOS 生效; 精灵窗口/合盖场景下守护线程可继续运行。"""
+    global _keep_awake_proc
+    if not IS_MACOS:
+        return False
+    with _keep_awake_lock:
+        if _keep_awake_proc and _keep_awake_proc.poll() is None:
+            return True  # 已在运行
+        try:
+            # -d 阻止显示器睡眠, -i 阻止空闲睡眠, -s 阻止系统睡眠(合盖), -m 阻止磁盘睡眠
+            proc = subprocess.Popen(
+                ["/usr/bin/caffeinate", "-d", "-i", "-s", "-m",
+                 "-w", str(os.getpid())],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _keep_awake_proc = proc
+            return True
+        except Exception:
+            return False
+
+
+def keep_awake_stop():
+    """停止 caffeinate 电源断言 (可选调用; 进程退出时 caffeinate 的 -w 标志会自动结束)。"""
+    global _keep_awake_proc
+    with _keep_awake_lock:
+        if _keep_awake_proc and _keep_awake_proc.poll() is None:
+            try:
+                _keep_awake_proc.terminate()
+            except Exception:
+                pass
+        _keep_awake_proc = None
+
+
+def keep_awake_enabled():
+    """查询保持唤醒是否正在生效。"""
+    global _keep_awake_proc
+    if not IS_MACOS:
+        return False
+    return bool(_keep_awake_proc and _keep_awake_proc.poll() is None)
+
+
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.3.3"
+APP_VERSION = "2.4.0"
 APP_NAME = "校园网连接管家"
 
 
