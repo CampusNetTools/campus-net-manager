@@ -1083,6 +1083,7 @@ class App(tk.Tk):
                   style="Muted.TLabel").pack(anchor="w", pady=(0, 10))
 
         var_history = tk.BooleanVar(value=self.cfg.get("history_enabled", False))
+        var_keep_awake = tk.BooleanVar(value=self.cfg.get("keep_awake", False))
         notifications = self.cfg.get("notifications", {})
         var_notify = tk.BooleanVar(value=notifications.get("enabled", True))
         category_vars = {
@@ -1093,6 +1094,10 @@ class App(tk.Tk):
         }
         ttk.Checkbutton(card, text="保存网络稳定性历史", variable=var_history,
                         style="Checkmark.TCheckbutton").pack(anchor="w")
+        keep_awake_hint = "合盖/系统空闲时继续保活（需 macOS，用 caffeinate 防止睡眠）" if core.IS_MACOS else "合盖/系统睡眠时继续保活（当前平台仅部分支持）"
+        ttk.Checkbutton(card, text="合盖/休眠时保持运行", variable=var_keep_awake,
+                        style="Checkmark.TCheckbutton").pack(anchor="w", pady=(4, 0))
+        ttk.Label(card, text=keep_awake_hint, style="Muted.TLabel").pack(anchor="w", pady=(0, 4))
 
         report = ttk.Frame(card, style="Surface.TFrame", padding=(14, 12))
         report.pack(fill="x", pady=(10, 14))
@@ -1142,11 +1147,21 @@ class App(tk.Tk):
 
         def save_preferences():
             self.cfg["history_enabled"] = bool(var_history.get())
+            self.cfg["keep_awake"] = bool(var_keep_awake.get())
             self.cfg["notifications"] = core.normalized_notification_settings(
                 bool(var_notify.get()), {key: bool(value.get()) for key, value in category_vars.items()})
             core.save_config(self.cfg)
-            self._log("偏好设置已保存：网络历史%s，系统通知%s" % (
-                "开启" if var_history.get() else "关闭", "开启" if var_notify.get() else "关闭"))
+            # 开关「合盖/休眠保持运行」: 立即启停 caffeinate
+            if self.cfg.get("keep_awake"):
+                ok = core.keep_awake_start()
+            else:
+                ok = core.keep_awake_stop() or True
+            self._log("偏好设置已保存：网络历史%s，系统通知%s，合盖保持运行%s" % (
+                "开启" if var_history.get() else "关闭",
+                "开启" if var_notify.get() else "关闭",
+                "开启" if var_keep_awake.get() else "关闭"))
+            if self.cfg.get("keep_awake") and not ok:
+                self._log("警告: 合盖保持运行启动失败 (可能非 macOS 或 caffeinate 不可用)")
             win.destroy()
 
         actions = ttk.Frame(card, style="Inner.TFrame")
@@ -1271,6 +1286,12 @@ class App(tk.Tk):
         self.daemon = core.KeepAliveDaemon(self.cfg, on_log=self._on_log, on_status=self._on_status,
                                            on_env=self._on_env, on_alert=self._on_alert)
         self.daemon.start()
+        # 按偏好实例保持唤醒(合盖不睡眠); 失败仅记录不阻断守护
+        if self.cfg.get("keep_awake"):
+            if core.keep_awake_start():
+                self._log("已开启合盖/休眠保持运行 (caffeinate)")
+            else:
+                self._log("警告: 合盖保持运行启动失败")
         self.set_guard(True)
         if not silent:
             self._log("守护启动 (GUI)")
@@ -1353,6 +1374,7 @@ class App(tk.Tk):
         if self.daemon and self.daemon.is_alive():
             self.daemon.stop()
             self.daemon = None
+        core.keep_awake_stop()
         core.release_lock()
         self.set_guard(False)
         self.dot_net.configure(fg=MUTED)
