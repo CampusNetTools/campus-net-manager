@@ -10,25 +10,45 @@ CLI 和桌面 App 共用本模块
 import json
 import os
 import re
+import copy
 import socket
 import subprocess
 import sys
 import threading
 import time
 import datetime
+import concurrent.futures
+import ipaddress
+import plistlib
 import urllib.request
 import urllib.parse
+import urllib.error
+import xml.etree.ElementTree as ET
+import uuid
+
+IS_WINDOWS = os.name == "nt"
+IS_MACOS = sys.platform == "darwin"
+_MAC_APP_SUPPORT = os.path.join(os.path.expanduser("~"), "Library", "Application Support", "CampusNetManager")
 
 # 打包成 exe 后, 配置/日志跟随 exe 所在目录 (否则会写到临时解压目录导致丢失)
-if getattr(sys, "frozen", False):
+if getattr(sys, "frozen", False) and IS_MACOS:
+    # .app 的 Contents/MacOS 目录不是用户数据目录，不能把配置写进应用包。
+    BASE_DIR = _MAC_APP_SUPPORT
+elif getattr(sys, "frozen", False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.makedirs(BASE_DIR, exist_ok=True)
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "keepalive.log")
 LOCK_PATH = os.path.join(BASE_DIR, "keepalive.lock")
+HISTORY_PATH = os.path.join(BASE_DIR, "network_history.jsonl")
+KEYCHAIN_SERVICE = "com.campusnettools.campusnetmanager"
 
 DEFAULT_AUTH_URL = "http://192.168.16.3/"
+LIDA_PROFILE_ID = "lida-campus"
+LIDA_PROFILE_NAME = "立达校园网"
+LIDA_SSID = "LIDA-UNIVERSITY"
 
 SUFFIX = {"unicom": "@unicom", "cmcc": "@cmcc", "teacher": ""}
 METHOD_NAME = {"unicom": "联通", "cmcc": "移动", "teacher": "教师"}
@@ -47,23 +67,236 @@ def default_profile(name="校园网"):
     }
 
 
+def default_preferences():
+    return {
+        "history_enabled": False,
+        "notifications": {
+            "enabled": True,
+            "disconnect": True,
+            "recovery": True,
+            "failure": True,
+            "device": True,
+        },
+    }
+
+
+def ensure_preferences(cfg):
+    changed = False
+    defaults = default_preferences()
+    if "history_enabled" not in cfg:
+        cfg["history_enabled"] = defaults["history_enabled"]
+        changed = True
+    notifications = cfg.setdefault("notifications", {})
+    for key, value in defaults["notifications"].items():
+        if key not in notifications:
+            notifications[key] = value
+            changed = True
+    return changed
+
+
+def _profile_secret_id(profile):
+    secret_id = profile.get("secret_id")
+    if not secret_id:
+        secret_id = "profile-" + uuid.uuid4().hex
+        profile["secret_id"] = secret_id
+    return secret_id
+
+
+def keychain_set(secret_id, password):
+    """把密码写入当前用户的 macOS 钥匙串。"""
+    if not IS_MACOS or not secret_id:
+        return False
+    result = subprocess.run(
+        ["/usr/bin/security", "add-generic-password", "-U", "-s", KEYCHAIN_SERVICE,
+         "-a", secret_id, "-w", password], capture_output=True, timeout=10)
+    return result.returncode == 0
+
+
+def keychain_get(secret_id):
+    if not IS_MACOS or not secret_id:
+        return ""
+    result = subprocess.run(
+        ["/usr/bin/security", "find-generic-password", "-w", "-s", KEYCHAIN_SERVICE,
+         "-a", secret_id], capture_output=True, timeout=10)
+    return result.stdout.decode("utf-8", errors="replace").rstrip("\r\n") if result.returncode == 0 else ""
+
+
+def keychain_delete(secret_id):
+    if not IS_MACOS or not secret_id:
+        return False
+    result = subprocess.run(
+        ["/usr/bin/security", "delete-generic-password", "-s", KEYCHAIN_SERVICE,
+         "-a", secret_id], capture_output=True, timeout=10)
+    return result.returncode == 0
+
+
+def lida_profile():
+    """立达学校内置档案；账号密码保持空白，由用户本人填写。"""
+    profile = default_profile(LIDA_PROFILE_NAME)
+    profile.update({
+        "preset": LIDA_PROFILE_ID,
+        "ssid": LIDA_SSID,
+        "gateway": "",
+        "auth_url": DEFAULT_AUTH_URL,
+        "login_type": "cmcc",
+        "interval": 60,
+    })
+    return profile
+
+
+def ensure_lida_profile(cfg):
+    """无损补齐立达专属档案，保留已有账号、密码和用户自定义档案。"""
+    profiles = cfg.setdefault("profiles", [])
+    for profile in profiles:
+        if (profile.get("preset") == LIDA_PROFILE_ID
+                or (profile.get("ssid") or "").strip().upper() == LIDA_SSID):
+            if profile.get("preset") != LIDA_PROFILE_ID:
+                profile["preset"] = LIDA_PROFILE_ID
+                return True
+            return False
+
+    # 将早期默认“校园网”档案原位升级，避免复制账号密码或制造重复档案。
+    for profile in profiles:
+        if (profile.get("name") in ("校园网", "立达校园网WiFi")
+                and profile.get("auth_url", DEFAULT_AUTH_URL) == DEFAULT_AUTH_URL
+                and not profile.get("ssid")):
+            old_name = profile.get("name")
+            profile.update({"name": LIDA_PROFILE_NAME, "ssid": LIDA_SSID,
+                            "gateway": profile.get("gateway", ""), "preset": LIDA_PROFILE_ID})
+            if cfg.get("active_profile") == old_name:
+                cfg["active_profile"] = LIDA_PROFILE_NAME
+            return True
+
+    profiles.insert(0, lida_profile())
+    if not cfg.get("active_profile"):
+        cfg["active_profile"] = LIDA_PROFILE_NAME
+    return True
+
+
 def load_config():
     if not os.path.exists(CONFIG_PATH):
-        return {"profiles": [default_profile()], "active_profile": "校园网"}
+        cfg = {"profiles": [lida_profile()], "active_profile": LIDA_PROFILE_NAME,
+               "auth_history": [DEFAULT_AUTH_URL]}
+        ensure_preferences(cfg)
+        return cfg
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         cfg = json.load(f)
+    changed = False
     # 兼容旧版单档案结构
     if "profiles" not in cfg:
         p = default_profile("校园网")
         p.update({k: cfg.get(k) for k in ("username", "password", "login_type", "interval") if cfg.get(k) is not None})
         cfg = {"profiles": [p], "active_profile": p["name"]}
+        changed = True
+    if ensure_lida_profile(cfg):
+        changed = True
+    if ensure_preferences(cfg):
+        changed = True
+    # 首次升级时把旧版明文密码迁移进钥匙串；配置文件只保留引用。
+    if IS_MACOS:
+        for profile in cfg.get("profiles", []):
+            password = profile.get("password", "")
+            secret_id = _profile_secret_id(profile)
+            if password and keychain_set(secret_id, password):
+                profile["password_store"] = "keychain"
+                changed = True
+            elif profile.get("password_store") == "keychain":
+                profile["password"] = keychain_get(secret_id)
+    if changed:
         save_config(cfg)
     return cfg
 
 
-def save_config(cfg):
+def save_config(cfg, sync_secrets=False):
+    ensure_preferences(cfg)
+    disk_cfg = copy.deepcopy(cfg)
+    if IS_MACOS:
+        for profile, disk_profile in zip(cfg.get("profiles", []), disk_cfg.get("profiles", [])):
+            secret_id = _profile_secret_id(profile)
+            disk_profile["secret_id"] = secret_id
+            password = profile.get("password", "")
+            if password and (sync_secrets or profile.get("password_store") != "keychain"):
+                if not keychain_set(secret_id, password):
+                    raise RuntimeError("无法把密码保存到 macOS 钥匙串")
+                profile["password_store"] = "keychain"
+            if profile.get("password_store") == "keychain":
+                disk_profile["password"] = ""
+                disk_profile["password_store"] = "keychain"
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
+        json.dump(disk_cfg, f, ensure_ascii=False, indent=2)
+
+
+def config_for_export(cfg):
+    """导出可迁移但不含密码的安全配置。"""
+    exported = copy.deepcopy(cfg)
+    for profile in exported.get("profiles", []):
+        profile["password"] = ""
+        profile.pop("secret_id", None)
+        profile.pop("password_store", None)
+    return exported
+
+
+def notification_enabled(cfg, category):
+    settings = cfg.get("notifications", {})
+    return settings.get("enabled", True) and settings.get(category, True)
+
+
+def normalized_notification_settings(enabled, categories):
+    """总开关关闭时，所有子通知同步关闭。"""
+    result = {"enabled": bool(enabled)}
+    result.update({key: bool(value) if enabled else False for key, value in categories.items()})
+    return result
+
+
+def record_network_history(cfg, event, message, **details):
+    if not cfg.get("history_enabled", False):
+        return False
+    item = {"time": now_str(), "event": event, "message": message, "details": details}
+    try:
+        with open(HISTORY_PATH, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(item, ensure_ascii=False) + "\n")
+        if os.path.getsize(HISTORY_PATH) > 2 * 1024 * 1024:
+            with open(HISTORY_PATH, "r", encoding="utf-8", errors="replace") as handle:
+                lines = handle.readlines()[-5000:]
+            with open(HISTORY_PATH, "w", encoding="utf-8") as handle:
+                handle.writelines(lines)
+        return True
+    except Exception:
+        return False
+
+
+def summarize_network_history(days=7):
+    """将技术事件汇总成普通用户可以理解的稳定性报告。"""
+    cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+    events = []
+    try:
+        with open(HISTORY_PATH, "r", encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    item = json.loads(line)
+                    when = datetime.datetime.strptime(item["time"], "%Y-%m-%d %H:%M:%S")
+                    if when >= cutoff:
+                        events.append(item)
+                except Exception:
+                    continue
+    except FileNotFoundError:
+        pass
+    counts = {key: 0 for key in ("online", "disconnect", "recovery", "failure", "vpn_issue")}
+    for item in events:
+        if item.get("event") in counts:
+            counts[item["event"]] += 1
+    checks = counts["online"] + counts["disconnect"] + counts["vpn_issue"]
+    stable = (counts["online"] * 100.0 / checks) if checks else None
+    if not events:
+        summary = "还没有可汇总的网络记录。开启保存后，软件会在这里解释最近的稳定情况。"
+    elif counts["failure"]:
+        summary = "网络近期不太稳定，有自动恢复失败的情况，建议检查账号、路由器或校园出口。"
+    elif counts["disconnect"] or counts["vpn_issue"]:
+        summary = "网络偶尔出现波动，大多数时候软件能够继续检测或自动恢复。"
+    else:
+        summary = "网络整体稳定，最近没有记录到明显掉线。"
+    return {"days": days, "events": len(events), "counts": counts, "stable_percent": stable,
+            "summary": summary}
 
 
 # ---------- 环境识别 ----------
@@ -75,8 +308,10 @@ def _run_decode(cmd, timeout=10):
     netsh/reg/tasklist 等输出编码随代码页变化 (GBK 或 UTF-8),
     先按 UTF-8 严格解码, 失败再回退 GBK, 避免中文 SSID 乱码。"""
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=timeout,
-                           creationflags=_NO_WINDOW)
+        kwargs = {"capture_output": True, "timeout": timeout}
+        if IS_WINDOWS:
+            kwargs["creationflags"] = _NO_WINDOW
+        r = subprocess.run(cmd, **kwargs)
         out = r.stdout or b""
         try:
             return out.decode("utf-8")
@@ -88,6 +323,22 @@ def _run_decode(cmd, timeout=10):
 
 def get_ssid():
     """返回当前连接的 WiFi SSID; 无线未连接/有线接入返回 None"""
+    if IS_MACOS:
+        device = None
+        ports = _run_decode(["networksetup", "-listallhardwareports"])
+        for block in ports.split("\n\n"):
+            if "Hardware Port: Wi-Fi" in block:
+                m = re.search(r"Device:\s*(\S+)", block)
+                if m:
+                    device = m.group(1)
+                    break
+        if not device:
+            return None
+        out = _run_decode(["networksetup", "-getairportnetwork", device]).strip()
+        # 英文/中文系统均取最后一个冒号后的 SSID；未连接时 networksetup 会给出说明。
+        if not out or "not associated" in out.lower() or "没有关联" in out:
+            return None
+        return out.rsplit(":", 1)[-1].strip() or None
     out = _run_decode(["netsh", "wlan", "show", "interfaces"])
     for line in out.splitlines():
         if "SSID" in line and "BSSID" not in line and ":" in line:
@@ -98,12 +349,191 @@ def get_ssid():
 
 def get_gateway():
     """返回当前默认网关 IP (路由器管理地址通常就是它)"""
+    if IS_MACOS:
+        gateway, _ = get_physical_route()
+        return gateway
     out = _run_decode(["route", "print", "-4"])
     for line in out.splitlines():
         parts = line.split()
         if len(parts) >= 3 and parts[0] == "0.0.0.0" and parts[1] == "0.0.0.0":
             return parts[2]
     return None
+
+
+def get_physical_route():
+    """返回 macOS 实际局域网的 (网关, 网卡)，忽略 utun 等 VPN 默认路由。"""
+    if not IS_MACOS:
+        return get_gateway(), None
+    out = _run_decode(["netstat", "-rn", "-f", "inet"])
+    for line in out.splitlines():
+        parts = line.split()
+        if (len(parts) >= 4 and parts[0] == "default"
+                and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[1])
+                and not parts[3].startswith("utun")):
+            return parts[1], parts[3]
+    return None, None
+
+
+def get_physical_interface():
+    """返回当前承载校园网的物理网卡名称，例如 en0。"""
+    _, interface = get_physical_route()
+    return interface
+
+
+def vpn_active():
+    """检测是否存在活跃 VPN 隧道；仅用于提示测速路径。"""
+    if IS_MACOS:
+        out = _run_decode(["netstat", "-rn", "-f", "inet"])
+        return any(len(line.split()) >= 4 and line.split()[0] == "default"
+                   and line.split()[3].startswith("utun") for line in out.splitlines())
+    out = _run_decode(["route", "print", "-4"])
+    return any(mark in out.lower() for mark in ("wireguard", "wintun", "tap-windows", "vpn"))
+
+
+def automatic_speed_test_plan():
+    """按当前 VPN 状态决定测速路径；界面无需让用户理解或选择底层网卡。"""
+    active = vpn_active()
+    compare = bool(active and IS_MACOS)
+    return {
+        "vpn_active": active,
+        "compare": compare,
+        "paths": ("current", "physical") if compare else ("current",),
+    }
+
+
+def _curl_speed_request(url, method="GET", upload_bytes=0, physical=False, timeout=20,
+                        allow_timed_sample=False):
+    """执行一次有限流量的 curl 测量，返回 curl 的结构化计时字段。"""
+    curl = "/usr/bin/curl" if IS_MACOS else "curl.exe"
+    command = [curl, "--silent", "--show-error", "--location", "--max-time", str(timeout),
+               "--output", os.devnull,
+               "--write-out", "%{http_code}\t%{time_namelookup}\t%{time_connect}\t%{time_appconnect}\t%{time_pretransfer}\t%{time_starttransfer}\t%{time_total}\t%{size_download}\t%{size_upload}\t%{remote_ip}"]
+    if physical and IS_MACOS:
+        interface = get_physical_interface()
+        if not interface:
+            raise RuntimeError("未找到可用的物理网卡")
+        command.extend(["--noproxy", "*", "--interface", interface])
+    payload = None
+    if method == "POST":
+        command.extend(["--request", "POST", "--header", "Content-Type: application/octet-stream",
+                        "--data-binary", "@-"])
+        payload = b"\0" * upload_bytes
+    command.append(url)
+    kwargs = {"input": payload, "capture_output": True, "timeout": timeout + 3}
+    if IS_WINDOWS:
+        kwargs["creationflags"] = _NO_WINDOW
+    result = subprocess.run(command, **kwargs)
+    parts = result.stdout.decode("ascii", errors="replace").strip().split("\t")
+    timed_sample = False
+    if result.returncode != 0:
+        # curl 在 --max-time 到期时仍会输出完整计时数据。测速流量较慢但已经
+        # 持续传输时，这本身就是有效的限时测速样本，不应误报为断网。
+        try:
+            transferred = float(parts[7]) + float(parts[8])
+            elapsed = float(parts[6])
+            timed_sample = (allow_timed_sample and result.returncode == 28
+                            and len(parts) == 10 and parts[0].startswith("2")
+                            and transferred >= 65536 and elapsed >= 5.0)
+        except (ValueError, IndexError):
+            timed_sample = False
+        if not timed_sample:
+            detail = result.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(detail or "测速请求失败")
+    if len(parts) != 10 or not parts[0].startswith("2"):
+        raise RuntimeError("测速服务器返回异常（HTTP %s）" % (parts[0] if parts else "?"))
+    return {
+        "status": int(parts[0]), "lookup": float(parts[1]), "connect": float(parts[2]),
+        "appconnect": float(parts[3]), "pretransfer": float(parts[4]), "ttfb": float(parts[5]),
+        "total": float(parts[6]), "downloaded": float(parts[7]), "uploaded": float(parts[8]),
+        "remote_ip": parts[9], "timed_sample": timed_sample,
+    }
+
+
+def _latency_from_timing(sample):
+    """优先使用 TCP 建连往返，避免把服务端首字节等待误当网络延迟。"""
+    connect = sample.get("connect", 0.0)
+    lookup = sample.get("lookup", 0.0)
+    appconnect = sample.get("appconnect", 0.0)
+    tcp_latency = max(0.0, connect - lookup)
+    tls_time = max(0.0, appconnect - connect)
+    # TUN/本地代理可能在本机立即接收 TCP，使 connect 接近 0；此时用 TLS 握手
+    # 的半程时间估算 RTT，比直接使用服务端 TTFB 更接近真实链路延迟。
+    if tcp_latency < 0.005 and tls_time > 0.020:
+        return tls_time * 500.0
+    if tcp_latency > 0:
+        return tcp_latency * 1000.0
+    if appconnect > connect:
+        return (appconnect - connect) * 500.0
+    return sample.get("ttfb", 0.0) * 1000.0
+
+
+def score_speed_quality(latency_ms, jitter_ms, download_mbps, upload_mbps, success_rate):
+    """给出可解释的 0-100 网络质量分，不替代专业 SLA 测试。"""
+    score = 100.0
+    score -= max(0.0, latency_ms - 30.0) * 0.22
+    score -= max(0.0, jitter_ms - 5.0) * 0.8
+    score -= max(0.0, 30.0 - download_mbps) * 0.55
+    score -= max(0.0, 8.0 - upload_mbps) * 1.0
+    score -= max(0.0, 100.0 - success_rate) * 0.8
+    score = max(0, min(100, int(round(score))))
+    grade = "优秀" if score >= 90 else "流畅" if score >= 75 else "一般" if score >= 60 else "较差"
+    return score, grade
+
+
+def run_speed_test(path="current", download_bytes=10000000, upload_bytes=2000000, progress=None):
+    """限流量测速。path=current 测当前/VPN路径，physical 在 macOS 上绑定物理网卡绕过 VPN。"""
+    if path not in ("current", "physical"):
+        raise ValueError("未知测速路径")
+    physical = path == "physical"
+    if physical and not IS_MACOS:
+        raise RuntimeError("绕过 VPN 的物理路径测速当前仅支持 macOS")
+    notify = progress or (lambda _text: None)
+    base = "https://speed.cloudflare.com"
+    latency = []
+    remote_ip = ""
+    sample_count = 6
+    notify("正在测量延迟、抖动和请求成功率…")
+    def latency_probe(index):
+        try:
+            return _curl_speed_request("%s/__down?bytes=0&r=%d" % (base, index),
+                                       physical=physical, timeout=8)
+        except Exception:
+            return None
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        samples = list(pool.map(latency_probe, range(sample_count)))
+    for sample in samples:
+        if sample:
+            latency.append(_latency_from_timing(sample))
+            remote_ip = sample["remote_ip"] or remote_ip
+    if len(latency) < 2:
+        raise RuntimeError("延迟探测成功次数不足")
+    notify("正在测量下载速度（约 %.0f MB）…" % (download_bytes / 1000000.0))
+    down = _curl_speed_request("%s/__down?bytes=%d" % (base, download_bytes),
+                               physical=physical, timeout=25, allow_timed_sample=True)
+    notify("正在测量上传速度（约 %.0f MB）…" % (upload_bytes / 1000000.0))
+    up = _curl_speed_request("%s/__up" % base, method="POST", upload_bytes=upload_bytes,
+                             physical=physical, timeout=25, allow_timed_sample=True)
+    down_mbps = (down["downloaded"] * 8.0 / 1000000.0) / max(down["total"], 0.001)
+    up_mbps = (up["uploaded"] * 8.0 / 1000000.0) / max(up["total"], 0.001)
+    latency_median = sorted(latency)[len(latency) // 2]
+    jitter = sum(abs(latency[i] - latency[i - 1]) for i in range(1, len(latency))) / (len(latency) - 1)
+    success_rate = len(latency) * 100.0 / sample_count
+    score, grade = score_speed_quality(latency_median, jitter, down_mbps, up_mbps, success_rate)
+    return {
+        "path": path,
+        "path_label": ("未经过 VPN（直连网络）" if physical else
+                       "当前系统路径（%s）" % ("经过 VPN" if vpn_active() else "未检测到 VPN")),
+        "interface": get_physical_interface() if physical else "",
+        "latency_ms": latency_median,
+        "jitter_ms": jitter,
+        "success_rate": success_rate,
+        "download_mbps": down_mbps,
+        "upload_mbps": up_mbps,
+        "quality_score": score,
+        "quality_grade": grade,
+        "remote_ip": down["remote_ip"] or remote_ip,
+        "traffic_mb": (down["downloaded"] + up["uploaded"]) / 1000000.0,
+    }
 
 
 # 常见路由器品牌 OUI (MAC 前 3 字节) 库, 用于识别路由器品牌给对应操作指引
@@ -123,16 +553,29 @@ OUI_BRANDS = {
 }
 
 
+def _arp_entries():
+    """返回 ARP 表中的 (IPv4, MAC)；兼容 Windows 与 macOS 输出。"""
+    entries = []
+    # -n 禁止反向 DNS；校园网 ARP 项很多时可避免几十秒阻塞。
+    for line in _run_decode(["arp", "-an"], timeout=3).splitlines():
+        mac_style = re.search(r"\((\d{1,3}(?:\.\d{1,3}){3})\)\s+at\s+([0-9a-fA-F:-]+)", line)
+        if mac_style:
+            entries.append((mac_style.group(1), mac_style.group(2).replace("-", ":")))
+            continue
+        parts = line.split()
+        if len(parts) >= 2 and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[0]):
+            entries.append((parts[0], parts[1].replace("-", ":")))
+    return entries
+
+
 def get_gateway_mac():
     """通过 arp 表查默认网关的 MAC 地址"""
     gw = get_gateway()
     if not gw:
         return None
-    out = _run_decode(["arp", "-a"])
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) >= 2 and parts[0] == gw:
-            return parts[1].replace("-", ":")
+    for ip, mac in _arp_entries():
+        if ip == gw:
+            return mac
     return None
 
 
@@ -144,35 +587,202 @@ def get_router_admin_url():
     gw = get_gateway()
     candidates = []
     if gw:
-        candidates.append(gw)
-    out = _run_decode(["arp", "-a"])
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) >= 1 and len(parts[0].split(".")) == 4:
-            ip = parts[0]
-            if ip != gw and not ip.startswith(("224.", "239.", "255.", "127.")):
-                candidates.append(ip)
+        candidates.append((gw, get_gateway_mac() or ""))
+    for ip, mac in _arp_entries():
+        if ip != gw and not ip.startswith(("224.", "239.", "255.", "127.")):
+            candidates.append((ip, mac))
     seen, uniq = set(), []
-    for ip in candidates:
+    for ip, mac in candidates:
         if ip not in seen:
             seen.add(ip)
-            uniq.append(ip)
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # 不走代理
-    for ip in uniq:
+            uniq.append((ip, mac))
+    router_words = (b"router", b"openwrt", b"luci", b"tp-link", b"tplink", b"xiaomi",
+                    b"huawei", b"tenda", b"mercury", b"asus", b"netgear", b"d-link")
+
+    def probe(item):
+        ip, mac = item
         try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             req = urllib.request.Request("http://%s/" % ip,
                                          headers={"User-Agent": "Mozilla/5.0"}, method="GET")
-            resp = opener.open(req, timeout=2)
-            body = resp.read(2000)
-            if len(body) > 200 and b"<" in body:
+            resp = opener.open(req, timeout=0.8)
+            body = resp.read(32768).lower()
+            known_oui = bool(mac and mac[:8].upper() in OUI_BRANDS)
+            # 默认网关可以是家用路由器；其他 ARP 主机必须有路由器品牌/OUI 证据，
+            # 防止把校园网内任意 Web 服务误判成管理页。
+            if len(body) > 200 and b"<" in body and (
+                    ip == gw or known_oui or any(word in body for word in router_words)):
                 return "http://%s/" % ip
         except Exception:
-            continue
+            pass
+        return None
+
+    candidates = uniq[:12]
+    if candidates:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(candidates))) as pool:
+            for found in pool.map(probe, candidates):
+                if found:
+                    return found
     return "http://%s/" % gw if gw else None
+
+
+def _private_http_url(url):
+    """只允许读取局域网 HTTP(S) 地址，避免把发现结果带到公网或任意协议。"""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        addr = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
+        return addr.is_private or addr.is_link_local or addr.is_loopback
+    except Exception:
+        return False
+
+
+def parse_upnp_device_description(payload):
+    """解析 UPnP 设备描述。独立函数便于测试，不执行任何写操作。"""
+    result = {}
+    try:
+        root = ET.fromstring(payload)
+        for elem in root.iter():
+            key = elem.tag.rsplit("}", 1)[-1]
+            if key in ("friendlyName", "manufacturer", "modelName", "modelNumber",
+                       "serialNumber", "presentationURL") and elem.text:
+                result[key] = elem.text.strip()
+    except (ET.ParseError, TypeError, ValueError):
+        pass
+    return result
+
+
+def discover_router_upnp(timeout=1.2):
+    """通过 SSDP/UPnP 只读发现路由器公开的厂商和型号信息。"""
+    message = ("M-SEARCH * HTTP/1.1\r\n"
+               "HOST: 239.255.255.250:1900\r\n"
+               "MAN: \"ssdp:discover\"\r\n"
+               "MX: 1\r\n"
+               "ST: urn:schemas-upnp-org:device:InternetGatewayDevice:1\r\n\r\n")
+    locations = []
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    try:
+        sock.settimeout(timeout)
+        sock.sendto(message.encode("ascii"), ("239.255.255.250", 1900))
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                data, _ = sock.recvfrom(65535)
+            except socket.timeout:
+                break
+            text = data.decode("iso-8859-1", errors="replace")
+            found = re.search(r"^location:\s*(\S+)", text, re.I | re.M)
+            if found and found.group(1) not in locations and _private_http_url(found.group(1)):
+                locations.append(found.group(1))
+    except OSError:
+        pass
+    finally:
+        sock.close()
+
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    for location in locations[:8]:
+        try:
+            req = urllib.request.Request(location, headers={"User-Agent": "CampusNetManager"})
+            with opener.open(req, timeout=2) as response:
+                info = parse_upnp_device_description(response.read(262144))
+            if info:
+                info["descriptionURL"] = location
+                return info
+        except Exception:
+            continue
+    return {}
+
+
+def inspect_router_admin(url):
+    """只读检查管理页标题/服务标识；不会登录、改配置或提交表单。"""
+    result = {"url": url or "", "title": "", "server": "", "openwrt": False}
+    if not url or not _private_http_url(url):
+        return result
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "CampusNetManager"})
+        with opener.open(req, timeout=2) as response:
+            raw = response.read(131072)
+            result["url"] = response.geturl()
+            result["server"] = response.headers.get("Server", "")[:120]
+        text = raw.decode("utf-8", errors="replace")
+        title = re.search(r"<title[^>]*>(.*?)</title>", text, re.I | re.S)
+        if title:
+            result["title"] = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", title.group(1))).strip()[:160]
+        signals = " ".join((result["title"], result["server"], text[:32768])).lower()
+        result["openwrt"] = any(mark in signals for mark in ("openwrt", "luci", "/cgi-bin/luci"))
+    except Exception:
+        pass
+    return result
+
+
+def router_fingerprint(gateway=None, mac=None):
+    """生成不含凭据的路由器标识；优先用 MAC，退化为网关地址。"""
+    gateway = get_gateway() if gateway is None else gateway
+    mac = get_gateway_mac() if mac is None else mac
+    return (mac or gateway or "unknown").lower()
+
+
+def detect_router_hardware():
+    """只读路由器体检。返回证据与保守结论，绝不执行刷机。"""
+    gateway = get_gateway()
+    mac = get_gateway_mac()
+    brand, _ = get_router_brand()
+    admin_url = get_router_admin_url()
+    upnp = discover_router_upnp()
+    page = inspect_router_admin(admin_url)
+    manufacturer = upnp.get("manufacturer", "")
+    model = upnp.get("modelName", "") or upnp.get("modelNumber", "")
+    if not brand and manufacturer:
+        brand = manufacturer
+    openwrt = bool(page.get("openwrt") or "openwrt" in " ".join(upnp.values()).lower())
+    return {
+        "fingerprint": router_fingerprint(gateway, mac),
+        "gateway": gateway or "",
+        "mac": mac or "",
+        "brand": brand or "",
+        "model": model,
+        "revision": "",
+        "admin_url": admin_url or "",
+        "page_title": page.get("title", ""),
+        "server": page.get("server", ""),
+        "openwrt": openwrt,
+        "wisp_status": ("OpenWrt 已识别：系统可配置无线客户端 + AP；仍需核验无线芯片/驱动和频段。"
+                        if openwrt else "尚不能仅凭网关/MAC确认 WISP；需结合精确型号、硬件版本和厂商说明。"),
+        "flash_allowed": False,
+        "flash_status": "未授权刷机：缺少精确型号/硬件版本与官方镜像匹配，程序不会自动写入固件。",
+        "evidence": upnp,
+    }
+
+
+def evaluate_flash_readiness(model, revision, official_match=False, checksum_verified=False,
+                             backup_ready=False, recovery_ready=False):
+    """生成刷机前置检查结论。所有条件满足也只表示可进入人工确认，不会自动刷。"""
+    checks = {
+        "已确认精确型号": bool((model or "").strip()),
+        "已确认硬件版本": bool((revision or "").strip()),
+        "OpenWrt 官方适配完全匹配": bool(official_match),
+        "镜像 SHA256 校验通过": bool(checksum_verified),
+        "原配置已备份": bool(backup_ready),
+        "已确认可用恢复方式": bool(recovery_ready),
+    }
+    missing = [name for name, ok in checks.items() if not ok]
+    return {
+        "ready_for_confirmation": not missing,
+        "automatic_flash_allowed": False,
+        "checks": checks,
+        "missing": missing,
+        "message": ("检查通过，可进入最终人工确认；仍不能保证零影响。"
+                    if not missing else "暂不可刷机，缺少：" + "、".join(missing)),
+    }
 
 
 def hotspot_on():
     """检测 Windows 移动热点是否已开启 (热点默认网段 192.168.137.x)"""
+    if IS_MACOS:
+        # macOS 没有稳定的无权限命令读取 Internet Sharing 状态，由界面提示用户确认。
+        return None
     out = _run_decode(["powershell", "-NoProfile", "-Command",
                        "Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | "
                        "Where-Object { $_.IPAddress -like '192.168.137.*' } | "
@@ -180,10 +790,25 @@ def hotspot_on():
     return "192.168.137" in out
 
 
+def open_wifi_settings():
+    """打开当前平台的 Wi-Fi 设置页。"""
+    try:
+        if IS_MACOS:
+            subprocess.Popen(["open", "x-apple.systempreferences:com.apple.wifi-settings-extension"])
+        else:
+            os.startfile("ms-settings:network-wifi")
+        return True
+    except Exception:
+        return False
+
+
 def open_hotspot_settings():
     """打开 Windows 移动热点设置页"""
     try:
-        os.startfile("ms-settings:network-mobilehotspot")
+        if IS_MACOS:
+            subprocess.Popen(["open", "x-apple.systempreferences:com.apple.Sharing-Settings.extension"])
+        else:
+            os.startfile("ms-settings:network-mobilehotspot")
         return True
     except Exception:
         return False
@@ -235,40 +860,161 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def detect_auth_server():
-    """
-    自动探测当前网络的认证服务器地址。
-    原理: 未认证时访问 http 站点会被 portal 重定向, 从 Location 提取服务器 host。
-    返回形如 http://192.168.16.3/ 的地址; 无法探测返回 None。
-    """
-    probes = ["http://www.baidu.com/", "http://www.qq.com/", "http://www.163.com/"]
-    for url in probes:
-        probe_host = url.split("/")[2]
+CAPTIVE_PROBES = (
+    {"url": "http://connect.rom.miui.com/generate_204", "status": 204, "body": ""},
+    {"url": "http://connectivitycheck.gstatic.com/generate_204", "status": 204, "body": ""},
+    {"url": "http://www.msftconnecttest.com/connecttest.txt", "status": 200,
+     "body": "Microsoft Connect Test"},
+    {"url": "http://captive.apple.com/hotspot-detect.html", "status": 200,
+     "body": "Success"},
+    {"url": "http://www.baidu.com/", "status": 200, "body": "百度一下"},
+)
+
+PORTAL_MARKERS = ("dr.com", "drcom", "eportal", "portal", "webauth", "wlan_user_ip",
+                  "wlanac", "user_account", "login_method", "bras", "注销页", "认证")
+
+
+def _origin_url(url):
+    """保留 scheme、主机和非默认端口，去除可能包含会话参数的路径与查询串。"""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return None
+        host = parsed.hostname
+        if ":" in host and not host.startswith("["):
+            host = "[%s]" % host
+        port = ":%s" % parsed.port if parsed.port else ""
+        return "%s://%s%s/" % (parsed.scheme, host, port)
+    except (TypeError, ValueError):
+        return None
+
+
+def _same_site(first, second):
+    try:
+        a = (urllib.parse.urlparse(first).hostname or "").lower()
+        b = (urllib.parse.urlparse(second).hostname or "").lower()
+        a = a[4:] if a.startswith("www.") else a
+        b = b[4:] if b.startswith("www.") else b
+        return a == b
+    except Exception:
+        return False
+
+
+def _portal_like(text):
+    lowered = (text or "").lower()
+    return any(marker in lowered for marker in PORTAL_MARKERS)
+
+
+def _extract_redirect_urls(source_url, headers, body):
+    """识别 HTTP Location、HTML meta refresh 和常见 JavaScript 跳转。"""
+    found = []
+    for match in re.finditer(r"^location:\s*([^\r\n]+)", headers or "", re.I | re.M):
+        found.append(urllib.parse.urljoin(source_url, match.group(1).strip()))
+    text = body or ""
+    patterns = (
+        r"http-equiv\s*=\s*['\"]?refresh['\"]?[^>]+content\s*=\s*['\"][^'\"]*url\s*=\s*([^'\";> ]+)",
+        r"(?:window\.)?location(?:\.href)?\s*=\s*['\"]([^'\"]+)",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, text, re.I):
+            found.append(urllib.parse.urljoin(source_url, match.group(1).strip()))
+    return list(dict.fromkeys(url for url in found if url.startswith(("http://", "https://"))))
+
+
+def _run_captive_probe(probe, physical=True):
+    """执行一个不跟随跳转的 GET，并返回状态、头和小段正文。"""
+    url = probe["url"]
+    if IS_MACOS:
+        command = ["/usr/bin/curl", "--silent", "--show-error", "--max-time", "6",
+                   "--max-redirs", "0", "--include", "--user-agent",
+                   "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",
+                   "--write-out", "\n__CNM_STATUS__%{http_code}", url]
+        if physical:
+            interface = get_physical_interface()
+            if not interface:
+                return {"probe": probe, "status": 0, "headers": "", "body": "",
+                        "error": "未找到物理网卡"}
+            command[7:7] = ["--noproxy", "*", "--interface", interface]
         try:
-            opener = urllib.request.build_opener(_NoRedirect)
-            req = urllib.request.Request(url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36"})
+            result = subprocess.run(command, capture_output=True, timeout=8)
+        except Exception as error:
+            return {"probe": probe, "status": 0, "headers": "", "body": "", "error": str(error)}
+        text = result.stdout.decode("utf-8", errors="replace")
+        status_match = re.search(r"__CNM_STATUS__(\d{3})\s*$", text)
+        status = int(status_match.group(1)) if status_match else 0
+        text = text[:status_match.start()] if status_match else text
+        head, _, body = text.partition("\r\n\r\n")
+        if not body:
+            head, _, body = text.partition("\n\n")
+        return {"probe": probe, "status": status, "headers": head, "body": body[:65536]}
+
+    opener = urllib.request.build_opener(_NoRedirect)
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with opener.open(request, timeout=6) as response:
+            return {"probe": probe, "status": response.status,
+                    "headers": str(response.headers),
+                    "body": response.read(65536).decode("utf-8", errors="replace")}
+    except urllib.error.HTTPError as error:
+        return {"probe": probe, "status": error.code, "headers": str(error.headers),
+                "body": error.read(65536).decode("utf-8", errors="replace")}
+    except Exception as error:
+        return {"probe": probe, "status": 0, "headers": "", "body": "", "error": str(error)}
+
+
+def discover_auth_servers(known_urls=None):
+    """从多组 204/正文探针和已知地址发现多个认证服务候选。"""
+    candidates = {}
+    online = False
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(CAPTIVE_PROBES)) as pool:
+        results = list(pool.map(lambda probe: _run_captive_probe(probe, physical=True), CAPTIVE_PROBES))
+
+    for result in results:
+        probe = result["probe"]
+        body = result.get("body", "")
+        expected_body = probe.get("body", "")
+        if result.get("status") == probe["status"] and (not expected_body or expected_body in body):
+            online = True
+        combined = "%s\n%s" % (result.get("headers", ""), body)
+        redirects = _extract_redirect_urls(probe["url"], result.get("headers", ""), body)
+        for redirected in redirects:
+            if _same_site(probe["url"], redirected):
+                continue
+            origin = _origin_url(redirected)
+            if not origin:
+                continue
+            private = False
             try:
-                opener.open(req, timeout=8)
-                continue  # 200 = 已认证或非 portal 网络, 换下一个
-            except urllib.error.HTTPError as e:
-                loc = e.headers.get("Location", "")
+                private = ipaddress.ip_address(socket.gethostbyname(urllib.parse.urlparse(origin).hostname)).is_private
             except Exception:
-                continue
-            if not loc:
-                continue
-            # 提取 scheme://host (去掉路径参数)
-            if loc.startswith("http://") or loc.startswith("https://"):
-                scheme, rest = loc.split("://", 1)
-                host = rest.split("/", 1)[0]
-                if host == probe_host:
-                    continue  # 网站自身跳转 (如 http→https), 不是 portal
-                return "%s://%s/" % (scheme, host)
-            # 相对路径: 用探测地址的 host (网站自身相对跳转, 视为非 portal)
+                pass
+            if private or _portal_like(redirected + " " + combined):
+                candidates[origin] = {
+                    "url": origin, "confidence": 100 if private or _portal_like(combined) else 75,
+                    "source": "重定向", "probe": probe["url"],
+                }
+
+    for known in list(dict.fromkeys(url for url in (known_urls or []) if url)):
+        origin = _origin_url(known)
+        if not origin or origin in candidates:
             continue
+        try:
+            status, raw = http_get(origin, timeout=5, physical=True)
+            text = decode_gbk(raw[:131072])
+            if status == 200 and (_portal_like(origin + " " + text) or origin == DEFAULT_AUTH_URL):
+                candidates[origin] = {"url": origin, "confidence": 90,
+                                      "source": "已知地址验证", "probe": origin}
         except Exception:
             continue
-    return None
+
+    ordered = sorted(candidates.values(), key=lambda item: (-item["confidence"], item["url"]))
+    return {"candidates": ordered, "online": online, "probes": results}
+
+
+def detect_auth_server(known_urls=None):
+    """兼容旧接口：返回多来源发现结果中可信度最高的认证服务器。"""
+    result = discover_auth_servers(known_urls)
+    return result["candidates"][0]["url"] if result["candidates"] else None
 
 
 def get_connection_mode():
@@ -302,7 +1048,7 @@ def match_profile(cfg, ssid, gateway=None):
 def auth_reachable(auth_url):
     """认证服务器是否可达 (判定是否校园网环境)"""
     try:
-        status, _ = http_get(auth_url, timeout=5)
+        status, _ = http_get(auth_url, timeout=5, physical=True)
         return status == 200
     except Exception:
         return False
@@ -324,6 +1070,21 @@ def log(msg):
     return line
 
 
+def send_system_notification(text, title="校园网连接管家"):
+    """发送系统通知；失败时由界面回退到运行日志。"""
+    if not IS_MACOS:
+        return False
+    script = ('on run argv\n'
+              'display notification (item 2 of argv) with title (item 1 of argv)\n'
+              'end run')
+    try:
+        result = subprocess.run(["/usr/bin/osascript", "-e", script, "--", title, text],
+                                capture_output=True, timeout=8)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def _trim_log(max_bytes=2 * 1024 * 1024, keep_bytes=300 * 1024):
     """日志超过 2MB 时截断到 300KB, 防止无限增长"""
     try:
@@ -336,8 +1097,9 @@ def _trim_log(max_bytes=2 * 1024 * 1024, keep_bytes=300 * 1024):
         pass
 
 
-# 开机自启: 注册表 Run 键控制
+# 开机自启: Windows 使用注册表 Run 键；macOS 使用当前用户的 LaunchAgent。
 _AUTOSTART_NAME = "CampusNetManager"
+_MAC_LAUNCH_LABEL = "com.campusnettools.campusnetmanager"
 AUTOSTART_CMD = '"%s" "%s"' % (
     sys.executable if not getattr(sys, "frozen", False) else sys.executable,
     os.path.abspath(__file__) if not getattr(sys, "frozen", False) else os.path.join(BASE_DIR, "校园网连接管家.exe"),
@@ -345,13 +1107,30 @@ AUTOSTART_CMD = '"%s" "%s"' % (
 
 
 def autostart_enabled():
+    if IS_MACOS:
+        return os.path.exists(os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents", _MAC_LAUNCH_LABEL + ".plist"))
     out = _run_decode(["reg", "query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
                        "/v", _AUTOSTART_NAME])
     return "CampusNetManager" in out
 
 
 def set_autostart(enabled):
-    """开启/关闭开机自启 (注册表 Run 键)"""
+    """开启/关闭开机自启；macOS 只登记下次登录启动，不立即拉起第二个实例。"""
+    if IS_MACOS:
+        path = os.path.join(os.path.expanduser("~"), "Library", "LaunchAgents", _MAC_LAUNCH_LABEL + ".plist")
+        try:
+            if enabled:
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                args = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.join(os.path.dirname(__file__), "app_gui.py")]
+                with open(path, "wb") as f:
+                    plistlib.dump({"Label": _MAC_LAUNCH_LABEL, "ProgramArguments": args,
+                                   "RunAtLoad": True, "ProcessType": "Interactive"}, f)
+                return True
+            if os.path.exists(path):
+                os.remove(path)
+            return True
+        except Exception:
+            return False
     try:
         if enabled:
             # exe 版: 指向 exe 自己; 源码版: 指向 pythonw + app_gui.py
@@ -375,7 +1154,25 @@ def set_autostart(enabled):
         return False
 
 
-def http_get(url, timeout=6):
+def http_get(url, timeout=6, physical=False):
+    """获取 URL；macOS 的校园认证请求可强制走物理网卡，避免被 VPN 路由接管。"""
+    if IS_MACOS and physical:
+        interface = get_physical_interface()
+        if interface:
+            try:
+                result = subprocess.run(
+                    ["/usr/bin/curl", "--silent", "--show-error", "--max-time", str(timeout),
+                     "--noproxy", "*",
+                     "--interface", interface, "--output", "-", "--write-out", "\n%{http_code}",
+                     "--user-agent", "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",
+                     url],
+                    capture_output=True, timeout=timeout + 2)
+                if result.returncode == 0 and b"\n" in result.stdout:
+                    body, raw_status = result.stdout.rsplit(b"\n", 1)
+                    return int(raw_status), body
+                raise OSError(result.stderr.decode("utf-8", errors="replace") or "物理网卡请求失败")
+            except Exception as exc:
+                raise urllib.error.URLError(exc)
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         "Referer": url,
@@ -394,7 +1191,7 @@ def decode_gbk(body):
 def check_auth(auth_url=DEFAULT_AUTH_URL):
     """True=已登录(注销页), False=未登录/不可达"""
     try:
-        status, body = http_get(auth_url, timeout=6)
+        status, body = http_get(auth_url, timeout=6, physical=True)
         if status != 200:
             return False
         text = decode_gbk(body)
@@ -404,16 +1201,34 @@ def check_auth(auth_url=DEFAULT_AUTH_URL):
         return False
 
 
-def check_internet():
-    for t in ("http://www.baidu.com/", "http://www.qq.com/"):
-        try:
-            socket.setdefaulttimeout(6)
-            status, _ = http_get(t, timeout=6)
-            if status in (200, 301, 302):
-                return True
-        except Exception:
-            continue
-    return False
+def _probe_matches_expected(result):
+    probe = result["probe"]
+    expected_body = probe.get("body", "")
+    return (result.get("status") == probe["status"]
+            and (not expected_body or expected_body in result.get("body", "")))
+
+
+def check_internet(physical=False):
+    """严格联网检测：只有 204 或预期正文才算在线，认证页 200/302 不算外网。"""
+    probes = CAPTIVE_PROBES[:4]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(probes)) as pool:
+        results = list(pool.map(lambda probe: _run_captive_probe(probe, physical=physical), probes))
+    return any(_probe_matches_expected(result) for result in results)
+
+
+def check_network_paths():
+    """分别检查当前系统/VPN路径和校园网物理路径，避免把 VPN 异常误报为校园网假在线。"""
+    vpn = vpn_active()
+    if vpn and IS_MACOS:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            current_future = pool.submit(check_internet, False)
+            physical_future = pool.submit(check_internet, True)
+            current = current_future.result()
+            physical = physical_future.result()
+    else:
+        current = check_internet(False)
+        physical = current
+    return {"vpn": vpn, "current": current, "physical": physical}
 
 
 # ---------- 登录 ----------
@@ -433,7 +1248,7 @@ def try_login(profile):
     ]
     url = "http://%s/drcom/login?%s" % (host, urllib.parse.urlencode(params))
     try:
-        status, body = http_get(url, timeout=15)
+        status, body = http_get(url, timeout=15, physical=True)
         return status == 200 and b"dr1003" in body
     except Exception:
         return False
@@ -469,12 +1284,30 @@ class KeepAliveDaemon(threading.Thread):
         if self.on_log:
             self.on_log(line)
 
-    def _alert(self, text):
+    def _alert(self, text, category="failure"):
         if self.on_alert:
             try:
-                self.on_alert(text)
+                self.on_alert(text, category)
             except Exception:
                 pass
+
+    def _check_and_publish_status(self, auth_url):
+        """完成一次联网检查，并把结果同步给顶部状态栏。"""
+        authed = check_auth(auth_url)
+        paths = check_network_paths()
+        self.last_check = now_str()
+        if self.on_status:
+            self.on_status(paths, authed, self.last_check)
+        return authed, paths
+
+    def _refresh_after_login(self, mode, ssid, gw, profile, auth_url):
+        """自动登录成功后立即复检，避免界面一直显示登录前的掉线状态。"""
+        if self.on_env:
+            self.on_env(mode, ssid, gw, profile["name"], True)
+        authed, paths = self._check_and_publish_status(auth_url)
+        if not authed and not self._stop.wait(2):
+            authed, paths = self._check_and_publish_status(auth_url)
+        return authed, paths
 
     def _wait_or_break(self, seconds, ref_fp=None):
         """分段等待: 每 60s 醒来检查一次连接指纹(SSID/网关)是否变化,
@@ -524,32 +1357,43 @@ class KeepAliveDaemon(threading.Thread):
                     continue
 
                 interval = max(10, int(profile.get("interval", 60)))
-                authed = check_auth(auth_url)
-                internet = check_internet()
-                self.last_check = now_str()
-                if self.on_status:
-                    self.on_status(internet and authed, authed, self.last_check)
+                authed, paths = self._check_and_publish_status(auth_url)
+                campus_internet = paths["physical"] if paths["vpn"] and IS_MACOS else paths["current"]
 
-                if authed and internet:
-                    self._log("在线正常 (%s / 认证页OK+外网OK)" % profile["name"])
-                elif authed and not internet:
-                    self._log("警告: 认证页在线但外网不通 (假在线), 尝试重登...")
-                    self._alert("⚠️ 网络异常: 认证在线但外网不通, 尝试重登")
+                if authed and campus_internet:
+                    if paths["vpn"] and not paths["current"]:
+                        self._log("校园网物理出口正常，但 VPN/系统路径暂时不通；不重复登录校园网")
+                        record_network_history(self.cfg, "vpn_issue", "校园网正常，但 VPN 暂时无法上网",
+                                               profile=profile["name"])
+                    else:
+                        self._log("在线正常 (%s / 认证页OK+外网OK)" % profile["name"])
+                        record_network_history(self.cfg, "online", "网络正常", profile=profile["name"])
+                elif authed and not campus_internet:
+                    self._log("警告: 校园网认证在线但物理出口不通, 尝试重登...")
+                    record_network_history(self.cfg, "disconnect", "校园网出口异常", profile=profile["name"])
+                    self._alert("校园网出口异常，正在尝试恢复", "disconnect")
                     if ensure_login(profile, on_log=self._log):
                         self._log("重登完成")
-                        self._alert("✅ 网络已恢复")
+                        self._refresh_after_login(mode, ssid, gw, profile, auth_url)
+                        record_network_history(self.cfg, "recovery", "网络已自动恢复", profile=profile["name"])
+                        self._alert("网络已自动恢复", "recovery")
                     else:
                         self._log("重登失败!")
-                        self._alert("❌ 自动重登失败, 请检查账号或网络")
+                        record_network_history(self.cfg, "failure", "自动恢复失败", profile=profile["name"])
+                        self._alert("自动恢复失败，请检查账号或网络", "failure")
                 elif not authed:
                     self._log("检测到掉线 (%s), 自动登录中..." % profile["name"])
-                    self._alert("⚠️ 检测到校园网掉线, 自动登录中...")
+                    record_network_history(self.cfg, "disconnect", "检测到校园网掉线", profile=profile["name"])
+                    self._alert("检测到校园网掉线，正在自动登录", "disconnect")
                     if ensure_login(profile, on_log=self._log):
                         self._log("自动登录成功")
-                        self._alert("✅ 已自动恢复连接")
+                        self._refresh_after_login(mode, ssid, gw, profile, auth_url)
+                        record_network_history(self.cfg, "recovery", "已自动恢复连接", profile=profile["name"])
+                        self._alert("已自动恢复连接", "recovery")
                     else:
                         self._log("自动登录失败 (稍后重试)")
-                        self._alert("❌ 自动登录失败, 请检查账号密码或网络")
+                        record_network_history(self.cfg, "failure", "自动登录失败", profile=profile["name"])
+                        self._alert("自动登录失败，请检查账号密码或网络", "failure")
                 else:
                     self._log("异常状态")
 
@@ -564,7 +1408,7 @@ class KeepAliveDaemon(threading.Thread):
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.3.3"
 APP_NAME = "校园网连接管家"
 
 
@@ -592,6 +1436,7 @@ def collect_diagnostics():
                             p.get("interval", "?"),
                             p.get("auth_url", "")))
         lines.append("开机自启: %s" % ("开启" if autostart_enabled() else "关闭"))
+        lines.append("VPN隧道: %s" % ("已检测到" if vpn_active() else "未检测到"))
         lines.append("热点共享: %s" % ("开启" if hotspot_on() else "关闭"))
     except Exception as e:
         lines.append("环境检测异常: %s" % e)
@@ -614,9 +1459,16 @@ def acquire_lock():
             with open(LOCK_PATH) as f:
                 old_pid = f.read().strip()
             if old_pid and old_pid != str(os.getpid()):
-                out = _run_decode(["tasklist", "/FI", "PID eq %s" % old_pid])
-                if old_pid in out:
-                    return False
+                if IS_MACOS:
+                    try:
+                        os.kill(int(old_pid), 0)
+                        return False
+                    except (OSError, ValueError):
+                        pass
+                else:
+                    out = _run_decode(["tasklist", "/FI", "PID eq %s" % old_pid])
+                    if old_pid in out:
+                        return False
         with open(LOCK_PATH, "w") as f:
             f.write(str(os.getpid()))
         return True

@@ -1,17 +1,26 @@
 {
-  "active_profile": "示例档案",
+  "active_profile": "立达校园网",
   "auth_history": ["http://192.168.16.3/"],
   "profiles": [
     {
-      "name": "示例档案",
-      "ssid": "你的校园网WiFi名",
+      "name": "立达校园网",
+      "preset": "lida-campus",
+      "ssid": "LIDA-UNIVERSITY",
       "gateway": "",
-      "username": "你的校园网账号",
-      "password": "你的校园网密码",
+      "username": "",
+      "password": "",
       "login_type": "cmcc",
       "auth_url": "http://192.168.16.3/",
       "interval": 1800
     }
   ],
-  "tunnel_allow": []
+  "tunnel_allow": [],
+  "history_enabled": false,
+  "notifications": {
+    "enabled": true,
+    "disconnect": true,
+    "recovery": true,
+    "failure": true,
+    "device": true
+  }
 }

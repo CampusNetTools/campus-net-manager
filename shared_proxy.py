@@ -7,17 +7,19 @@ shared_proxy.py - 局域网 HTTP 代理隧道服务
 """
 import socket
 import threading
+import urllib.request
 
 
 class SharedProxy:
     """轻量 HTTP 代理: 监听局域网端口, 转发 TCP 流量。
     支持访问控制: allowed 集合 + on_ask 回调(新设备询问, 防开放代理被滥用)"""
 
-    def __init__(self, port=8080, host="0.0.0.0", allowed=None, on_ask=None):
+    def __init__(self, port=8080, host="0.0.0.0", allowed=None, on_ask=None, pac_host=None):
         self.port = port
         self.host = host
         self.allowed = set(allowed or [])   # 已授权客户端 IP
         self.on_ask = on_ask                # callable(ip) -> bool 新设备是否放行
+        self.pac_host = pac_host             # 自动代理配置文件中返回给客户端的局域网地址
         self._listener = None
         self._running = False
         self._threads = []
@@ -33,6 +35,7 @@ class SharedProxy:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.host, self.port))
+            self.port = s.getsockname()[1]
             s.listen(32)
             s.settimeout(0.5)
             self._listener = s
@@ -78,14 +81,7 @@ class SharedProxy:
         while self._running:
             try:
                 client, addr = self._listener.accept()
-                if not self._check_allow(addr[0]):
-                    try:
-                        client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
-                        client.close()
-                    except Exception:
-                        pass
-                    continue
-                t = threading.Thread(target=self._handle, args=(client,), daemon=True)
+                t = threading.Thread(target=self._handle, args=(client, addr[0]), daemon=True)
                 t.start()
                 self._threads.append(t)
             except socket.timeout:
@@ -93,7 +89,7 @@ class SharedProxy:
             except Exception:
                 break
 
-    def _handle(self, client):
+    def _handle(self, client, client_ip):
         try:
             client.settimeout(20)
             data = b""
@@ -110,6 +106,33 @@ class SharedProxy:
             if len(parts) < 2:
                 return
             method, target = parts[0].upper(), parts[1]
+            if method == b"GET" and target.split(b"?", 1)[0] in (b"/proxy.pac", b"/wpad.dat"):
+                host = self.pac_host or client.getsockname()[0]
+                pac = ('function FindProxyForURL(url, host) { return "PROXY %s:%d; DIRECT"; }'
+                       % (host, self.port)).encode("utf-8")
+                client.sendall(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/x-ns-proxy-autoconfig\r\n"
+                    b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: "
+                    + str(len(pac)).encode("ascii") + b"\r\n\r\n" + pac)
+                return
+            if method == b"GET" and target.split(b"?", 1)[0] == b"/":
+                host = self.pac_host or client.getsockname()[0]
+                pac_url = "http://%s:%d/proxy.pac" % (host, self.port)
+                page = ("<!doctype html><meta charset='utf-8'><meta name='viewport' "
+                        "content='width=device-width'><title>校园网隧道共享</title>"
+                        "<style>body{font-family:-apple-system;padding:28px;line-height:1.65;"
+                        "max-width:620px;margin:auto}code{word-break:break-all;background:#eef2f7;"
+                        "padding:8px;display:block;border-radius:8px}</style>"
+                        "<h2>隧道共享已就绪</h2><p>在当前 Wi-Fi 的代理设置中选择“自动”，"
+                        "粘贴下面的地址：</p><code>%s</code><p>没有自动选项时，选择手动："
+                        "服务器 <b>%s</b>，端口 <b>%d</b>。</p>" % (pac_url, host, self.port)).encode("utf-8")
+                client.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                               b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: "
+                               + str(len(page)).encode("ascii") + b"\r\n\r\n" + page)
+                return
+            if not self._check_allow(client_ip):
+                client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+                return
             if method == b"CONNECT":
                 # HTTPS 隧道: 连上游后转发
                 host, _, port = target.partition(b":")
@@ -211,3 +234,13 @@ def get_lan_ips():
     except Exception:
         pass
     return ips
+
+
+def check_setup_page(host, port=8080, timeout=2):
+    """启动后自动确认手机引导页和 PAC 服务确实可访问。"""
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open("http://%s:%d/" % (host, port), timeout=timeout) as response:
+            return response.status == 200 and "隧道共享已就绪" in response.read().decode("utf-8", errors="replace")
+    except Exception:
+        return False
