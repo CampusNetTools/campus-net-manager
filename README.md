@@ -1,6 +1,6 @@
 # 校园网连接管家 (CampusNetManager)
 
-[![Release](https://img.shields.io/badge/下载-v2.4.0-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
+[![Release](https://img.shields.io/badge/下载-v2.5.0-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
 
 > Dr.COM 校园网自动保活 · 多设备共享上网 · Windows / macOS 桌面工具
 
@@ -37,6 +37,7 @@
 16. **隐私与稳定性报告**：macOS 密码保存到系统钥匙串，配置文件不再保存明文密码；网络历史默认关闭，用户开启后只记录连接状态并生成通俗的 7 天汇总
 17. **合盖/休眠保持运行**：macOS 用 caffeinate 电源断言阻止系统/空闲睡眠，守护线程在合盖或系统空闲时继续联网保活，掉线后仍能自动重登（可在偏好设置中开关）
 18. **中继路由器自动重登**：电脑连着中继路由器时按校园网环境处理，即便认证服务器暂时探测不到也会尝试重登，不再误判「非校园网」后静止休眠；并自动优先选用已填写账号的校园网档案
+19. **防踢保活**：周期性刷新登录会话让本机/路由器保持最新，校园网名额满时第 3 台设备登录被挤掉的是别人而非本设备
 
 VPN 开启时，主界面会分别判断 VPN/系统路径和校园网物理出口：两条都通显示“VPN 与校园网在线”；仅物理出口正常显示“校园网在线（VPN异常）”，不会再误报“假在线”或反复重登校园网。
 

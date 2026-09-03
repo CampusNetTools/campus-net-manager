@@ -790,12 +790,38 @@ class App(tk.Tk):
             self._log("测速完成 [%s] 延迟 %.0fms / 下载 %.1fMbps / 上传 %.1fMbps" % (
                 result["path_label"], result["latency_ms"], result["download_mbps"], result["upload_mbps"]))
 
-        def finish_compare(results=None, error=None):
+        def finish_compare(results=None, error=None, errors=None):
             set_running(False)
             if error:
                 path_label.configure(text="VPN 对比失败：%s" % error)
                 return
             vpn_result, physical_result = results
+            # 单路径容错: 若某一路径失败, 展示成功的路径, 并对失败路径给出文字提示
+            if vpn_result is None and physical_result is None:
+                path_label.configure(text="两条路径均测速失败：%s" % ("；".join(errors) if errors else "未知错误"))
+                return
+            if physical_result is None:
+                # 只有 VPN 路径成功
+                render(vpn_result)
+                set_metric_hints()
+                detail_label.configure(text="直连网络路径测速失败，已显示经过 VPN 的结果" +
+                                       ("（%s）" % errors[0] if errors else ""))
+                path_label.configure(text="当前显示：经过 VPN 的测速结果（直连路径失败）")
+                self._log("测速完成 [仅VPN路径] 延迟 %.0fms / 下载 %.1fMbps / 上传 %.1fMbps%s"
+                          % (vpn_result["latency_ms"], vpn_result["download_mbps"],
+                             vpn_result["upload_mbps"], ("；直连失败: %s" % errors[0]) if errors else ""))
+                return
+            if vpn_result is None:
+                # 只有直连(physical)路径成功
+                render(physical_result)
+                set_metric_hints()
+                detail_label.configure(text="经过 VPN 的路径测速失败，已显示直连网络结果" +
+                                       ("（%s）" % errors[0] if errors else ""))
+                path_label.configure(text="当前显示：直连网络测速结果（VPN 路径失败）")
+                self._log("测速完成 [仅直连路径] 延迟 %.0fms / 下载 %.1fMbps / 上传 %.1fMbps%s"
+                          % (physical_result["latency_ms"], physical_result["download_mbps"],
+                             physical_result["upload_mbps"], ("；VPN失败: %s" % errors[0]) if errors else ""))
+                return
             render(vpn_result)
             latency_delta = vpn_result["latency_ms"] - physical_result["latency_ms"]
             down_change = (vpn_result["download_mbps"] / max(physical_result["download_mbps"], 0.01) - 1.0) * 100.0
@@ -826,9 +852,20 @@ class App(tk.Tk):
             def work():
                 try:
                     if compare:
-                        vpn_result = core.run_speed_test("current", progress=progress)
-                        physical_result = core.run_speed_test("physical", progress=progress)
-                        self.after(0, lambda: finish_compare(results=(vpn_result, physical_result)))
+                        vpn_result = None
+                        physical_result = None
+                        errors = []
+                        try:
+                            vpn_result = core.run_speed_test("current", progress=progress)
+                        except Exception as exc:
+                            errors.append("经过 VPN 路径测速失败：%s" % exc)
+                        try:
+                            physical_result = core.run_speed_test("physical", progress=progress)
+                        except Exception as exc:
+                            errors.append("直连网络路径测速失败：%s" % exc)
+                        # 两条路径独立容错: 只要有一条成功就展示结果, 失败路径用 None 占位提示
+                        self.after(0, lambda v=vpn_result, p=physical_result, e=errors:
+                                   finish_compare(results=(v, p), errors=e))
                     else:
                         result = core.run_speed_test("current", progress=progress)
                         self.after(0, lambda: finish(result=result))
@@ -1084,6 +1121,7 @@ class App(tk.Tk):
 
         var_history = tk.BooleanVar(value=self.cfg.get("history_enabled", False))
         var_keep_awake = tk.BooleanVar(value=self.cfg.get("keep_awake", False))
+        var_kick_guard = tk.BooleanVar(value=self.cfg.get("kick_guard", True))
         notifications = self.cfg.get("notifications", {})
         var_notify = tk.BooleanVar(value=notifications.get("enabled", True))
         category_vars = {
@@ -1098,6 +1136,10 @@ class App(tk.Tk):
         ttk.Checkbutton(card, text="合盖/休眠时保持运行", variable=var_keep_awake,
                         style="Checkmark.TCheckbutton").pack(anchor="w", pady=(4, 0))
         ttk.Label(card, text=keep_awake_hint, style="Muted.TLabel").pack(anchor="w", pady=(0, 4))
+        ttk.Checkbutton(card, text="防踢保活（名额满时优先保住本机，不让新设备挤掉）",
+                        variable=var_kick_guard, style="Checkmark.TCheckbutton").pack(anchor="w")
+        ttk.Label(card, text="周期性刷新登录会话，让本机/路由器保持最新，第 3 台设备登录时被挤掉的是别人",
+                  style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
 
         report = ttk.Frame(card, style="Surface.TFrame", padding=(14, 12))
         report.pack(fill="x", pady=(10, 14))
@@ -1148,6 +1190,7 @@ class App(tk.Tk):
         def save_preferences():
             self.cfg["history_enabled"] = bool(var_history.get())
             self.cfg["keep_awake"] = bool(var_keep_awake.get())
+            self.cfg["kick_guard"] = bool(var_kick_guard.get())
             self.cfg["notifications"] = core.normalized_notification_settings(
                 bool(var_notify.get()), {key: bool(value.get()) for key, value in category_vars.items()})
             core.save_config(self.cfg)
@@ -1156,10 +1199,11 @@ class App(tk.Tk):
                 ok = core.keep_awake_start()
             else:
                 ok = core.keep_awake_stop() or True
-            self._log("偏好设置已保存：网络历史%s，系统通知%s，合盖保持运行%s" % (
+            self._log("偏好设置已保存：网络历史%s，系统通知%s，合盖保持运行%s，防踢保活%s" % (
                 "开启" if var_history.get() else "关闭",
                 "开启" if var_notify.get() else "关闭",
-                "开启" if var_keep_awake.get() else "关闭"))
+                "开启" if var_keep_awake.get() else "关闭",
+                "开启" if var_kick_guard.get() else "关闭"))
             if self.cfg.get("keep_awake") and not ok:
                 self._log("警告: 合盖保持运行启动失败 (可能非 macOS 或 caffeinate 不可用)")
             win.destroy()
