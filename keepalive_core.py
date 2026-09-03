@@ -70,6 +70,7 @@ def default_profile(name="校园网"):
 def default_preferences():
     return {
         "history_enabled": False,
+        "kick_guard": True,   # 防踢: 周期性刷新登录, 让本机/路由器会话保持最新不被挤掉
         "notifications": {
             "enabled": True,
             "disconnect": True,
@@ -1382,6 +1383,10 @@ class KeepAliveDaemon(threading.Thread):
                     continue
 
                 interval = max(10, int(profile.get("interval", 60)))
+                # 防踢: 会话刷新计数器 (每 interval 秒循环一次)
+                if not hasattr(self, "_refresh_count"):
+                    self._refresh_count = 0
+                    self._kickguard = bool(self.cfg.get("kick_guard", True))
                 authed, paths = self._check_and_publish_status(auth_url)
                 campus_internet = paths["physical"] if paths["vpn"] and IS_MACOS else paths["current"]
 
@@ -1393,6 +1398,18 @@ class KeepAliveDaemon(threading.Thread):
                     else:
                         self._log("在线正常 (%s / 认证页OK+外网OK)" % profile["name"])
                         record_network_history(self.cfg, "online", "网络正常", profile=profile["name"])
+                        # --- 防踢保活: 周期性刷新登录, 让本会话保持"最新" ---
+                        # Dr.COM 名额按会话新鲜度淘汰: 第N+1台登录会挤掉最旧会话。
+                        # 定期 try_login (同来源IP=刷新续期, 已实测会话IP不变) 使被保护
+                        # 设备始终为最新, 新设备登录时被挤掉的是别人而不是本机/路由器。
+                        self._refresh_count += 1
+                        if self._kickguard and self._refresh_count >= 3:
+                            self._refresh_count = 0
+                            self._log("防踢保活: 刷新登录会话, 保持本设备名额最新")
+                            if try_login(profile):
+                                self._log("会话刷新成功")
+                            else:
+                                self._log("会话刷新失败(不阻塞, 下轮再试)")
                 elif authed and not campus_internet:
                     self._log("警告: 校园网认证在线但物理出口不通, 尝试重登...")
                     record_network_history(self.cfg, "disconnect", "校园网出口异常", profile=profile["name"])
@@ -1482,7 +1499,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.4.0"
+APP_VERSION = "2.5.0"
 APP_NAME = "校园网连接管家"
 
 
@@ -1523,6 +1540,26 @@ def collect_diagnostics():
             lines.extend(l.rstrip("\n") for l in tail)
     except Exception:
         pass
+    # 会话归属分析 (防踢排查): 用有账号档案探测一次, 看谁占着校园网名额
+    lines.append("-" * 46)
+    lines.append("会话归属:")
+    try:
+        import diagnostics
+        for p in cfg.get("profiles", []):
+            if p.get("username"):
+                ana = diagnostics.analyze(p)
+                if ana.get("ok"):
+                    lines.append("  账号 %s -> 会话IP %s / 会话MAC %s (本机:%s) / 来源MAC %s (本机:%s) / %s"
+                                 % (ana.get("uid"), ana.get("session_ip"), ana.get("session_mac"),
+                                    "是" if ana.get("session_is_local") else "否",
+                                    ana.get("source_mac"),
+                                    "是" if ana.get("source_is_local") else "否",
+                                    ana.get("note") or ""))
+                else:
+                    lines.append("  账号 %s -> 探测失败: %s" % (p.get("username"), ana.get("detail")))
+                break
+    except Exception as exc:
+        lines.append("  会话分析异常: %s" % exc)
     return "\n".join(lines)
 
 
