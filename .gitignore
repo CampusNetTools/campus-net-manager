@@ -7,8 +7,11 @@ keepalive.log
 build/
 dist/
 *.spec
+.venv/
+release/
 __pycache__/
 *.pyc
+.DS_Store
 
 # 诊断导出
 校园网连接管家诊断_*.txt
