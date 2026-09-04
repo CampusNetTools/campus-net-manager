@@ -250,7 +250,7 @@ class App(tk.Tk):
         prof_row.columnconfigure(0, weight=1)
         self.cmb_profile = ttk.Combobox(prof_row, state="readonly")
         self.cmb_profile.grid(row=0, column=0, sticky="ew")
-        self.cmb_profile.bind("<<ComboboxSelected>>", lambda e: self._load_form_from_current())
+        self.cmb_profile.bind("<<ComboboxSelected>>", self._on_profile_selected)
         ttk.Button(prof_row, text="新建", style="Gray.TButton", command=self.new_profile).grid(row=0, column=1, padx=(8, 0))
         ttk.Button(prof_row, text="删除", style="Quiet.TButton", command=self.del_profile).grid(row=0, column=2, padx=(4, 0))
 
@@ -427,6 +427,22 @@ class App(tk.Tk):
             if p["name"] == name:
                 return p
         return None
+
+    def _on_profile_selected(self, event=None):
+        """下拉框切换档案: 同步更新 active_profile 并保存, 否则守护读到旧档案。"""
+        try:
+            p = self._current_profile()
+            if not p:
+                return
+            old = self.cfg.get("active_profile")
+            new = p["name"]
+            if new != old:
+                self.cfg["active_profile"] = new
+                core.save_config(self.cfg)
+                self._log("已切换档案: %s" % new)
+            self._load_form_from_current()
+        except Exception:
+            self._load_form_from_current()
 
     def _refresh_profile_list(self):
         self._profile_map = {}
