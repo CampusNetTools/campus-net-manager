@@ -124,12 +124,16 @@ class SharedProxy:
                 pac_url = "http://%s:%d/proxy.pac" % (host, self.port)
                 page = ("<!doctype html><meta charset='utf-8'><meta name='viewport' "
                         "content='width=device-width'><title>校园网隧道共享</title>"
-                        "<style>body{font-family:-apple-system;padding:28px;line-height:1.65;"
-                        "max-width:620px;margin:auto}code{word-break:break-all;background:#eef2f7;"
-                        "padding:8px;display:block;border-radius:8px}</style>"
-                        "<h2>隧道共享已就绪</h2><p>在当前 Wi-Fi 的代理设置中选择“自动”，"
-                        "粘贴下面的地址：</p><code>%s</code><p>没有自动选项时，选择手动："
-                        "服务器 <b>%s</b>，端口 <b>%d</b>。</p>" % (pac_url, host, self.port)).encode("utf-8")
+                        "<style>body{font-family:-apple-system,sans-serif;padding:24px;line-height:1.7;"
+                        "max-width:520px;margin:auto;font-size:16px}code{word-break:break-all;background:#eef2f7;"
+                        "padding:10px;display:block;border-radius:8px;font-size:15px}</style>"
+                        "<h2>隧道共享已就绪</h2>"
+                        "<p>在手机 Wi-Fi 的代理设置中选择「自动」，粘贴下面的地址：</p>"
+                        "<code>%s</code>"
+                        "<p>没有「自动」选项时，选择「手动」，服务器填下面的 IP，端口填 <b>%d</b>：</p>"
+                        "<code>%s&nbsp;&nbsp;&nbsp;%d</code>"
+                        "<p>连接时本机首次会询问是否允许。</p>"
+                        % (pac_url, self.port, host, self.port)).encode("utf-8")
                 client.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
                                b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: "
                                + str(len(page)).encode("ascii") + b"\r\n\r\n" + page)

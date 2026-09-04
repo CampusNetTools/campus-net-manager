@@ -964,7 +964,7 @@ class App(tk.Tk):
         win = tk.Toplevel(self)
         win.title("隧道共享")
         win.configure(bg=BG)
-        win.geometry("620x430")
+        win.geometry("620x560")
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
@@ -989,13 +989,13 @@ class App(tk.Tk):
         guide = (
             "手机与电脑连接同一 Wi‑Fi 后：\n"
             "Wi‑Fi 详情  →  配置代理  →  自动  →  粘贴上面的地址。\n\n"
-            "如果设备没有“自动”选项，请改用手动代理：\n"
+            "没有“自动”选项时，改用手动代理：\n"
             "服务器 %s    端口 8080\n\n"
             "首次访问时，本机会询问是否允许该设备。\n"
-            "本机已开启防蹭网口令：%s\n"
-            "（设备首次连接时需在代理头带上该口令，仅授权的对方才能上网）"
+            "防蹭网口令：%s\n"
+            "（连接时需在代理头带上该口令）"
             % (myip, self.tunnel_shared_key))
-        ttk.Label(left, text=guide, style="Card.TLabel", justify="left", wraplength=350).pack(anchor="w")
+        ttk.Label(left, text=guide, style="Card.TLabel", justify="left", wraplength=380).pack(anchor="w")
 
         if HAS_QR:
             qr_image = qrcode.make(setup_url).resize((150, 150))
