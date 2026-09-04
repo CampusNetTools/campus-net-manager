@@ -1050,12 +1050,13 @@ def is_campus_locked(profile, ssid, gw):
     return bool(ssid_bound or gw_bound or not ssid)
 
 
-def match_profile(cfg, ssid, gateway=None):
+def match_profile(cfg, ssid, gateway=None, respect_user_choice=False):
     """匹配档案: SSID 精确匹配 > 网关精确匹配(有线) > 默认档案 > 首个有账号档案。
 
-    中继/校园网场景下, 若按 SSID/网关只命中空账号的默认档案, 但存在已填写账号且
-    认证地址相同(指向校园网)的档案, 则优先返回该有账号档案 —— 否则会因账号为空
-    而永久登录失败。"""
+    respect_user_choice=True 时(用户明确选了「任意网络使用」的默认档案), 即使该默认档案
+    没有账号, 也返回它本身, 绝不回退到其他有账号的校园网档案 —— 尊重用户"不绑定"的选择,
+    避免选了任意网络却被硬用立达账号登录并显示校园网环境。
+    """
     profiles = cfg.get("profiles", [])
     if ssid:
         for p in profiles:
@@ -1068,7 +1069,10 @@ def match_profile(cfg, ssid, gateway=None):
     # 默认档案: ssid / gateway 均为空
     for p in profiles:
         if not p.get("ssid") and not p.get("gateway"):
-            # 若该默认档案没有账号, 且存在有账号的校园网档案, 则优先用后者
+            # 尊重用户选择: 选了「任意网络」就用它本身, 不回退
+            if respect_user_choice:
+                return p
+            # 否则: 若该默认档案没有账号, 且存在有账号的校园网档案, 则优先用后者
             if not profile_has_credentials(p):
                 with_account = next((x for x in profiles
                                      if profile_has_credentials(x)
@@ -1370,7 +1374,15 @@ class KeepAliveDaemon(threading.Thread):
                 mode, ssid = get_connection_mode()
                 gw = get_gateway()
                 fp = (mode, ssid, gw)
-                profile = match_profile(self.cfg, ssid, gw)
+                # 尊重用户"任意网络"选择: 若当前激活档案是空账号的默认档案(SSID/网关留空),
+                # 说明用户明确不想绑定特定网络 —— 不自动回退到其他校园网档案, 也不强制锁定为校园网。
+                active_name = self.cfg.get("active_profile")
+                active_prof = next((p for p in self.cfg.get("profiles", []) if p.get("name") == active_name), None)
+                user_any_network = bool(
+                    active_prof and not active_prof.get("ssid") and not active_prof.get("gateway")
+                    and not profile_has_credentials(active_prof))
+                profile = match_profile(self.cfg, ssid, gw,
+                                        respect_user_choice=user_any_network)
                 auth_url = profile.get("auth_url", DEFAULT_AUTH_URL) if profile else DEFAULT_AUTH_URL
 
                 # 环境判定: 认证服务器可达 = 校园网环境; 不可达 = 非校园网。
@@ -1378,7 +1390,8 @@ class KeepAliveDaemon(threading.Thread):
                 # --- 增强: 中继/直连校园网场景, 认证服务器可能暂时探测不到(如路由器链路抖动、
                 # 交换机短暂隔离、有线接路由器时物理网卡探测超时), 但只要当前连接被"校园网档案
                 # 锁定"(用户明确在该网络配过账号), 仍视为校园网环境进入检测并尝试重登。
-                if not in_campus and is_campus_locked(profile, ssid, gw):
+                # 若用户选了「任意网络使用」, 则不锁定、不自动重登, 保持中立。
+                if not in_campus and is_campus_locked(profile, ssid, gw) and not user_any_network:
                     self._log("认证服务器暂时不可达, 但处于校园网档案 [%s] 环境 (%s), 按校园网处理 (尝试检测/重登)"
                               % (profile["name"], ssid or ("有线/网关 " + (gw or "?"))))
                     in_campus = True
@@ -1435,9 +1448,16 @@ class KeepAliveDaemon(threading.Thread):
                         record_network_history(self.cfg, "recovery", "网络已自动恢复", profile=profile["name"])
                         self._alert("网络已自动恢复", "recovery")
                     else:
-                        self._log("重登失败! 提示: 账号可能已被其他设备占用名额(校园网通常限2台), 或被服务器临时限制")
-                        record_network_history(self.cfg, "failure", "自动恢复失败", profile=profile["name"])
-                        self._alert("自动恢复失败：账号名额可能被其他设备占用，可登录自助系统处理占用设备", "failure")
+                        reachable = auth_reachable(auth_url)
+                        if not reachable:
+                            self._log("重登失败：认证服务器不可达。中继/路由器模式下校园网链路可能已断开，"
+                                      "请重启路由器重新拨号恢复")
+                            record_network_history(self.cfg, "failure", "校园网链路断开", profile=profile["name"])
+                            self._alert("校园网链路已断开：请重启路由器恢复（电脑无法直接重连）", "failure")
+                        else:
+                            self._log("重登失败! 提示: 账号可能已被其他设备占用名额(校园网通常限2台), 或被服务器临时限制")
+                            record_network_history(self.cfg, "failure", "自动恢复失败", profile=profile["name"])
+                            self._alert("自动恢复失败：账号名额可能被其他设备占用，可登录自助系统处理占用设备", "failure")
                 elif not authed:
                     self._log("检测到掉线 (%s), 自动登录中..." % profile["name"])
                     record_network_history(self.cfg, "disconnect", "检测到校园网掉线", profile=profile["name"])
@@ -1448,9 +1468,17 @@ class KeepAliveDaemon(threading.Thread):
                         record_network_history(self.cfg, "recovery", "已自动恢复连接", profile=profile["name"])
                         self._alert("已自动恢复连接", "recovery")
                     else:
-                        self._log("自动登录失败 (稍后重试)")
-                        record_network_history(self.cfg, "failure", "自动登录失败", profile=profile["name"])
-                        self._alert("自动登录失败：请检查账号密码；若提示名额已满，需在自助系统下线其他设备", "failure")
+                        # 区分"链路断开"(认证服务器不可达) 与 "账号问题"(可达但登录失败)
+                        reachable = auth_reachable(auth_url)
+                        if not reachable:
+                            self._log("自动登录失败：认证服务器不可达。当前处于中继/路由器模式时，"
+                                      "校园网链路可能已断开，需要重启路由器重新拨号才能恢复")
+                            record_network_history(self.cfg, "failure", "校园网链路断开", profile=profile["name"])
+                            self._alert("校园网链路已断开：请重启路由器恢复（电脑无法直接重连）", "failure")
+                        else:
+                            self._log("自动登录失败 (稍后重试)")
+                            record_network_history(self.cfg, "failure", "自动登录失败", profile=profile["name"])
+                            self._alert("自动登录失败：请检查账号密码；若提示名额已满，需在自助系统下线其他设备", "failure")
                 else:
                     self._log("异常状态")
 
@@ -1514,7 +1542,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.6.0"
+APP_VERSION = "2.6.1"
 APP_NAME = "校园网连接管家"
 
 

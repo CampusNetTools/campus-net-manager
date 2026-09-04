@@ -119,5 +119,48 @@ class CampusLockTests(unittest.TestCase):
         self.assertFalse(core.is_campus_locked(prof, "SomeWiFi", "10.0.0.1"))
 
 
+class RespectUserChoiceTests(unittest.TestCase):
+    """尊重「任意网络使用」选择: 不自动回退到校园网档案, 不强制锁定为校园网"""
+
+    def _cfg(self):
+        return {"profiles": [
+            {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "24012752",
+             "password": "pw", "auth_url": "http://192.168.16.3/", "gateway": ""},
+            {"name": "新档案1", "ssid": "", "username": "", "password": "",
+             "auth_url": "http://192.168.16.3/"},
+        ], "active_profile": "新档案1"}  # 用户选"任意网络"
+
+    def test_match_respects_any_network(self):
+        cfg = self._cfg()
+        p = core.match_profile(cfg, "192.168.1.1", None, respect_user_choice=True)
+        self.assertEqual(p["name"], "新档案1")  # 不回退到立达
+
+    def test_match_default_still_falls_back_for_autologin(self):
+        cfg = self._cfg()
+        p = core.match_profile(cfg, "192.168.1.1", None, respect_user_choice=False)
+        self.assertEqual(p["name"], "立达校园网")  # 自动登录用的兜底保留
+
+    def test_user_any_network_detected(self):
+        cfg = self._cfg()
+        active = next(p for p in cfg["profiles"] if p["name"] == cfg["active_profile"])
+        user_any = not active.get("ssid") and not active.get("gateway") and not core.profile_has_credentials(active)
+        self.assertTrue(user_any)
+
+    def test_any_network_not_forced_campus(self):
+        cfg = self._cfg()
+        active = next(p for p in cfg["profiles"] if p["name"] == cfg["active_profile"])
+        user_any = not active.get("ssid") and not active.get("gateway") and not core.profile_has_credentials(active)
+        in_campus = False
+        if not in_campus and core.is_campus_locked(active, None, "192.168.1.1") and not user_any:
+            in_campus = True
+        self.assertFalse(in_campus)  # 任意网络不强制校园网
+
+    def test_choosing_campus_profile_not_any(self):
+        cfg = dict(self._cfg(), active_profile="立达校园网")
+        active = next(p for p in cfg["profiles"] if p["name"] == cfg["active_profile"])
+        user_any = not active.get("ssid") and not active.get("gateway") and not core.profile_has_credentials(active)
+        self.assertFalse(user_any)
+
+
 if __name__ == "__main__":
     unittest.main()
