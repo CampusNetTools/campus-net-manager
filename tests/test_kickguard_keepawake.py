@@ -89,5 +89,35 @@ class KeepAwakeTests(unittest.TestCase):
         self.assertFalse(core.keep_awake_enabled())
 
 
+CAMPUS_PROFILE = {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "24012752",
+                  "password": "x", "auth_url": "http://192.168.16.3/", "gateway": ""}
+
+
+class CampusLockTests(unittest.TestCase):
+    """环境判定 is_campus_locked: 认证探测失败时是否按校园网处理"""
+
+    def test_wifi_direct_lida_locked(self):
+        self.assertTrue(core.is_campus_locked(CAMPUS_PROFILE, "LIDA-UNIVERSITY", "10.52.1.1"))
+
+    def test_ethernet_relay_locked(self):
+        """有线接路由器(无SSID) + 有账号档案 -> 锁定(不误判非校园网)"""
+        self.assertTrue(core.is_campus_locked(CAMPUS_PROFILE, None, "192.168.1.1"))
+
+    def test_home_wifi_not_locked(self):
+        """家里WiFi(SSID不匹配, 有SSID) -> 不锁定(保持休眠不误登)"""
+        self.assertFalse(core.is_campus_locked(CAMPUS_PROFILE, "MyHomeWiFi", "192.168.50.1"))
+
+    def test_empty_profile_not_locked(self):
+        self.assertFalse(core.is_campus_locked(
+            {"name": "空", "ssid": "", "username": "", "password": "",
+             "auth_url": "http://192.168.16.3/"}, None, "192.168.1.1"))
+        self.assertFalse(core.is_campus_locked(None, None, "192.168.1.1"))
+
+    def test_gateway_bound_locked(self):
+        prof = dict(CAMPUS_PROFILE, ssid="", gateway="192.168.1.1")
+        self.assertTrue(core.is_campus_locked(prof, None, "192.168.1.1"))
+        self.assertFalse(core.is_campus_locked(prof, "SomeWiFi", "10.0.0.1"))
+
+
 if __name__ == "__main__":
     unittest.main()
