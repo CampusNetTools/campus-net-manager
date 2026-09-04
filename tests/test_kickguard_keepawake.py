@@ -146,14 +146,27 @@ class RespectUserChoiceTests(unittest.TestCase):
         user_any = not active.get("ssid") and not active.get("gateway") and not core.profile_has_credentials(active)
         self.assertTrue(user_any)
 
-    def test_any_network_not_forced_campus(self):
-        cfg = self._cfg()
-        active = next(p for p in cfg["profiles"] if p["name"] == cfg["active_profile"])
-        user_any = not active.get("ssid") and not active.get("gateway") and not core.profile_has_credentials(active)
-        in_campus = False
-        if not in_campus and core.is_campus_locked(active, None, "192.168.1.1") and not user_any:
-            in_campus = True
-        self.assertFalse(in_campus)  # 任意网络不强制校园网
+    def test_any_network_hotspot_not_locked(self):
+        """连手机热点(无SSID) + 用户选任意网络 -> 不锁定(不硬拉去登校园网)"""
+        anyprof = {"name": "新档案1", "ssid": "", "username": "", "password": "",
+                   "auth_url": "http://192.168.16.3/"}
+        self.assertFalse(core.is_campus_locked(anyprof, None, "172.20.10.1", respect_user_choice=True))
+
+    def test_campus_profile_locked_when_no_ssid(self):
+        """选立达档案 + 无SSID -> 锁定(用户明确要登校园网)"""
+        lida = {"name": "立达", "ssid": "LIDA-UNIVERSITY", "username": "u", "password": "p",
+                "auth_url": "http://192.168.16.3/"}
+        self.assertTrue(core.is_campus_locked(lida, None, "172.20.10.1", respect_user_choice=False))
+
+    def test_campus_profile_ssid_match_locked(self):
+        lida = {"name": "立达", "ssid": "LIDA-UNIVERSITY", "username": "u", "password": "p",
+                "auth_url": "http://192.168.16.3/"}
+        self.assertTrue(core.is_campus_locked(lida, "LIDA-UNIVERSITY", "10.52.1.1", respect_user_choice=False))
+
+    def test_any_network_ssid_mismatch_not_locked(self):
+        anyprof = {"name": "新档案1", "ssid": "", "username": "", "password": "",
+                   "auth_url": "http://192.168.16.3/"}
+        self.assertFalse(core.is_campus_locked(anyprof, "SomeWiFi", "192.168.1.1", respect_user_choice=True))
 
     def test_choosing_campus_profile_not_any(self):
         cfg = dict(self._cfg(), active_profile="立达校园网")

@@ -1034,15 +1034,21 @@ def profile_has_credentials(profile):
     return bool(profile and profile.get("username") and profile.get("password"))
 
 
-def is_campus_locked(profile, ssid, gw):
+def is_campus_locked(profile, ssid, gw, respect_user_choice=False):
     """判断当前连接是否被校园网档案"锁定"。
     命中条件: 匹配到的档案已填账号密码且指向校园网认证地址, 且
       - SSID 精确绑定 (直连 LIDA / 中继路由器 WiFi), 或
       - 网关精确绑定 (有线接指定路由器), 或
-      - 无 SSID 的有线/其他连接 (用户在该网络配过校园网账号)。
-    用于认证服务器短暂探测不到时, 不误判"非校园网"而静止休眠。"""
+      - 无 SSID 但用户未明确选"任意网络"的有线/其他连接。
+    用于认证服务器短暂探测不到时, 不误判"非校园网"而静止休眠。
+
+    respect_user_choice=True 时(用户明确选了「任意网络使用」的默认档案),
+    绝不锁定 —— 尊重用户不绑定选择, 即使无 SSID 也不按校园网处理, 避免
+    在手机热点等非校园网下被硬拉去登录校园网。"""
     profile_bound = bool(profile and profile.get("username") and profile.get("password")
                          and (profile.get("auth_url") or "").strip())
+    if respect_user_choice:
+        return False
     if not profile_bound:
         return False
     ssid_bound = bool(profile.get("ssid") and profile.get("ssid") == ssid)
@@ -1391,7 +1397,8 @@ class KeepAliveDaemon(threading.Thread):
                 # 交换机短暂隔离、有线接路由器时物理网卡探测超时), 但只要当前连接被"校园网档案
                 # 锁定"(用户明确在该网络配过账号), 仍视为校园网环境进入检测并尝试重登。
                 # 若用户选了「任意网络使用」, 则不锁定、不自动重登, 保持中立。
-                if not in_campus and is_campus_locked(profile, ssid, gw) and not user_any_network:
+                if not in_campus and is_campus_locked(profile, ssid, gw,
+                                                      respect_user_choice=user_any_network):
                     self._log("认证服务器暂时不可达, 但处于校园网档案 [%s] 环境 (%s), 按校园网处理 (尝试检测/重登)"
                               % (profile["name"], ssid or ("有线/网关 " + (gw or "?"))))
                     in_campus = True
@@ -1542,7 +1549,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.6.2"
+APP_VERSION = "2.6.3"
 APP_NAME = "校园网连接管家"
 
 
