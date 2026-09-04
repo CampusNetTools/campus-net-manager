@@ -1418,7 +1418,9 @@ class App(tk.Tk):
         if self.daemon and self.daemon.is_alive():
             self.daemon.stop()
             self.daemon = None
-        core.keep_awake_stop()
+        # 合盖保活与守护解耦: 仅当偏好关闭时才停 caffeinate
+        if not self.cfg.get("keep_awake"):
+            core.keep_awake_stop()
         core.release_lock()
         self.set_guard(False)
         self.dot_net.configure(fg=MUTED)
@@ -1727,12 +1729,27 @@ class App(tk.Tk):
             self._on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
         threading.Thread(target=work, daemon=True).start()
 
+    def _restore_preferences(self):
+        """App 启动即恢复独立偏好: 合盖/休眠保持运行不依赖守护是否启动。
+        用户在偏好设置开启后, 即使还没配置账号/守护未运行, 合盖保活也生效。"""
+        try:
+            self.cfg = core.load_config()
+            if self.cfg.get("keep_awake") and not core.keep_awake_enabled():
+                if core.keep_awake_start():
+                    self._log("已恢复合盖/休眠保持运行 (caffeinate)")
+                else:
+                    self._log("警告: 合盖保持运行启动失败")
+        except Exception:
+            pass
+
     def _auto_start(self):
         try:
             self.cfg = core.load_config()
             if not any(p.get("username") and p.get("password") for p in self.cfg.get("profiles", [])):
+                self._restore_preferences()
                 self.after(800, self.show_wizard)
                 return
+            self._restore_preferences()
             if core.acquire_lock():
                 core.release_lock()
                 self.start_daemon(silent=True)
