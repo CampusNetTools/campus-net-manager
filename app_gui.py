@@ -1067,10 +1067,12 @@ class App(tk.Tk):
             if core.open_hotspot_settings():
                 messagebox.showinfo(
                     "📶 开启互联网共享",
-                    "已打开 macOS「通用 → 共享」设置页。\n\n"
-                    "选择「互联网共享」后，把校园网连接共享给 Wi‑Fi，"
-                    "再让手机/平板连接你设置的热点。\n\n"
-                    "macOS 不提供稳定的无权限状态读取，因此请在该页面确认开关状态。")
+                    "已为你打开「系统设置 → 通用 → 共享」。\n\n"
+                    "在这里只需要一步：\n"
+                    "① 打开「互联网共享」开关  →  选择「Wi‑Fi」共享给\n"
+                    "② 点「Wi‑Fi 选项」设置热点名称和密码\n\n"
+                    "说明：macOS 出于安全不开放自动开启，需在此页面手动确认一次；"
+                    "开启后手机/平板连该热点即上网，只占电脑 1 个校园网名额。")
             else:
                 messagebox.showerror("打开失败", "请手动打开：系统设置 → 通用 → 共享 → 互联网共享")
         else:
@@ -1223,8 +1225,8 @@ class App(tk.Tk):
                 ("failure", "自动恢复失败"), ("device", "新设备请求共享"))):
             child = ttk.Checkbutton(categories, text=text, variable=category_vars[key],
                                     style="Checkmark.TCheckbutton")
-            child.grid(
-                row=index // 2, column=index % 2, sticky="w", padx=(0, 30), pady=2)
+            # 单列纵向排列, 避免长文案被窗口宽度截断
+            child.pack(anchor="w", pady=2)
             category_buttons.append(child)
 
         def sync_notification_children():
