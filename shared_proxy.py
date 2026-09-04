@@ -80,6 +80,105 @@ class SharedProxy:
                 pass
         return False
 
+    @staticmethod
+    def _detect_ua(head):
+        """通过 User-Agent 判断设备类型: ios / android / harmony / other"""
+        ua = b""
+        for ln in head.split(b"\r\n"):
+            if ln.lower().startswith(b"user-agent:"):
+                ua = ln[len(b"user-agent:"):].strip().lower()
+                break
+        if b"iphone" in ua or b"ipad" in ua or b"ios" in ua:
+            return "ios"
+        if b"harmony" in ua or b"openharmony" in ua or b"emui" in ua:
+            return "harmony"
+        if b"android" in ua:
+            return "android"
+        return "other"
+
+    @staticmethod
+    def _setup_page(ua_kind, host, port, pac_url, mob_url, key):
+        """生成统一智能引导页, 根据设备系统给出对应一键配置方式。
+        ua_kind: ios / android / harmony / other"""
+        ip = host
+        if ua_kind == "ios":
+            head = (
+                "<h2>📱 检测到 iPhone / iPad</h2>"
+                "<p>点击下方按钮下载配置描述文件，随后在系统弹窗里点一次"
+                "<b>「安装」</b>即可自动配好代理，无需手动输入。</p>"
+                "<p><a class='btn' href='%s' style='background:#0a84ff'>"
+                "⬇ 下载配置并自动安装</a></p>" % mob_url)
+        elif ua_kind in ("android", "harmony"):
+            head = (
+                "<h2>📱 检测到 %s</h2>"
+                "<p>请按下面两步操作，服务器和端口已经填好：</p>"
+                "<p><a class='btn' href='#manual' onclick='fillManual()'>"
+                "⚡ 一键获取自动配置地址</a></p>" % ("鸿蒙/华为" if ua_kind == "harmony" else "安卓"))
+        else:
+            head = (
+                "<h2>🔗 隧道共享已就绪</h2>"
+                "<p>在其他设备上配置以下代理即可连接（不同系统见下）：</p>")
+        manual = (
+            "<p><b>服务器(IP)：</b><code>%s</code></p>"
+            "<p><b>端口：</b><code>%d</code></p>" % (ip, port))
+        pac_section = (
+            "<p>如果设备支持「自动代理配置」，可用：<br>"
+            "<code>%s</code></p>" % pac_url)
+        key_section = (
+            "<p>🔐 首次连接需带口令：<b><code>%s</code></b></p>" % (key or "（未开启口令）"))
+        note = (
+            "<p style='color:#888'>提示：配置一次后，手机连同一个 Wi‑Fi 会自动生效，"
+            "无需重复设置。</p>")
+        return (
+            "<!doctype html><meta charset='utf-8'><meta name='viewport' "
+            "content='width=device-width'><title>校园网隧道共享</title>"
+            "<style>body{font-family:-apple-system,sans-serif;padding:24px;line-height:1.7;"
+            "max-width:520px;margin:auto;font-size:16px}code{word-break:break-all;background:#eef2f7;"
+            "padding:10px;display:block;border-radius:8px;font-size:15px}"
+            ".btn{display:inline-block;padding:12px 20px;border-radius:10px;color:#fff;"
+            "text-decoration:none;font-size:16px;margin:6px 0}</style>"
+            "%s%s%s%s%s" % (head, manual, pac_section, key_section, note)).encode("utf-8")
+
+    @staticmethod
+    def _ios_mobileconfig(host, port, key, label="校园网隧道"):
+        """生成 iOS 配置描述文件 (GlobalHTTPProxy 手动代理)，用户点「安装」即自动配置。
+        返回 bytes(plist/XML utf-8)。"""
+        payload_uuid = "11111111-1111-1111-1111-111111111111"
+        prof_uuid = "22222222-2222-2222-2222-222222222222"
+        xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+            '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+            '<plist version="1.0">\n<dict>\n'
+            '  <key>PayloadContent</key>\n  <array>\n    <dict>\n'
+            '      <key>PayloadDescription</key><string>Configure HTTP Proxy</string>\n'
+            '      <key>PayloadDisplayName</key><string>%s</string>\n'
+            '      <key>PayloadIdentifier</key><string>com.campusnet.proxy.%s</string>\n'
+            '      <key>PayloadType</key><string>com.apple.proxy.managed</string>\n'
+            '      <key>PayloadUUID</key><string>%s</string>\n'
+            '      <key>PayloadVersion</key><integer>1</integer>\n'
+            '      <key>ProxyType</key><string>Manual</string>\n'
+            '      <key>ProxyServer</key><string>%s</string>\n'
+            '      <key>ProxyServerPort</key><integer>%d</integer>\n'
+            '      <key>Proxies</key><dict>\n'
+            '        <key>HTTPEnable</key><integer>1</integer>\n'
+            '        <key>HTTPPort</key><integer>%d</integer>\n'
+            '        <key>HTTPProxy</key><string>%s</string>\n'
+            '      </dict>\n'
+            '    </dict>\n  </array>\n'
+            '  <key>PayloadDescription</key><string>校园网隧道共享代理配置</string>\n'
+            '  <key>PayloadDisplayName</key><string>校园网隧道</string>\n'
+            '  <key>PayloadIdentifier</key><string>com.campusnet.tunnel</string>\n'
+            '  <key>PayloadOrganization</key><string>CampusNet</string>\n'
+            '  <key>PayloadRemovalDisallowed</key><false/>\n'
+            '  <key>PayloadType</key><string>Configuration</string>\n'
+            '  <key>PayloadUUID</key><string>%s</string>\n'
+            '  <key>PayloadVersion</key><integer>1</integer>\n'
+            '</dict>\n</plist>\n'
+            % (label, payload_uuid[:8], payload_uuid, host, port, port, host, prof_uuid)
+        )
+        return xml.encode("utf-8")
+
     # ---------- 内部 ----------
     def _accept_loop(self):
         while self._running:
@@ -119,21 +218,23 @@ class SharedProxy:
                     b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: "
                     + str(len(pac)).encode("ascii") + b"\r\n\r\n" + pac)
                 return
+            if method == b"GET" and target.split(b"?", 1)[0] == b"/setup.mobileconfig":
+                # iOS 配置描述文件: 下载后点「安装」即自动配置代理
+                host = self.pac_host or client.getsockname()[0]
+                mob = self._ios_mobileconfig(host, self.port, self.shared_key)
+                client.sendall(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/x-apple-aspen-config\r\n"
+                    b"Content-Disposition: attachment; filename=\"campusnet.mobileconfig\"\r\n"
+                    b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: "
+                    + str(len(mob)).encode("ascii") + b"\r\n\r\n" + mob)
+                return
             if method == b"GET" and target.split(b"?", 1)[0] == b"/":
                 host = self.pac_host or client.getsockname()[0]
+                ua_kind = self._detect_ua(head)
                 pac_url = "http://%s:%d/proxy.pac" % (host, self.port)
-                page = ("<!doctype html><meta charset='utf-8'><meta name='viewport' "
-                        "content='width=device-width'><title>校园网隧道共享</title>"
-                        "<style>body{font-family:-apple-system,sans-serif;padding:24px;line-height:1.7;"
-                        "max-width:520px;margin:auto;font-size:16px}code{word-break:break-all;background:#eef2f7;"
-                        "padding:10px;display:block;border-radius:8px;font-size:15px}</style>"
-                        "<h2>隧道共享已就绪</h2>"
-                        "<p>在手机 Wi-Fi 的代理设置中选择「自动」，粘贴下面的地址：</p>"
-                        "<code>%s</code>"
-                        "<p>没有「自动」选项时，选择「手动」，服务器填下面的 IP，端口填 <b>%d</b>：</p>"
-                        "<code>%s&nbsp;&nbsp;&nbsp;%d</code>"
-                        "<p>连接时本机首次会询问是否允许。</p>"
-                        % (pac_url, self.port, host, self.port)).encode("utf-8")
+                mob_url = "http://%s:%d/setup.mobileconfig" % (host, self.port)
+                page = self._setup_page(ua_kind, host, self.port, pac_url, mob_url,
+                                        self.shared_key)
                 client.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
                                b"Cache-Control: no-store\r\nConnection: close\r\nContent-Length: "
                                + str(len(page)).encode("ascii") + b"\r\n\r\n" + page)
