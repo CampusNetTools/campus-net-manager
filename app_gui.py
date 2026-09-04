@@ -971,10 +971,16 @@ class App(tk.Tk):
         card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
         card.pack(fill="both", expand=True, padx=18, pady=18)
         ttk.Label(card, text="隧道已经准备好", style="Section.TLabel").pack(anchor="w")
-        status_text = ("服务自检通过，自动配置地址已复制。" if verified else
-                       "服务已启动，但局域网自检未通过；请检查防火墙。")
+        gm = core.detect_gateway_mode()
+        gm_txt = ""
+        if gm["mode"] == "router":
+            gm_txt = "检测到当前经路由器接入（%s）\n手机连路由器 Wi‑Fi 即可直接上网，无需代理；\n若需跨网段借网，可用下方代理。" % gm["description"]
+        elif gm["mode"] == "computer":
+            gm_txt = "检测到电脑直连网络\n手机/平板通过代理借用电脑网络上网。"
+        status_text = ("服务自检通过，自动配置地址已复制。\n\n%s" % gm_txt if verified else
+                       "服务已启动，但局域网自检未通过；请检查防火墙。\n\n%s" % gm_txt)
         ttk.Label(card, text=status_text,
-                  style="Muted.TLabel").pack(anchor="w", pady=(5, 18))
+                  style="Muted.TLabel", justify="left", wraplength=480).pack(anchor="w", pady=(5, 18))
 
         content = ttk.Frame(card, style="Inner.TFrame")
         content.pack(fill="both", expand=True)
@@ -1009,11 +1015,28 @@ class App(tk.Tk):
 
         actions = ttk.Frame(card, style="Inner.TFrame")
         actions.pack(fill="x", side="bottom", pady=(18, 0))
-        ttk.Button(actions, text="复制自动配置地址", style="Gray.TButton",
-                   command=lambda: self._copy_text(pac_url)).pack(side="left")
-        ttk.Button(actions, text="打开手机引导页", style="Gray.TButton",
-                   command=lambda: webbrowser.open(setup_url)).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="完成", style="Accent.TButton", command=win.destroy).pack(side="right")
+        # 一键部署: 自动开启开机自启, 让隧道长期在线(日常主力)
+        ttk.Button(actions, text="🚀 一键部署(自动开启+开机自启)", style="Accent.TButton",
+                   command=lambda: self._deploy_tunnel(win, myip, pac_url, setup_url)).pack(side="left")
+        ttk.Button(actions, text="复制配置地址", style="Gray.TButton",
+                   command=lambda: self._copy_text(pac_url)).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="完成", style="Gray.TButton", command=win.destroy).pack(side="right")
+
+    def _deploy_tunnel(self, win, myip, pac_url, setup_url):
+        """一键部署: 自动开启开机自启, 让隧道长期在线; 提示用户手机扫码连接。"""
+        ok = core.set_autostart(True)
+        if ok:
+            self.var_auto.set(True)
+            self._update_auto_btn()
+            self._log("一键部署: 已开启开机自启, 隧道将长期在线")
+            messagebox.showinfo(
+                "🚀 一键部署完成",
+                "已自动开启开机自启，隧道会长期在线。\n\n"
+                "手机扫码后按提示点一次「安装/保存」即可连上，"
+                "之后连同一个 Wi‑Fi 会自动生效，无需重复设置。\n\n"
+                "（防蹭网口令已内置在二维码中）")
+        else:
+            messagebox.showerror("部署失败", "开启开机自启失败（可能需要权限），请手动开启开机自启。")
 
     def _copy_text(self, text):
         try:

@@ -790,6 +790,37 @@ def gen_tunnel_key(length=16):
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+def detect_gateway_mode():
+    """检测当前网关模式: 电脑直连网络(computer) 还是 经路由器(router)。
+    判断依据: 网关是否是一台路由器(有管理页/UPnP/对应品牌 MAC), 且本机非网关本身。
+    返回 dict: {mode: 'router'|'computer'|'unknown', gateway, gateway_mac, brand,
+    description}"""
+    gw = get_gateway()
+    if not gw:
+        return {"mode": "unknown", "gateway": "", "gateway_mac": "", "brand": "",
+                "description": "未检测到默认网关"}
+    gmac = get_gateway_mac()
+    brand_val = get_router_brand()
+    if isinstance(brand_val, tuple):
+        brand = brand_val[0] if brand_val else ""
+    elif not isinstance(brand_val, str):
+        brand = str(brand_val or "")
+    else:
+        brand = brand_val
+    # 判断是否为路由器: 有品牌MAC + 网关是私有地址(通常是路由器/AP)
+    is_router = bool(brand) or (gmac and gmac not in ("", "00:00:00:00:00:00"))
+    # 常见路由器网关段: 192.168.x.1 / 10.x.x.1 / 172.16-31.x.1
+    gw_is_lan = bool(re.match(r"^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)", gw or ""))
+    if is_router and gw_is_lan:
+        mode = "router"
+        desc = "经路由器接入（网关 %s）" % gw
+    else:
+        mode = "computer"
+        desc = "电脑直连网络（网关 %s）" % gw
+    return {"mode": mode, "gateway": gw, "gateway_mac": gmac or "", "brand": brand,
+            "description": desc}
+
+
 def relay_stealth_check():
     """中继/路由器场景下的"单设备伪装"检测与建议。
 
@@ -1691,7 +1722,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.7.2"
+APP_VERSION = "2.8.0"
 APP_NAME = "校园网连接管家"
 
 
