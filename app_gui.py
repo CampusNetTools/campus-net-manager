@@ -651,6 +651,22 @@ class App(tk.Tk):
                 lines.append("UPnP 证据：%s" % " / ".join(filter(None, (
                     evidence.get("friendlyName"), evidence.get("manufacturer"),
                     evidence.get("modelName"), evidence.get("modelNumber")))))
+            # 多设备泄露检测 (中继伪装)
+            try:
+                stealth = core.relay_stealth_check()
+                risk_txt = {"low": "低（仅本机）", "mid": "中（少量设备）", "high": "高（多台设备共享）"}
+                lines.append("")
+                lines.append("多设备检测：%s 台设备可被看到（风险：%s）" % (
+                    stealth["device_count"], risk_txt.get(stealth["risk"], stealth["risk"])))
+                for device in stealth["visible_devices"][:4]:
+                    lines.append("  · %s  %s  %s" % (device["ip"], device["mac"],
+                                                     device["brand"] or "未知设备"))
+                lines.append("轻量伪装建议（不掉速）：")
+                for tip in stealth["advice"][:3]:
+                    lines.append("  · %s" % tip)
+            except Exception as exc:
+                lines.append("")
+                lines.append("多设备检测：暂不可用（%s）" % exc)
             set_status("\n\n".join(lines))
             btn_detect.configure(text="重新检测", state="normal")
 
@@ -914,9 +930,14 @@ class App(tk.Tk):
             allowed = list(self.cfg.get("tunnel_allow", []))
             ips = shared_proxy.get_lan_ips()
             myip = ips[0] if ips else None
+            # 防蹭网: 生成/复用共享口令。默认开启口令校验, 仅记住口令的设备能访问。
+            self.tunnel_shared_key = self.cfg.get("tunnel_shared_key") or core.gen_tunnel_key()
+            self.cfg["tunnel_shared_key"] = self.tunnel_shared_key
+            core.save_config(self.cfg)
             self.proxy = shared_proxy.SharedProxy(port=8080, allowed=allowed,
                                                   on_ask=self._ask_tunnel_allow,
-                                                  pac_host=myip)
+                                                  pac_host=myip,
+                                                  shared_key=self.tunnel_shared_key)
             self.proxy.start()
         except Exception as e:
             self.proxy = None
@@ -965,11 +986,15 @@ class App(tk.Tk):
         value.configure(state="readonly")
         value.pack(fill="x", pady=(6, 14))
 
-        guide = ("手机与电脑连接同一 Wi‑Fi 后：\n"
-                 "Wi‑Fi 详情  →  配置代理  →  自动  →  粘贴上面的地址。\n\n"
-                 "如果设备没有“自动”选项，请改用手动代理：\n"
-                 "服务器 %s    端口 8080\n\n"
-                 "首次访问时，本机会询问是否允许该设备。" % myip)
+        guide = (
+            "手机与电脑连接同一 Wi‑Fi 后：\n"
+            "Wi‑Fi 详情  →  配置代理  →  自动  →  粘贴上面的地址。\n\n"
+            "如果设备没有“自动”选项，请改用手动代理：\n"
+            "服务器 %s    端口 8080\n\n"
+            "首次访问时，本机会询问是否允许该设备。\n"
+            "本机已开启防蹭网口令：%s\n"
+            "（设备首次连接时需在代理头带上该口令，仅授权的对方才能上网）"
+            % (myip, self.tunnel_shared_key))
         ttk.Label(left, text=guide, style="Card.TLabel", justify="left", wraplength=350).pack(anchor="w")
 
         if HAS_QR:
@@ -1166,12 +1191,22 @@ class App(tk.Tk):
             data = core.summarize_network_history(7)
             c = data["counts"]
             stable = ("%.0f%%" % data["stable_percent"] if data["stable_percent"] is not None else "暂无")
-            report_label.configure(text=(
+            text = (
                 "最近 7 天网络概况\n%s\n\n"
                 "记录 %d 条 · 正常比例 %s · 掉线 %d 次 · 自动恢复 %d 次 · "
                 "恢复失败 %d 次 · VPN 异常 %d 次" % (
                     data["summary"], data["events"], stable, c["disconnect"], c["recovery"],
-                    c["failure"], c["vpn_issue"])))
+                    c["failure"], c["vpn_issue"]))
+            # 断网时间线: 每次掉线的时间点和时长
+            outages = core.analyze_outage_timeline(7)
+            if outages:
+                text += "\n\n—— 断网时间线（最近 7 天）——\n"
+                for idx, o in enumerate(outages, 1):
+                    text += "%d. %s 断网 → %s 恢复（持续 %s）\n" % (
+                        idx, o["start"], o["end"], o["duration"])
+                text += ("\n（提示：若断网集中在固定时段，多为路由器过热/链路问题；"
+                         "持续多次请检查路由器散热或考虑重启）")
+            report_label.configure(text=text)
 
         refresh_report()
         ttk.Label(card, text="系统通知", style="Section.TLabel").pack(anchor="w")
