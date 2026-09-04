@@ -14,12 +14,16 @@ class SharedProxy:
     """轻量 HTTP 代理: 监听局域网端口, 转发 TCP 流量。
     支持访问控制: allowed 集合 + on_ask 回调(新设备询问, 防开放代理被滥用)"""
 
-    def __init__(self, port=8080, host="0.0.0.0", allowed=None, on_ask=None, pac_host=None):
+    def __init__(self, port=8080, host="0.0.0.0", allowed=None, on_ask=None, pac_host=None,
+                 shared_key=None):
         self.port = port
         self.host = host
         self.allowed = set(allowed or [])   # 已授权客户端 IP
         self.on_ask = on_ask                # callable(ip) -> bool 新设备是否放行
         self.pac_host = pac_host             # 自动代理配置文件中返回给客户端的局域网地址
+        # 防蹭网: 共享口令。客户端代理请求需带 X-Shared-Key 头, 与口令一致才放行。
+        # 留空则不校验口令(仅靠 IP 白名单), 兼容旧用法。
+        self.shared_key = shared_key or ""
         self._listener = None
         self._running = False
         self._threads = []
@@ -133,6 +137,18 @@ class SharedProxy:
             if not self._check_allow(client_ip):
                 client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
                 return
+            # 防蹭网: 校验共享口令 (X-Shared-Key 头). 服务端设了口令才校验; 未设则跳过(兼容旧用法).
+            if self.shared_key:
+                key_ok = False
+                for ln in lines:
+                    if ln.lower().startswith(b"x-shared-key:"):
+                        provided = ln.split(b":", 1)[1].strip()
+                        if provided == self.shared_key.encode("utf-8", errors="ignore"):
+                            key_ok = True
+                        break
+                if not key_ok:
+                    client.sendall(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n")
+                    return
             if method == b"CONNECT":
                 # HTTPS 隧道: 连上游后转发
                 host, _, port = target.partition(b":")

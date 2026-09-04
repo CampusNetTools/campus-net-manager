@@ -300,6 +300,71 @@ def summarize_network_history(days=7):
             "summary": summary}
 
 
+def analyze_outage_timeline(days=7):
+    """提取断网时间线: 每次掉线的事件 + 下次恢复, 计算断网时长和频率。
+    返回 [{start, end, duration_s, event, message}...] 按时间排序。"""
+    cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+    events = []
+    try:
+        with open(HISTORY_PATH, "r", encoding="utf-8") as handle:
+            for line in handle:
+                try:
+                    item = json.loads(line)
+                    when = datetime.datetime.strptime(item["time"], "%Y-%m-%d %H:%M:%S")
+                    if when >= cutoff:
+                        events.append(item)
+                except Exception:
+                    continue
+    except FileNotFoundError:
+        pass
+    # 断网事件 = disconnect 或 failure; 恢复 = recovery 或 online
+    outages = []
+    last_disconnect_time = None
+    last_disconnect_msg = ""
+    for item in events:
+        ev = item.get("event")
+        when = datetime.datetime.strptime(item["time"], "%Y-%m-%d %H:%M:%S")
+        if ev == "disconnect":
+            last_disconnect_time = when
+            last_disconnect_msg = item.get("message", "")
+        elif ev in ("recovery", "online"):
+            if last_disconnect_time is not None:
+                end = when
+                dur = (end - last_disconnect_time).total_seconds()
+                outages.append({
+                    "start": last_disconnect_time.strftime("%m-%d %H:%M:%S"),
+                    "end": end.strftime("%m-%d %H:%M:%S"),
+                    "duration_s": int(dur),
+                    "duration": _fmt_duration(dur),
+                    "message": last_disconnect_msg,
+                })
+                last_disconnect_time = None
+    # 若最后一次断网还没恢复
+    if last_disconnect_time is not None:
+        now = datetime.datetime.now()
+        dur = (now - last_disconnect_time).total_seconds()
+        outages.append({
+            "start": last_disconnect_time.strftime("%m-%d %H:%M:%S"),
+            "end": "至今未恢复",
+            "duration_s": int(dur),
+            "duration": _fmt_duration(dur),
+            "message": last_disconnect_msg,
+        })
+    return outages
+
+
+def _fmt_duration(seconds):
+    """秒 -> 友好时长 (X分X秒 / X小时X分 / X天X小时)"""
+    seconds = int(seconds)
+    if seconds < 60:
+        return "%d秒" % seconds
+    if seconds < 3600:
+        return "%d分%d秒" % (seconds // 60, seconds % 60)
+    if seconds < 86400:
+        return "%d小时%d分" % (seconds // 3600, (seconds % 3600) // 60)
+    return "%d天%d小时" % (seconds // 86400, (seconds % 86400) // 3600)
+
+
 # ---------- 环境识别 ----------
 _NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
 
@@ -716,6 +781,83 @@ def inspect_router_admin(url):
     except Exception:
         pass
     return result
+
+
+def gen_tunnel_key(length=16):
+    """生成隧道共享的随机防蹭网口令 (字母+数字, 去易混淆字符)。"""
+    import secrets
+    alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def relay_stealth_check():
+    """中继/路由器场景下的"单设备伪装"检测与建议。
+
+    目的: 校园网按出口IP(路由器)判断网络使用。若路由器下挂了多台设备,
+    校园网可能通过 ARP 表/设备指纹/并发连接看出"共享", 触发关注。
+    本函数检测当前 ARP 表中可见的设备数, 评估"多设备泄露"风险, 并给出
+    路由器侧的轻量伪装建议 (改 TTL 统一 / 关闭 WPS 等, 不加密不掉速)。
+
+    返回 dict: {
+        gateway, gateway_mac, brand, device_count, visible_devices: [...],
+        risk (low/mid/high), advice: [...]
+    }"""
+    gw = get_gateway()
+    gmac = get_gateway_mac()
+    brand = get_router_brand()
+    # get_router_brand 可能返回 字符串 或 (品牌, ip) 元组
+    if isinstance(brand, tuple):
+        brand = brand[0] if brand else ""
+    elif not isinstance(brand, str):
+        brand = str(brand or "")
+    entries = _arp_entries()
+    # 局域网范围: 排除外网/组播/本网关
+    local_devices = []
+    for ip, mac in entries:
+        if mac == gmac:
+            continue
+        if ip.startswith(("224.", "239.", "255.", "127.")):
+            continue
+        if mac in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
+            continue
+        local_devices.append({"ip": ip, "mac": mac, "brand": vender_lookup(mac)})
+    # 大多数校园网/路由器网段是私有地址
+    count = len(local_devices)
+    if count <= 0:
+        risk = "low"
+    elif count <= 2:
+        risk = "mid"
+    else:
+        risk = "high"
+
+    advice = [
+        "在路由器上关闭 WPS / UPnP 的对外广播，避免被扫描到真实设备数",
+        "路由器无线设为「仅 2.4G 或 5G 单频段中继」并隐藏 SSID（减少广播泄露）",
+        "若路由器支持，可统一修改 NAT/防火墙的 TTL 为固定值（如 64），防止被按跳数判断多设备",
+        "关闭路由器上不必要的「远程管理 / 云端」功能，减少对外暴露",
+    ]
+    if count == 0:
+        advice.insert(0, "当前仅检测到本机与路由器，未发现其他局域网设备，共享痕迹较少。")
+    return {
+        "gateway": gw or "",
+        "gateway_mac": gmac or "",
+        "brand": brand or "",
+        "device_count": count,
+        "visible_devices": local_devices[:8],
+        "risk": risk,
+        "advice": advice,
+    }
+
+
+def vender_lookup(mac):
+    """通过 MAC 前缀查厂商(复用 _VENDOR 表); 查不到返回空。"""
+    if not mac:
+        return ""
+    mac = mac.replace(":", "").upper()
+    for prefix, name in OUI_BRANDS.items():
+        if mac.startswith(prefix.replace(":", "").upper()):
+            return name
+    return ""
 
 
 def router_fingerprint(gateway=None, mac=None):
@@ -1549,7 +1691,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.6.3"
+APP_VERSION = "2.7.0"
 APP_NAME = "校园网连接管家"
 
 
