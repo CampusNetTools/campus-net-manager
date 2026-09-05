@@ -1715,26 +1715,48 @@ class App(tk.Tk):
         def enter_plan_b():
             state["plan"] = "B"
             btn_act3.pack_forget()
-            title.configure(text="方式 B：路由器中继校园网")
-            set_body("正在检测你的路由器...\n\n（请确认电脑当前连接的是【路由器】的 WiFi）")
-            btn_act.configure(text="重新检测", command=enter_plan_b)
-            btn_act2.configure(text="打开管理页", state="disabled")
+            title.configure(text="方式 B：副路由器中继扩展信号")
+            set_body("副路由器的中继目标是什么？\n\n"
+                     "【校园】副路由器想连接的是……\n"
+                     "  ① 校园网 LIDA-UNIVERSITY（常在学校）\n\n"
+                     "【家庭】副路由器想连接的是……\n"
+                     "  ② 主路由器的 WiFi（主路由接光猫，常在家）\n\n"
+                     "请点下方按钮选择，或点「重新检测」直接按默认(校园网)引导。\n\n"
+                     "（副路由器设定中继后，会连接这个上游 WiFi，扩大信号范围）")
+            btn_act.configure(text="① 校园网", command=lambda: enter_plan_b_detect("LIDA-UNIVERSITY", True))
+            btn_act.pack(side="right")
+            btn_act2.configure(text="② 主路由器WiFi", state="normal",
+                               command=lambda: enter_plan_b_detect("主路由器的WiFi", False))
             btn_prev.pack(side="left")
             btn_prev.configure(command=lambda: show_plan_choice())
 
-            def detect():
-                brand, gw, guide = core.router_guide()
-                state["brand"], state["gw"], state["guide"] = brand, gw, guide
-                head = "检测到路由器：%s\n管理地址：http://%s\n\n" % (brand or "未知品牌", gw or "无法获取")
-                if not gw:
-                    tail = "没有检测到路由器网关。\n请先连接【路由器】的 WiFi（不是校园网直连），再点「重新检测」。"
-                else:
-                    tail = "👇 照着下面的步骤设置中继：\n\n" + guide + \
-                           "\n\n完成后：电脑连回这个路由器的 WiFi，软件会自动帮路由器保活（被踢自动重登）。"
-                set_body(head + tail)
-                btn_act2.configure(state="normal" if gw else "disabled",
-                                   command=lambda: webbrowser.open("http://%s" % gw))
-            threading.Thread(target=detect, daemon=True).start()
+            def enter_plan_b_detect(target_ssid, need_auth):
+                state["target_ssid"] = target_ssid
+                state["need_auth"] = need_auth
+                title.configure(text="方式 B：副路由器中继「%s」" % target_ssid)
+                set_body("正在检测副路由器...\n\n（请确认电脑当前连接的是【副路由器】的 WiFi）")
+                btn_act.configure(text="重新检测", state="normal",
+                                  command=lambda: enter_plan_b_detect(target_ssid, need_auth))
+                btn_act2.configure(state="disabled")
+
+                def detect():
+                    brand, gw, guide = core.router_guide(target_ssid, need_auth)
+                    state["brand"], state["gw"], state["guide"] = brand, gw, guide
+                    head = "检测到副路由器：%s\n管理地址：http://%s\n\n" % (brand or "未知品牌", gw or "无法获取")
+                    if need_auth:
+                        up_txt = "校园网 %s" % target_ssid
+                    else:
+                        up_txt = "主路由器的 WiFi「%s」" % target_ssid
+                    if not gw:
+                        tail = "没有检测到副路由器网关。\n请先连接【副路由器】的 WiFi（不是校园网/主路由直连），再点「重新检测」。"
+                    else:
+                        tail = ("👇 让副路由器中继连接「%s」（%s）：\n\n" % (target_ssid, up_txt)
+                                + guide +
+                                "\n\n完成后：副路由会扩展「%s」的信号范围，手机/电脑连副路由(或主路由)都能上网。" % target_ssid)
+                    set_body(head + tail)
+                    btn_act2.configure(state="normal" if gw else "disabled",
+                                       command=lambda: webbrowser.open("http://%s" % gw))
+                threading.Thread(target=detect, daemon=True).start()
 
         def enter_plan_c():
             state["plan"] = "C"
