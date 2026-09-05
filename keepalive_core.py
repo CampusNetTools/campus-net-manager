@@ -20,6 +20,7 @@ import datetime
 import concurrent.futures
 import ipaddress
 import plistlib
+import traceback
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -1559,6 +1560,8 @@ class KeepAliveDaemon(threading.Thread):
         self.last_check = ""
         self._in_campus = None      # 最近一次环境判定 (None=未知, True=校园网, False=非校园网)
         self._user_any_network = False
+        self._consecutive_errors = 0    # 守护循环连续异常计数 (健康循环后清零)
+        self._error_alerted = False     # 本轮连续异常是否已告警过 (避免重复通知)
 
     def stop(self):
         self._stop.set()
@@ -1566,7 +1569,18 @@ class KeepAliveDaemon(threading.Thread):
     def _log(self, msg):
         line = log(msg)
         if self.on_log:
-            self.on_log(line)
+            try:
+                self.on_log(line)
+            except Exception:
+                pass
+
+    def _safe_callback(self, cb, *args):
+        """界面回调保护: 回调(GUI/测试 lambda)抛错不应被守护兜底误记为守护异常,
+        记录日志后继续, 避免污染连续异常计数。回调签名变更时此处日志能立即暴露问题。"""
+        try:
+            cb(*args)
+        except Exception as cb_err:
+            log("界面回调异常(已忽略, 请检查回调签名): %s" % cb_err)
 
     def _alert(self, text, category="failure"):
         if self.on_alert:
@@ -1582,15 +1596,15 @@ class KeepAliveDaemon(threading.Thread):
         self.last_check = now_str()
         if self.on_status:
             # 传当前环境判定, 让 GUI 区分"校园网"和"任意网络非校园网"
-            self.on_status(paths, authed, self.last_check,
-                           getattr(self, "_in_campus", None),
-                           getattr(self, "_user_any_network", False))
+            self._safe_callback(self.on_status, paths, authed, self.last_check,
+                                getattr(self, "_in_campus", None),
+                                getattr(self, "_user_any_network", False))
         return authed, paths
 
     def _refresh_after_login(self, mode, ssid, gw, profile, auth_url):
         """自动登录成功后立即复检，避免界面一直显示登录前的掉线状态。"""
         if self.on_env:
-            self.on_env(mode, ssid, gw, profile["name"], True)
+            self._safe_callback(self.on_env, mode, ssid, gw, profile["name"], True)
         authed, paths = self._check_and_publish_status(auth_url)
         if not authed and not self._stop.wait(2):
             authed, paths = self._check_and_publish_status(auth_url)
@@ -1646,7 +1660,8 @@ class KeepAliveDaemon(threading.Thread):
                               % (profile["name"], ssid or ("有线/网关 " + (gw or "?"))))
                     in_campus = True
                 if self.on_env:
-                    self.on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
+                    self._safe_callback(self.on_env, mode, ssid, gw,
+                                        profile["name"] if profile else None, in_campus)
                 # 记住当前环境判定, 供顶部状态栏显示(区分校园网/任意网络非校园网)
                 self._in_campus = in_campus
                 self._user_any_network = user_any_network
@@ -1682,6 +1697,8 @@ class KeepAliveDaemon(threading.Thread):
                                     % (ssid or (gw or "?")), "disconnect")
                     else:
                         self._log("网络正常 (%s)" % (ssid or (gw or "?")))
+                    self._consecutive_errors = 0
+                    self._error_alerted = False
                     if self._wait_or_break(30, fp):
                         break
                     continue
@@ -1713,6 +1730,9 @@ class KeepAliveDaemon(threading.Thread):
                     self._refresh_count = 0
                     self._kickguard = bool(self.cfg.get("kick_guard", True))
                 authed, paths = self._check_and_publish_status(auth_url)
+                # 一次完整检测成功 = 健康循环, 清零连续异常计数
+                self._consecutive_errors = 0
+                self._error_alerted = False
                 campus_internet = paths["physical"] if paths["vpn"] and IS_MACOS else paths["current"]
 
                 if authed and campus_internet:
@@ -1782,9 +1802,18 @@ class KeepAliveDaemon(threading.Thread):
                 if self._wait_or_break(interval, fp):
                     break
             except Exception as e:
-                # 兜底: 任何异常都不让守护线程退出, 记录后短暂恢复
-                self._log("守护异常: %s (自动恢复)" % e)
-                if self._stop.wait(5):
+                # 兜底: 任何异常都不让守护线程退出。但连续异常多半是代码 bug(而非网络抖动),
+                # 记录堆栈、超阈值告警并延长退避, 避免无声空转(历史教训: 回调签名失配曾在此死循环)。
+                self._consecutive_errors += 1
+                self._log("守护异常(连续第%d次): %s" % (self._consecutive_errors, e))
+                if self._consecutive_errors == 1 or self._consecutive_errors % 20 == 0:
+                    self._log(traceback.format_exc().rstrip())
+                if self._consecutive_errors >= 5 and not self._error_alerted:
+                    self._error_alerted = True
+                    self._alert("守护连续异常（%s），请查看日志并重启守护；若反复出现请反馈"
+                                % e, "failure")
+                wait_s = 5 if self._consecutive_errors < 5 else 60
+                if self._stop.wait(wait_s):
                     break
         self._log("守护已停止")
 
@@ -1839,7 +1868,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.9.5"
+APP_VERSION = "2.9.6"
 APP_NAME = "校园网连接管家"
 
 

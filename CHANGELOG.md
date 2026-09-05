@@ -1,5 +1,16 @@
 # 更新记录
 
+## v2.9.6
+
+- 守护异常兜底加固：连续异常现在计数并记录完整堆栈，第 5 次起退避延长到 60 秒并发送系统通知（不再无声空转）；健康循环自动清零。历史教训：回调签名失配曾被兜底静默吞掉导致死循环。
+- 界面回调隔离：on_status / on_env / on_log 回调抛错单独记录「界面回调异常」，不再误计入守护异常，也不会拖死守护循环。
+- 新增 test_daemon_resilience.py（4 项）：连续异常告警/退避、健康清零、回调隔离、on_status 5 参签名防回归。
+- 修复 test_router_and_speed 卡死：on_status 回调已扩展为 5 参，测试 lambda 同步更新。
+- 版本号单源化：新增 scripts/sync_version.py，从 APP_VERSION 同步 README 徽章并校验 CHANGELOG（--check 模式供 CI 使用）。
+- 新增 GitHub Actions CI：push 自动在 macOS/Windows 双平台跑全部测试 + 版本一致性校验；打 v* 标签自动构建 macOS zip 和 Windows exe 并附加到 Release。
+- 移除过时的 校园网连接管家.spec（含硬编码旧路径，构建脚本并不使用它）。
+- 84 项测试全部通过。
+
 ## v2.9.5
 
 - 修复「档案类型」下拉框与「连接档案」下拉框重合：类型行下移，grid 布局行号整体顺延。

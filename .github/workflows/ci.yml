@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    name: 测试与版本校验 (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: pip install -r requirements-dev.txt
+      - name: 运行全部测试
+        run: python -m unittest discover -s tests
+      - name: 版本号一致性校验
+        run: python scripts/sync_version.py --check
+
+  release:
+    name: 构建并发布 (${{ matrix.target }})
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, target: macos }
+          - { os: windows-latest, target: windows }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: 安装依赖
+        run: pip install -r requirements-dev.txt
+
+      - name: 构建 macOS .app 并打 zip
+        if: matrix.target == 'macos'
+        run: |
+          PYTHON_BIN=python bash scripts/build_macos.sh
+          cd dist/macos
+          zip -rq "校园网连接管家-macOS-arm64-${GITHUB_REF_NAME}.zip" "校园网连接管家.app"
+
+      - name: 构建 Windows exe
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed \
+            --name "CampusNetManager" --icon icon.ico --collect-all pystray \
+            --distpath dist/windows --workpath build/pyinstaller-windows \
+            app_gui.py
+          mv dist/windows/CampusNetManager.exe \
+             "dist/windows/CampusNetManager_${GITHUB_REF_NAME}_win64.exe"
+
+      - name: 上传 macOS 资产到 Release
+        if: matrix.target == 'macos'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "dist/macos/校园网连接管家-macOS-arm64-${{ github.ref_name }}.zip"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传 Windows 资产到 Release
+        if: matrix.target == 'windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "dist/windows/CampusNetManager_${{ github.ref_name }}_win64.exe"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
