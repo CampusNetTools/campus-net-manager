@@ -17,6 +17,8 @@ APP_VERSION="$("$PYTHON_BIN" -c 'import keepalive_core; print(keepalive_core.APP
   --icon "$PROJECT_DIR/assets/CampusNetManager.icns" \
   --osx-bundle-identifier "com.campusnettools.campusnetmanager" \
   --collect-all pystray \
+  --collect-submodules core \
+  --collect-submodules gui \
   --distpath "$PROJECT_DIR/dist/macos" \
   --workpath "$PROJECT_DIR/build/pyinstaller-macos" \
   app_gui.py

@@ -2,6 +2,8 @@ import unittest
 from unittest.mock import patch
 
 import keepalive_core as core
+from core import portal  # noqa: F401
+
 
 
 class PortalDiscoveryTests(unittest.TestCase):
@@ -21,7 +23,7 @@ class PortalDiscoveryTests(unittest.TestCase):
             return {"probe": item, "status": 302,
                     "headers": "Location: http://192.168.16.%d/eportal/login\r\n" % suffix,
                     "body": "Dr.COM eportal"}
-        with patch.object(core, "_run_captive_probe", side_effect=probe):
+        with patch.object(portal, "_run_captive_probe", side_effect=probe):
             report = core.discover_auth_servers([])
         urls = [item["url"] for item in report["candidates"]]
         self.assertEqual(urls, ["http://192.168.16.2/", "http://192.168.16.3/"])
@@ -31,7 +33,7 @@ class PortalDiscoveryTests(unittest.TestCase):
         def probe(item, physical=True):
             return {"probe": item, "status": item["status"], "headers": "",
                     "body": item.get("body", "")}
-        with patch.object(core, "_run_captive_probe", side_effect=probe):
+        with patch.object(portal, "_run_captive_probe", side_effect=probe):
             report = core.discover_auth_servers([])
         self.assertTrue(report["online"])
         self.assertEqual(report["candidates"], [])

@@ -60,6 +60,7 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --windowed \
             --name "CampusNetManager" --icon icon.ico --collect-all pystray \
+            --collect-submodules core --collect-submodules gui \
             --distpath dist/windows --workpath build/pyinstaller-windows \
             app_gui.py
           mv dist/windows/CampusNetManager.exe \

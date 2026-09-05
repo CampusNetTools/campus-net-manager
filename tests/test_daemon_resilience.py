@@ -10,7 +10,9 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import keepalive_core as core  # noqa: E402
+import keepalive_core as core
+from core import auth, history, matching, netinfo, sysutils  # noqa: F401
+  # noqa: E402
 
 
 class _FakeStop:
@@ -41,8 +43,8 @@ class ConsecutiveErrorTests(unittest.TestCase):
         alerts = []
         daemon = core.KeepAliveDaemon(cfg, on_alert=lambda text, cat: alerts.append((text, cat)))
         daemon._stop = _FakeStop(max_waits=12)
-        with patch.object(core, "log", side_effect=lambda text: text), \
-                patch.object(core, "get_connection_mode",
+        with patch.object(sysutils, "log", side_effect=lambda text: text), \
+                patch.object(netinfo, "get_connection_mode",
                              side_effect=RuntimeError("boom")):
             daemon.run()
         self.assertEqual(daemon._consecutive_errors, 13)  # max_waits 12 + 跳出前最后一轮
@@ -59,14 +61,14 @@ class ConsecutiveErrorTests(unittest.TestCase):
                "history_enabled": False}
         daemon = core.KeepAliveDaemon(cfg)
         daemon._stop = _FakeStop(max_waits=5)
-        with patch.object(core, "log", side_effect=lambda text: text), \
-                patch.object(core, "get_connection_mode", return_value=("wifi", "HomeWiFi")), \
-                patch.object(core, "get_gateway", return_value="192.168.1.1"), \
-                patch.object(core, "auth_reachable", return_value=False), \
-                patch.object(core, "best_match_profile", return_value=(None, None)), \
-                patch.object(core, "check_internet",
+        with patch.object(sysutils, "log", side_effect=lambda text: text), \
+                patch.object(netinfo, "get_connection_mode", return_value=("wifi", "HomeWiFi")), \
+                patch.object(netinfo, "get_gateway", return_value="192.168.1.1"), \
+                patch.object(auth, "auth_reachable", return_value=False), \
+                patch.object(matching, "best_match_profile", return_value=(None, None)), \
+                patch.object(auth, "check_internet",
                              side_effect=[RuntimeError("抖动"), True]), \
-                patch.object(core, "record_network_history"), \
+                patch.object(history, "record_network_history"), \
                 patch.object(daemon, "_wait_or_break", return_value=True):
             daemon.run()
         # 第一次循环异常(计数1), 第二次健康循环后清零
@@ -89,15 +91,15 @@ class CallbackIsolationTests(unittest.TestCase):
             on_status=on_status)
         offline = {"vpn": True, "current": True, "physical": True}
         online = {"vpn": True, "current": True, "physical": True}
-        with patch.object(core, "log", side_effect=lambda text: text), \
-                patch.object(core, "get_connection_mode", return_value=("wired", "")), \
-                patch.object(core, "get_gateway", return_value="10.12.255.254"), \
-                patch.object(core, "match_profile", return_value=profile), \
-                patch.object(core, "auth_reachable", return_value=True), \
-                patch.object(core, "check_auth", side_effect=[False, True]), \
-                patch.object(core, "check_network_paths", side_effect=[offline, online]), \
-                patch.object(core, "ensure_login", return_value=True), \
-                patch.object(core, "record_network_history"), \
+        with patch.object(sysutils, "log", side_effect=lambda text: text), \
+                patch.object(netinfo, "get_connection_mode", return_value=("wired", "")), \
+                patch.object(netinfo, "get_gateway", return_value="10.12.255.254"), \
+                patch.object(matching, "match_profile", return_value=profile), \
+                patch.object(auth, "auth_reachable", return_value=True), \
+                patch.object(auth, "check_auth", side_effect=[False, True]), \
+                patch.object(auth, "check_network_paths", side_effect=[offline, online]), \
+                patch.object(auth, "ensure_login", return_value=True), \
+                patch.object(history, "record_network_history"), \
                 patch.object(daemon, "_wait_or_break", return_value=True):
             daemon.run()
         return daemon, logs
