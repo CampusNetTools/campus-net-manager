@@ -78,13 +78,17 @@ class NetworkHistoryTests(unittest.TestCase):
 
 class SharedProxySetupTests(unittest.TestCase):
     def test_setup_page_and_pac_are_public_but_proxy_stays_protected(self):
+        import time
         asked = []
         proxy = shared_proxy.SharedProxy(port=0, host="127.0.0.1", pac_host="127.0.0.1",
                                          on_ask=lambda ip: asked.append(ip) or False)
         proxy.start()
         try:
+            time.sleep(0.3)  # 等待监听线程就绪
             self.assertTrue(shared_proxy.check_setup_page("127.0.0.1", proxy.port))
-            with urllib.request.urlopen("http://127.0.0.1:%d/proxy.pac" % proxy.port) as response:
+            # 绕过系统代理(环境可能设置了 http_proxy), 直连本机端口
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open("http://127.0.0.1:%d/proxy.pac" % proxy.port) as response:
                 self.assertIn(b"FindProxyForURL", response.read())
             self.assertEqual(asked, [])
         finally:

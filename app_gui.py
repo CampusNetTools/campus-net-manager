@@ -937,7 +937,8 @@ class App(tk.Tk):
             self.proxy = shared_proxy.SharedProxy(port=8080, allowed=allowed,
                                                   on_ask=self._ask_tunnel_allow,
                                                   pac_host=myip,
-                                                  shared_key=self.tunnel_shared_key)
+                                                  shared_key=self.tunnel_shared_key,
+                                                  upstream_proxy=self._get_vpn_upstream())
             self.proxy.start()
         except Exception as e:
             self.proxy = None
@@ -1020,6 +1021,8 @@ class App(tk.Tk):
                    command=lambda: self._deploy_tunnel(win, myip, pac_url, setup_url)).pack(side="left")
         ttk.Button(actions, text="复制配置地址", style="Gray.TButton",
                    command=lambda: self._copy_text(pac_url)).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="VPN 上游", style="Gray.TButton",
+                   command=self._show_vpn_upstream_dialog).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="完成", style="Gray.TButton", command=win.destroy).pack(side="right")
 
     def _deploy_tunnel(self, win, myip, pac_url, setup_url):
@@ -1037,6 +1040,67 @@ class App(tk.Tk):
                 "（防蹭网口令已内置在二维码中）")
         else:
             messagebox.showerror("部署失败", "开启开机自启失败（可能需要权限），请手动开启开机自启。")
+
+    def _get_vpn_upstream(self):
+        """读取配置的 VPN 上游代理 (供隧道共享把设备流量转给 VPN)。
+        返回 None 表示不使用上游; 否则 dict {host, port, type}。"""
+        vpn = self.cfg.get("vpn_upstream") or {}
+        host = (vpn.get("host") or "").strip()
+        port = vpn.get("port")
+        if not host or not port:
+            return None
+        try:
+            port = int(port)
+        except Exception:
+            return None
+        return {"host": host, "port": port, "type": vpn.get("type") or "http"}
+
+    def _show_vpn_upstream_dialog(self):
+        """VPN 上游代理配置对话框。"""
+        import tkinter.simpledialog as simpledialog
+        win = tk.Toplevel(self)
+        win.title("VPN 上游代理")
+        win.configure(bg=BG)
+        win.geometry("460x300")
+        win.transient(self)
+        win.grab_set()
+        card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))
+        card.pack(fill="both", expand=True, padx=16, pady=16)
+        ttk.Label(card, text="VPN 上游代理", style="DialogTitle.TLabel").pack(anchor="w")
+        ttk.Label(card, text="开启后，接入隧道的设备流量会经你的 VPN 转发，实现\"电脑当网关+VPN全透明\"。\n"
+                  "填你本机 VPN 客户端（如 Clash/机场）的 HTTP 代理端口即可（通常 127.0.0.1:7890）。\n"
+                  "留空则设备直连外网。",
+                  style="Muted.TLabel", justify="left", wraplength=400).pack(anchor="w", pady=(4, 12))
+        vpn = self.cfg.get("vpn_upstream") or {}
+        def make_row(label, val):
+            row = ttk.Frame(card, style="Inner.TFrame")
+            row.pack(fill="x", pady=4)
+            ttk.Label(row, text=label, style="Field.TLabel", width=10).pack(side="left")
+            ent = ttk.Entry(row)
+            ent.insert(0, val)
+            ent.pack(side="left", fill="x", expand=True, padx=(8, 0))
+            return ent
+        e_host = make_row("主机", vpn.get("host", "127.0.0.1"))
+        e_port = make_row("端口", vpn.get("port", "7890"))
+        def save():
+            host = e_host.get().strip()
+            port = e_port.get().strip()
+            if host and port:
+                try:
+                    int(port)
+                except Exception:
+                    messagebox.showwarning("端口无效", "端口必须是数字", parent=win)
+                    return
+                self.cfg["vpn_upstream"] = {"host": host, "port": port, "type": "http"}
+            else:
+                self.cfg.pop("vpn_upstream", None)
+            core.save_config(self.cfg)
+            self._log("VPN 上游代理: %s" % (host and ("%s:%s" % (host, port)) or "已关闭"))
+            win.destroy()
+        actions = ttk.Frame(card, style="Inner.TFrame")
+        actions.pack(fill="x", side="bottom", pady=(14, 0))
+        ttk.Button(actions, text="保存并应用", style="Accent.TButton", command=save).pack(side="right")
+        ttk.Button(actions, text="取消", style="Gray.TButton", command=win.destroy).pack(side="right", padx=(0, 8))
 
     def _copy_text(self, text):
         try:
