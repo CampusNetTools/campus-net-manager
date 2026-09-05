@@ -483,7 +483,15 @@ class App(tk.Tk):
         setv(self.ent_pass, p.get("password", ""))
         self.cmb_interval.set(str(p.get("interval", 1800)))
         history = self.cfg.get("auth_history") or []
-        cur = p.get("auth_url", core.DEFAULT_AUTH_URL)
+        # 任意网络使用档案: 不强制预填学校认证服务器, 留空让用户探测/自行填写。
+        is_any = not p.get("ssid") and not p.get("gateway") and not p.get("username")
+        cur = "" if is_any else (p.get("auth_url", "") or "")
+        # 若档案存了 auth_url 则用它; 否则留空(任意网络可探测)
+        saved_auth = p.get("auth_url", "")
+        if is_any and not saved_auth:
+            cur = ""
+        elif saved_auth:
+            cur = saved_auth
         if cur and cur not in history:
             history = [cur] + history
         self.cmb_auth["values"] = history[-15:]
@@ -567,7 +575,7 @@ class App(tk.Tk):
         threading.Thread(target=self._do_open_router, daemon=True).start()
 
     def _do_open_router(self):
-        self._log("正在探测路由器管理页...")
+        self._log("正在探测路由器/光猫管理页...")
         fingerprint = core.router_fingerprint()
         saved = (self.cfg.get("routers") or {}).get(fingerprint, {})
         url = saved.get("admin_url") or core.get_router_admin_url()
@@ -575,9 +583,14 @@ class App(tk.Tk):
             self._log("打开管理页: %s" % url)
             webbrowser.open(url)
         else:
-            self._log("未检测到路由器管理页")
+            self._log("未检测到路由器/光猫管理页")
             self.after(0, lambda: messagebox.showwarning(
-                "未找到", "没检测到路由器管理页。\n请确认电脑已连接路由器 WiFi 后重试。"))
+                "未找到",
+                "没检测到路由器/光猫管理页。\n\n"
+                "常见原因与解决：\n"
+                "① 若是光猫，直接连光猫 WiFi 后访问192.168.1.1 或 192.168.100.1\n"
+                "② 光猫管理页可能被运营商隐藏，需先拨号上网或用超级账号\n"
+                "③ 请确认电脑已连接路由器/光猫 WiFi 后重试"))
 
     def show_router_assessment(self):
         """路由器只读体检：收集证据、保存入口，但绝不自动刷写固件。"""
@@ -1412,12 +1425,17 @@ class App(tk.Tk):
         self.btn_guard.configure(text="停止守护" if running else "启动守护",
                                  style="Danger.TButton" if running else "Green.TButton")
 
-    def set_net(self, paths, authed, last_check):
+    def set_net(self, paths, authed, last_check, in_campus=None, user_any_network=False):
         if last_check:
             self.lbl_last.configure(text="上次检测: %s" % last_check)
         vpn = paths.get("vpn", False)
         current = paths.get("current", False)
         physical = paths.get("physical", current)
+        # 用户选了「任意网络使用」且明确不在校园网: 显示 WiFi 连接正常(绿点), 不展示校园网相关状态。
+        if user_any_network and in_campus is False:
+            self.dot_net.configure(fg=GREEN)
+            self.lbl_net.configure(text="网络: WiFi 连接正常")
+            return
         if authed and physical and current:
             self.dot_net.configure(fg=GREEN)
             self.lbl_net.configure(text="网络: VPN 与校园网在线" if vpn else "网络: 在线正常")
@@ -1437,20 +1455,20 @@ class App(tk.Tk):
     def set_env(self, mode, ssid, gw, profile_name, in_campus):
         if in_campus is None:
             return
-        conn = (" (" + ssid + ")" if ssid else (" (有线/网关 %s)" % gw if gw else ""))
+        conn = (" (" + ssid + ")" if ssid else ("" if not in_campus else (" (有线/网关 %s)" % gw if gw else "")))
         if in_campus:
             self.dot_env.configure(fg=GREEN)
             extra = " → 档案「%s」" % profile_name if profile_name else " (未匹配档案)"
             self.lbl_env.configure(text="环境: 校园网%s%s" % (conn, extra))
         else:
             self.dot_env.configure(fg=MUTED)
-            self.lbl_env.configure(text="环境: 非校园网%s (守护休眠)" % conn)
+            self.lbl_env.configure(text="环境: 非校园网环境 守护休眠")
 
     def _on_log(self, line):
         self.log_q.put(line)
 
-    def _on_status(self, paths, authed, last_check):
-        self.after(0, self.set_net, paths, authed, last_check)
+    def _on_status(self, paths, authed, last_check, in_campus=None, user_any_network=False):
+        self.after(0, self.set_net, paths, authed, last_check, in_campus, user_any_network)
 
     def _on_env(self, mode, ssid, gw, profile_name, in_campus):
         self.after(0, self.set_env, mode, ssid, gw, profile_name, in_campus)
