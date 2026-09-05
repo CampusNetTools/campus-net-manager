@@ -41,10 +41,15 @@ jobs:
 
       - name: 配置使用 runner 预装 Android SDK（许可已接受）
         run: |
-          # android.sdk_path 必须在 [app] 段内, 直接 append 会落到 [buildozer] 段被忽略
-          sed -i "/^\[app\]/a\\
-android.sdk_path = $ANDROID_HOME" build_mobile/buildozer.spec
-          grep -A2 "^\[app\]" build_mobile/buildozer.spec | head -4
+          python3 -c "
+          import os
+          p = 'build_mobile/buildozer.spec'
+          s = open(p).read()
+          assert 'android.sdk_path' not in s
+          s = s.replace('[app]', '[app]\nandroid.sdk_path = ' + os.environ['ANDROID_HOME'], 1)
+          open(p, 'w').write(s)
+          print([ln for ln in s.splitlines() if 'sdk_path' in ln])
+          "
           ls "$ANDROID_HOME/build-tools"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
