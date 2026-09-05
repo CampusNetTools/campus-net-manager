@@ -55,14 +55,15 @@ METHOD_NAME = {"unicom": "联通", "cmcc": "移动", "teacher": "教师"}
 
 
 # ---------- 配置 ----------
-def default_profile(name="校园网"):
+def default_profile(name="校园网", profile_type="campus"):
     return {
         "name": name,
+        "profile_type": profile_type,  # "campus"=校园网认证(登录保活) / "wifi"=普通WiFi/热点(只检测断网,不登录)
         "ssid": "",            # 绑定的 WiFi 名, 留空=默认档案(任意网络)
         "username": "",
         "password": "",
         "login_type": "cmcc",  # cmcc / unicom / teacher
-        "auth_url": DEFAULT_AUTH_URL,
+        "auth_url": DEFAULT_AUTH_URL if profile_type == "campus" else "",
         "interval": 60,
     }
 
@@ -1230,6 +1231,13 @@ def profile_has_credentials(profile):
     return bool(profile and profile.get("username") and profile.get("password"))
 
 
+def profile_is_wifi(profile):
+    """档案是否为"普通WiFi/热点"类型 (不登录校园网, 只检测连通性)。"""
+    return bool(profile and profile.get("profile_type") == "wifi" or
+                (profile and not profile.get("profile_type")
+                 and not profile_has_credentials(profile) and not profile.get("auth_url")))
+
+
 def is_campus_locked(profile, ssid, gw, respect_user_choice=False):
     """判断当前连接是否被校园网档案"锁定"。
     命中条件: 匹配到的档案已填账号密码且指向校园网认证地址, 且
@@ -1662,6 +1670,22 @@ class KeepAliveDaemon(threading.Thread):
                         break
                     continue
 
+                # --- 普通WiFi/热点档案: 不登录校园网, 但持续检测连通性, 断网通知用户 ---
+                if profile and profile_is_wifi(profile):
+                    self._log("普通WiFi档案「%s」(%s): 不登录校园网, 检测网络连通性"
+                              % (profile["name"], ssid or ("有线/网关 " + (gw or "?"))))
+                    # 检测外网可达性 (用系统路径, 不强制物理网卡)
+                    if not check_internet(physical=False):
+                        self._log("⚠️ 检测到断网 (%s), 通知用户" % (ssid or (gw or "?")))
+                        record_network_history(self.cfg, "disconnect", "WiFi断网", profile=profile["name"])
+                        self._alert("检测到断网：当前网络（%s）无法上网，请检查手机热点/路由器"
+                                    % (ssid or (gw or "?")), "disconnect")
+                    else:
+                        self._log("网络正常 (%s)" % (ssid or (gw or "?")))
+                    if self._wait_or_break(30, fp):
+                        break
+                    continue
+
                 # 用户明确选了「任意网络使用」: 无论认证服务器探测结果如何, 一律视为非校园网,
                 # 直接休眠, 绝不尝试登录 —— 尊重用户选择, 避免在家 WiFi 等场景误登录。
                 if user_any_network:
@@ -1815,7 +1839,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.9.3"
+APP_VERSION = "2.9.4"
 APP_NAME = "校园网连接管家"
 
 
