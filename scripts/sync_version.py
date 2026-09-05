@@ -57,6 +57,12 @@ def sync_readme(version, check_only):
 
 
 def main():
+    # Windows CI 控制台默认 cp1252, 打印中文会 UnicodeEncodeError
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     check_only = "--check" in sys.argv
     version = read_app_version()
     ok = True
