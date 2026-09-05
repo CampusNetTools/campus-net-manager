@@ -7,6 +7,7 @@ import tempfile
 import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import keepalive_core as core
+from core import common  # noqa: F401
 import shared_proxy as sp
 
 
@@ -21,12 +22,12 @@ class OutageTimelineTests(unittest.TestCase):
         return tmp.name
 
     def _patch_history(self, path):
-        self._orig = core.HISTORY_PATH
-        core.HISTORY_PATH = path
+        self._orig = common.HISTORY_PATH
+        common.HISTORY_PATH = path
 
     def tearDown(self):
         if hasattr(self, "_orig"):
-            core.HISTORY_PATH = self._orig
+            common.HISTORY_PATH = self._orig
         for f in getattr(self, "_files", []):
             try:
                 os.unlink(f)

@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import keepalive_core as core
+from core import auth, common, history, matching, netinfo, speed, sysutils  # noqa: F401
+
 
 
 class RouterAssessmentTests(unittest.TestCase):
@@ -45,15 +47,15 @@ class SpeedTestTests(unittest.TestCase):
         self.assertEqual(result["downloaded"], 3012480.0)
 
     def test_speed_plan_automatically_compares_when_vpn_is_active(self):
-        with patch.object(core, "IS_MACOS", True), \
-                patch.object(core, "vpn_active", return_value=True):
+        with patch.object(common, "IS_MACOS", True), \
+                patch.object(netinfo, "vpn_active", return_value=True):
             plan = core.automatic_speed_test_plan()
         self.assertTrue(plan["compare"])
         self.assertEqual(plan["paths"], ("current", "physical"))
 
     def test_speed_plan_uses_one_path_without_vpn(self):
-        with patch.object(core, "IS_MACOS", True), \
-                patch.object(core, "vpn_active", return_value=False):
+        with patch.object(common, "IS_MACOS", True), \
+                patch.object(netinfo, "vpn_active", return_value=False):
             plan = core.automatic_speed_test_plan()
         self.assertFalse(plan["compare"])
         self.assertEqual(plan["paths"], ("current",))
@@ -69,8 +71,8 @@ class SpeedTestTests(unittest.TestCase):
             {"ttfb": 0.02, "total": 2.0, "downloaded": 10000000, "uploaded": 0, "remote_ip": "1.1.1.1"},
             {"ttfb": 0.02, "total": 1.0, "downloaded": 0, "uploaded": 2000000, "remote_ip": "1.1.1.1"},
         ]
-        with patch.object(core, "_curl_speed_request", side_effect=replies), \
-                patch.object(core, "vpn_active", return_value=True):
+        with patch.object(speed, "_curl_speed_request", side_effect=replies), \
+                patch.object(netinfo, "vpn_active", return_value=True):
             result = core.run_speed_test("current")
         self.assertEqual(result["latency_ms"], 30.0)
         self.assertEqual(result["download_mbps"], 40.0)
@@ -82,9 +84,9 @@ class SpeedTestTests(unittest.TestCase):
     def test_physical_mode_binds_interface(self):
         reply = {"ttfb": 0.01, "total": 1.0, "downloaded": 10000000,
                  "uploaded": 2000000, "remote_ip": "1.1.1.1"}
-        with patch.object(core, "IS_MACOS", True), \
-                patch.object(core, "_curl_speed_request", return_value=reply) as request, \
-                patch.object(core, "get_physical_interface", return_value="en0"):
+        with patch.object(common, "IS_MACOS", True), \
+                patch.object(speed, "_curl_speed_request", return_value=reply) as request, \
+                patch.object(netinfo, "get_physical_interface", return_value="en0"):
             result = core.run_speed_test("physical")
         self.assertEqual(result["interface"], "en0")
         self.assertTrue(all(call.kwargs.get("physical") for call in request.call_args_list))
@@ -98,9 +100,9 @@ class SpeedTestTests(unittest.TestCase):
         self.assertAlmostEqual(core._latency_from_timing(sample), 200.0)
 
     def test_network_paths_separate_vpn_and_physical(self):
-        with patch.object(core, "IS_MACOS", True), \
-                patch.object(core, "vpn_active", return_value=True), \
-                patch.object(core, "check_internet", side_effect=lambda physical=False: physical):
+        with patch.object(common, "IS_MACOS", True), \
+                patch.object(netinfo, "vpn_active", return_value=True), \
+                patch.object(auth, "check_internet", side_effect=lambda physical=False: physical):
             paths = core.check_network_paths()
         self.assertEqual(paths, {"vpn": True, "current": False, "physical": True})
 
@@ -119,15 +121,15 @@ class KeepAliveStatusTests(unittest.TestCase):
             on_env=lambda *args: environments.append(args))
         offline = {"vpn": True, "current": True, "physical": True}
         online = {"vpn": True, "current": True, "physical": True}
-        with patch.object(core, "log", side_effect=lambda text: text), \
-                patch.object(core, "get_connection_mode", return_value=("wired", "")), \
-                patch.object(core, "get_gateway", return_value="10.12.255.254"), \
-                patch.object(core, "match_profile", return_value=profile), \
-                patch.object(core, "auth_reachable", return_value=True), \
-                patch.object(core, "check_auth", side_effect=[False, True]), \
-                patch.object(core, "check_network_paths", side_effect=[offline, online]), \
-                patch.object(core, "ensure_login", return_value=True), \
-                patch.object(core, "record_network_history"), \
+        with patch.object(sysutils, "log", side_effect=lambda text: text), \
+                patch.object(netinfo, "get_connection_mode", return_value=("wired", "")), \
+                patch.object(netinfo, "get_gateway", return_value="10.12.255.254"), \
+                patch.object(matching, "match_profile", return_value=profile), \
+                patch.object(auth, "auth_reachable", return_value=True), \
+                patch.object(auth, "check_auth", side_effect=[False, True]), \
+                patch.object(auth, "check_network_paths", side_effect=[offline, online]), \
+                patch.object(auth, "ensure_login", return_value=True), \
+                patch.object(history, "record_network_history"), \
                 patch.object(daemon, "_wait_or_break", return_value=True):
             daemon.run()
         self.assertEqual(len(statuses), 2)

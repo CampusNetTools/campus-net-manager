@@ -1,7 +1,7 @@
 # 校园网连接管家 (CampusNetManager) — 开发交接文档
 
 > 本文件给后续接手的 AI 助手 / 开发者（WorkBuddy 等），一站式了解项目现状、如何构建、发布、测试。
-> 最后更新：2026-09-06（v2.9.6）
+> 最后更新：2026-09-06（v3.0.0）
 
 ---
 
@@ -11,7 +11,7 @@
 - **GitHub**：`CampusNetTools/campus-net-manager`（org: CampusNetTools / 显示名 CampusAide）
 - **作用**：Dr.COM 校园网自动保活 · 多设备共享上网 · 扫码一键配置 · macOS/Windows 桌面工具
 - **技术栈**：Python + tkinter（GUI）+ PyInstaller 打包，macOS .app / Windows .exe
-- **当前版本**：**v2.9.6**（2026-09-06）
+- **当前版本**：**v3.0.0**（2026-09-06，代码拆分大版本）
 
 ## 二、主项目路径（git 主仓库）
 
@@ -21,21 +21,37 @@
 - 2026-09-06 起以桌面目录为**唯一工作区**（用户决定），已对齐 GitHub main。改代码请在这里改。
 - `/Users/nanyu/Documents/Codex/2026-08-28/hi-2/campus-net-manager` 为旧主仓库（已归档，不再更新）；/Applications 安装的 app 只是构建产物。
 
-## 三、核心模块（都在主项目根目录）
+## 三、代码结构（v3.0.0 起）
 
-| 文件 | 作用 |
-|---|---|
-| `app_gui.py` | tkinter GUI，主界面 / 档案表单 / 设置 |
-| `keepalive_core.py` | 保活核心：环境判定、登录/重登、防踢、档案匹配、APP_VERSION |
-| `shared_proxy.py` | 隧道共享代理：HTTP CONNECT、VPN 上游、PAC、扫码配置页 |
-| `diagnostics.py` | 诊断报告 |
-| `lida_keepalive.py` | 立达校区专用保活脚本 |
-| `tests/` | unittest 测试（84 项） |
-| `scripts/build_macos.sh` | macOS 构建脚本 |
-| `scripts/sync_version.py` | 版本号单源同步（见第四节） |
-| `.github/workflows/ci.yml` | CI：双平台测试 + tag 自动构建发布 |
-| `assets/CampusNetManager.icns` | 应用图标 |
-| `icon.ico` | Windows 图标 |
+```
+keepalive_core.py   # 门面: re-export + APP_VERSION(唯一权威版本号) + 诊断/实例锁
+core/               # 核心实现包
+  common.py         # 标准库导入 re-export + 平台标志 + 路径/常量
+  config.py         # 档案/配置/钥匙串/通知开关
+  history.py        # 网络历史 + 断网时间线
+  netinfo.py        # SSID/网关/物理网卡/VPN 探测
+  speed.py          # 测速与质量评分
+  router.py         # 路由器体检/管理页/中继指引/伪装检测
+  portal.py         # captive portal 认证服务器探测
+  matching.py       # 档案匹配 + 校园网环境判定
+  auth.py           # Dr.COM 登录 + 联网检测 + http 工具
+  sysutils.py       # 日志/系统通知/自启/caffeinate/单实例锁
+  daemon.py         # KeepAliveDaemon 守护线程
+app_gui.py          # App 类组装入口 (继承 Mixin)
+gui/                # 界面包
+  theme.py          # 深色主题常量
+  profile_form.py / router_tools.py / speed_window.py / tunnel_ui.py
+  preferences.py / tray.py / daemon_ctl.py / wizard.py   # 八个 Mixin
+shared_proxy.py     # 隧道共享代理 (HTTP CONNECT / VPN 上游 / PAC / 扫码页)
+diagnostics.py      # 诊断报告导出
+lida_keepalive.py   # 立达校区专用 CLI 保活脚本
+tests/              # unittest（84 项）
+scripts/build_macos.sh    # macOS 构建
+scripts/sync_version.py   # 版本号单源同步
+scripts/split_core.py / split_gui.py   # v3.0.0 拆分脚本(留档)
+```
+
+**铁律**：跨模块调用一律 `模块.名字(...)`（如 `auth.check_auth(...)`），禁止 `from core.auth import check_auth` 后裸调——否则 mock patch 不到。测试 patch 目标 = 定义所在模块（如 `patch.object(auth, "check_auth")`）。
 
 ## 四、版本号管理（单源化，v2.9.6 起）
 

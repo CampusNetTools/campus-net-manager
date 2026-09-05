@@ -6,6 +6,8 @@ import urllib.request
 from unittest.mock import patch
 
 import keepalive_core as core
+from core import common, config  # noqa: F401
+
 import shared_proxy
 
 
@@ -23,17 +25,17 @@ class KeychainConfigTests(unittest.TestCase):
                 "auth_history": [core.DEFAULT_AUTH_URL],
             }
             core.ensure_preferences(cfg)
-            with patch.object(core, "IS_MACOS", True), \
-                    patch.object(core, "CONFIG_PATH", path), \
-                    patch.object(core, "keychain_set", return_value=True):
+            with patch.object(common, "IS_MACOS", True), \
+                    patch.object(common, "CONFIG_PATH", path), \
+                    patch.object(config, "keychain_set", return_value=True):
                 core.save_config(cfg, sync_secrets=True)
             with open(path, "r", encoding="utf-8") as handle:
                 stored = json.load(handle)
             self.assertEqual(stored["profiles"][0]["password"], "")
             self.assertEqual(stored["profiles"][0]["password_store"], "keychain")
-            with patch.object(core, "IS_MACOS", True), \
-                    patch.object(core, "CONFIG_PATH", path), \
-                    patch.object(core, "keychain_get", return_value="secret"):
+            with patch.object(common, "IS_MACOS", True), \
+                    patch.object(common, "CONFIG_PATH", path), \
+                    patch.object(config, "keychain_get", return_value="secret"):
                 loaded = core.load_config()
             self.assertEqual(loaded["profiles"][0]["password"], "secret")
 
@@ -49,7 +51,7 @@ class KeychainConfigTests(unittest.TestCase):
 class NetworkHistoryTests(unittest.TestCase):
     def test_history_is_opt_in_and_has_plain_language_summary(self):
         with tempfile.TemporaryDirectory() as temp_dir, \
-                patch.object(core, "HISTORY_PATH", os.path.join(temp_dir, "history.jsonl")):
+                patch.object(common, "HISTORY_PATH", os.path.join(temp_dir, "history.jsonl")):
             self.assertFalse(core.record_network_history({"history_enabled": False}, "online", "正常"))
             cfg = {"history_enabled": True}
             core.record_network_history(cfg, "online", "网络正常")

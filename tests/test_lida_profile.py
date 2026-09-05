@@ -5,12 +5,14 @@ import unittest
 from unittest.mock import patch
 
 import keepalive_core as core
+from core import common, config  # noqa: F401
+
 
 
 class LidaProfileTests(unittest.TestCase):
     def test_new_config_contains_lida_preset(self):
         with tempfile.TemporaryDirectory() as temp_dir, \
-                patch.object(core, "CONFIG_PATH", os.path.join(temp_dir, "config.json")):
+                patch.object(common, "CONFIG_PATH", os.path.join(temp_dir, "config.json")):
             cfg = core.load_config()
         profile = cfg["profiles"][0]
         self.assertEqual(profile["name"], "立达校园网")
@@ -29,8 +31,8 @@ class LidaProfileTests(unittest.TestCase):
                     "password": "secret", "login_type": "unicom",
                     "auth_url": core.DEFAULT_AUTH_URL, "interval": 300,
                 }], "active_profile": "校园网"}, handle)
-            with patch.object(core, "CONFIG_PATH", path), \
-                    patch.object(core, "keychain_set", return_value=True):
+            with patch.object(common, "CONFIG_PATH", path), \
+                    patch.object(config, "keychain_set", return_value=True):
                 cfg = core.load_config()
         self.assertEqual(len(cfg["profiles"]), 1)
         profile = cfg["profiles"][0]

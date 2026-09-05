@@ -1,5 +1,15 @@
 # 更新记录
 
+## v3.0.0
+
+- 代码拆分（可维护性大版本）：
+  - `keepalive_core.py`（1970 行单文件）拆为 `core/` 包：common(常量) / config(档案配置) / history(网络历史) / netinfo(网络信息) / speed(测速) / router(路由器) / portal(认证探测) / matching(档案匹配) / auth(Dr.COM认证) / sysutils(日志通知自启) / daemon(守护线程)。`keepalive_core.py` 保留为门面（re-export + APP_VERSION 单源 + 诊断/实例锁），旧 import 与 patch 路径兼容。
+  - `app_gui.py`（1987 行单类）拆为 `gui/` Mixin：theme(主题) + profile_form / router_tools / speed_window / tunnel_ui / preferences / tray / daemon_ctl / wizard 八个 Mixin，App 继承组装；主题常量独立 `gui/theme.py`。
+  - 跨模块调用统一 `模块.名字` 风格——测试 patch 永远指向定义所在模块，杜绝签名/归属漂移。
+  - 拆分脚本留档 `scripts/split_core.py`、`scripts/split_gui.py`。
+- 测试 patch 目标全部迁移到子模块命名空间；84 项测试全绿 + Tk 实例化冒烟通过。
+- 构建打包显式收集 core/gui 子模块（build_macos.sh 与 CI Windows 构建同步更新）。
+
 ## v2.9.6
 
 - 守护异常兜底加固：连续异常现在计数并记录完整堆栈，第 5 次起退避延长到 60 秒并发送系统通知（不再无声空转）；健康循环自动清零。历史教训：回调签名失配曾被兜底静默吞掉导致死循环。
