@@ -51,6 +51,10 @@ jobs:
           print([ln for ln in s.splitlines() if 'sdk_path' in ln])
           "
           ls "$ANDROID_HOME/build-tools"
+          # p4a 按旧布局找 $SDK/tools/bin/sdkmanager, 新 SDK 在 cmdline-tools 下, 建符号链接兼容
+          mkdir -p "$ANDROID_HOME/tools/bin"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager" || true
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: 构建 debug APK
