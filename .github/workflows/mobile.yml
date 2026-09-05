@@ -39,17 +39,15 @@ jobs:
       - name: 安装 buildozer
         run: pip install buildozer cython==0.29.36
 
+      - name: 配置使用 runner 预装 Android SDK（许可已接受）
+        run: |
+          echo "android.sdk_path = $ANDROID_HOME" >> build_mobile/buildozer.spec
+          ls "$ANDROID_HOME/build-tools"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
       - name: 构建 debug APK
         working-directory: build_mobile
-        run: |
-          # 首次运行 buildozer 自装 SDK 时会因许可未接受而失败:
-          # 先跑一遍让它装好 cmdline-tools, 接受许可后再正式构建
-          buildozer android debug || true
-          SDKMANAGER=$(find "$HOME/.buildozer" -name sdkmanager -type f 2>/dev/null | head -1)
-          if [ -n "$SDKMANAGER" ]; then
-            yes | "$SDKMANAGER" --licenses > /dev/null || true
-          fi
-          buildozer android debug
+        run: buildozer android debug
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
