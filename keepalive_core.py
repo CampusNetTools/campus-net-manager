@@ -663,22 +663,30 @@ def get_router_admin_url():
             seen.add(ip)
             uniq.append((ip, mac))
     router_words = (b"router", b"openwrt", b"luci", b"tp-link", b"tplink", b"xiaomi",
-                    b"huawei", b"tenda", b"mercury", b"asus", b"netgear", b"d-link")
+                    b"huawei", b"tenda", b"mercury", b"asus", b"netgear", b"d-link",
+                    b"gateway", b"gpon", b"epon", b"\xe5\x85\x89\xe7\x8c\xab", b"onn",
+                    b"zte", b"fiberhome", b"\xe7\x83\xbd\xe7\x81\xab", b"\xe8\x81\x94\xe9\x80\x9a",
+                    b"unicom", b"telecom", b"chinanet")
 
     def probe(item):
         ip, mac = item
         try:
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-            req = urllib.request.Request("http://%s/" % ip,
-                                         headers={"User-Agent": "Mozilla/5.0"}, method="GET")
-            resp = opener.open(req, timeout=0.8)
-            body = resp.read(32768).lower()
-            known_oui = bool(mac and mac[:8].upper() in OUI_BRANDS)
-            # 默认网关可以是家用路由器；其他 ARP 主机必须有路由器品牌/OUI 证据，
-            # 防止把校园网内任意 Web 服务误判成管理页。
-            if len(body) > 200 and b"<" in body and (
-                    ip == gw or known_oui or any(word in body for word in router_words)):
-                return "http://%s/" % ip
+            # 常见管理端口: HTTP 80 / 8080 都要试 (光猫/路由器管理页常在 8080)
+            for port in (80, 8080):
+                try:
+                    req = urllib.request.Request("http://%s:%d/" % (ip, port),
+                                                 headers={"User-Agent": "Mozilla/5.0"}, method="GET")
+                    resp = opener.open(req, timeout=0.8)
+                    body = resp.read(32768).lower()
+                    known_oui = bool(mac and mac[:8].upper() in OUI_BRANDS)
+                    # 默认网关可以是家用路由器/光猫；其他 ARP 主机必须有路由器/光猫品牌图证据，
+                    # 防止把校园网内任意 Web 服务误判成管理页。
+                    if len(body) > 200 and b"<" in body and (
+                            ip == gw or known_oui or any(word in body for word in router_words)):
+                        return "http://%s:%d/" % (ip, port)
+                except Exception:
+                    continue
         except Exception:
             pass
         return None
@@ -1492,6 +1500,8 @@ class KeepAliveDaemon(threading.Thread):
         self.on_alert = on_alert        # callable(text) 掉线/重登/失败通知
         self._stop = threading.Event()
         self.last_check = ""
+        self._in_campus = None      # 最近一次环境判定 (None=未知, True=校园网, False=非校园网)
+        self._user_any_network = False
 
     def stop(self):
         self._stop.set()
@@ -1514,7 +1524,10 @@ class KeepAliveDaemon(threading.Thread):
         paths = check_network_paths()
         self.last_check = now_str()
         if self.on_status:
-            self.on_status(paths, authed, self.last_check)
+            # 传当前环境判定, 让 GUI 区分"校园网"和"任意网络非校园网"
+            self.on_status(paths, authed, self.last_check,
+                           getattr(self, "_in_campus", None),
+                           getattr(self, "_user_any_network", False))
         return authed, paths
 
     def _refresh_after_login(self, mode, ssid, gw, profile, auth_url):
@@ -1577,6 +1590,18 @@ class KeepAliveDaemon(threading.Thread):
                     in_campus = True
                 if self.on_env:
                     self.on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
+                # 记住当前环境判定, 供顶部状态栏显示(区分校园网/任意网络非校园网)
+                self._in_campus = in_campus
+                self._user_any_network = user_any_network
+
+                # 用户明确选了「任意网络使用」: 无论认证服务器探测结果如何, 一律视为非校园网,
+                # 直接休眠, 绝不尝试登录 —— 尊重用户选择, 避免在家 WiFi 等场景误登录。
+                if user_any_network:
+                    self._log("非校园网环境 (%s), 守护休眠 (任意网络档案, 不进行登录)"
+                              % (ssid or ("有线/网关 " + (gw or "?"))))
+                    if self._wait_or_break(30, fp):
+                        break
+                    continue
 
                 if not in_campus:
                     self._log("非校园网环境%s, 守护休眠 (不进行登录)" % (" (" + ssid + ")" if ssid else " (有线/其他)"))
@@ -1722,7 +1747,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.9.0"
+APP_VERSION = "2.9.1"
 APP_NAME = "校园网连接管家"
 
 
