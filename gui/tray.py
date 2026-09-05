@@ -73,6 +73,9 @@ class TrayMixin:
             if not messagebox.askyesno("停止守护?", "守护正在运行。\n关闭窗口将停止连接管家，确定关闭吗？"):
                 return
             self.stop_daemon()
+        console = getattr(self, "_console", None)
+        if console and console.running:
+            console.stop()
         self.destroy()
 
 
