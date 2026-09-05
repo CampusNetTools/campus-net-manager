@@ -1839,7 +1839,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.9.4"
+APP_VERSION = "2.9.5"
 APP_NAME = "校园网连接管家"
 
 
