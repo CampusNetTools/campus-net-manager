@@ -41,6 +41,8 @@ class DaemonCtlMixin:
         vpn = paths.get("vpn", False)
         current = paths.get("current", False)
         physical = paths.get("physical", current)
+        self._last_authed = bool(authed)
+        self._last_internet = bool(physical if (vpn and core.IS_MACOS) else current)
         # 用户选了「任意网络使用」且明确不在校园网: 显示 WiFi 连接正常(绿点), 不展示校园网相关状态。
         if user_any_network and in_campus is False:
             self.dot_net.configure(fg=GREEN)
@@ -317,6 +319,7 @@ class DaemonCtlMixin:
                 self.start_daemon(silent=True)
         except Exception:
             pass
+        self.after(5000, self._startup_update_check)
 
 
 

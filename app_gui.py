@@ -36,9 +36,11 @@ from gui.preferences import PreferencesMixin  # noqa: F401
 from gui.tray import TrayMixin  # noqa: F401
 from gui.daemon_ctl import DaemonCtlMixin  # noqa: F401
 from gui.wizard import WizardMixin  # noqa: F401
+from gui.update_ui import UpdateUiMixin  # noqa: F401
+from gui.console_ui import ConsoleUiMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -342,9 +344,12 @@ class App(ProfileFormMixin, RouterToolsMixin, SpeedWindowMixin, TunnelUiMixin, P
             row=9, column=0, sticky="ew", padx=(0, 3), pady=(4, 0))
         self.btn_help = ttk.Button(sidebar, text="使用帮助", style="Quiet.TButton", command=self.show_help)
         self.btn_help.grid(row=9, column=1, sticky="ew", padx=(3, 0), pady=(4, 0))
+        self.btn_console = ttk.Button(sidebar, text="网络控制台", style="Gray.TButton",
+                                      command=self.toggle_console)
+        self.btn_console.grid(row=10, column=0, sticky="ew", padx=(0, 3), pady=(3, 0))
         ttk.Button(sidebar, text="偏好设置与网络报告", style="Quiet.TButton",
                    command=self.show_preferences).grid(
-                       row=10, column=0, columnspan=2, sticky="ew", pady=(3, 0))
+                       row=10, column=1, sticky="ew", padx=(3, 0), pady=(3, 0))
 
         # 日志区
         logf = ttk.Frame(self, style="Card.TFrame", padding=(12, 8))

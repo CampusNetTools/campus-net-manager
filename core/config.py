@@ -22,6 +22,9 @@ def default_preferences():
     return {
         "history_enabled": False,
         "kick_guard": True,   # 防踢: 周期性刷新登录, 让本机/路由器会话保持最新不被挤掉
+        "auto_update_check": True,      # 启动时自动检查 GitHub 新版本(20小时间隔)
+        "update_skip_version": "",      # 用户选择跳过的版本 tag
+        "update_last_check": "",        # 上次检查时间 ISO
         "notifications": {
             "enabled": True,
             "disconnect": True,
@@ -35,9 +38,11 @@ def default_preferences():
 def ensure_preferences(cfg):
     changed = False
     defaults = default_preferences()
-    if "history_enabled" not in cfg:
-        cfg["history_enabled"] = defaults["history_enabled"]
-        changed = True
+    for key in ("history_enabled", "kick_guard",
+                "auto_update_check", "update_skip_version", "update_last_check"):
+        if key not in cfg:
+            cfg[key] = defaults[key]
+            changed = True
     notifications = cfg.setdefault("notifications", {})
     for key, value in defaults["notifications"].items():
         if key not in notifications:

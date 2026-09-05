@@ -108,6 +108,7 @@ class PreferencesMixin:
         var_history = tk.BooleanVar(value=self.cfg.get("history_enabled", False))
         var_keep_awake = tk.BooleanVar(value=self.cfg.get("keep_awake", False))
         var_kick_guard = tk.BooleanVar(value=self.cfg.get("kick_guard", True))
+        var_auto_update = tk.BooleanVar(value=self.cfg.get("auto_update_check", True))
         notifications = self.cfg.get("notifications", {})
         var_notify = tk.BooleanVar(value=notifications.get("enabled", True))
         category_vars = {
@@ -126,6 +127,8 @@ class PreferencesMixin:
                         variable=var_kick_guard, style="Checkmark.TCheckbutton").pack(anchor="w")
         ttk.Label(card, text="周期性刷新登录会话，让本机/路由器保持最新，第 3 台设备登录时被挤掉的是别人",
                   style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
+        ttk.Checkbutton(card, text="启动时自动检查新版本（GitHub Release）",
+                        variable=var_auto_update, style="Checkmark.TCheckbutton").pack(anchor="w")
 
         report = ttk.Frame(card, style="Surface.TFrame", padding=(14, 12))
         report.pack(fill="x", pady=(10, 14))
@@ -187,6 +190,7 @@ class PreferencesMixin:
             self.cfg["history_enabled"] = bool(var_history.get())
             self.cfg["keep_awake"] = bool(var_keep_awake.get())
             self.cfg["kick_guard"] = bool(var_kick_guard.get())
+            self.cfg["auto_update_check"] = bool(var_auto_update.get())
             self.cfg["notifications"] = core.normalized_notification_settings(
                 bool(var_notify.get()), {key: bool(value.get()) for key, value in category_vars.items()})
             core.save_config(self.cfg)
@@ -209,6 +213,8 @@ class PreferencesMixin:
         ttk.Button(actions, text="刷新网络报告", style="Gray.TButton", command=refresh_report).pack(side="left")
         ttk.Button(actions, text="测试通知", style="Gray.TButton",
                    command=lambda: core.send_system_notification("通知设置工作正常")).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="检查更新", style="Gray.TButton",
+                   command=lambda: self._bg_check_update(manual=True)).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="保存设置", style="Accent.TButton", command=save_preferences).pack(side="right")
 
     # ---------- 系统托盘 ----------
