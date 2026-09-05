@@ -1,0 +1,51 @@
+name: 手机版 APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["mobile/**", "core/**", ".github/workflows/mobile.yml"]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: 构建 Android APK (debug)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 组装打包目录 (main.py + core/ + buildozer.spec)
+        run: |
+          mkdir -p build_mobile
+          cp mobile/main.py mobile/buildozer.spec build_mobile/
+          cp -r core build_mobile/
+          ls build_mobile
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 缓存 buildozer 依赖
+        uses: actions/cache@v4
+        with:
+          path: .buildozer_global
+          key: buildozer-${{ hashFiles('mobile/buildozer.spec') }}
+
+      - name: 安装 buildozer
+        run: pip install buildozer cython==0.29.36
+
+      - name: 构建 debug APK
+        env:
+          BUILDOZER_GLOBAL_DIR: ${{ github.workspace }}/.buildozer_global
+        working-directory: build_mobile
+        run: buildozer android debug
+
+      - name: 上传 APK 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 校园网连接管家-android-debug-apk
+          path: build_mobile/bin/*.apk
