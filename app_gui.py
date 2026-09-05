@@ -261,38 +261,48 @@ class App(tk.Tk):
         def _field(widget, row, col):
             widget.grid(row=row, column=col, sticky="ew", padx=(0 if col == 0 else 8, 8 if col == 0 else 0), pady=(0, 4))
 
-        _field_label(2, 0, "档案名称")
-        _field_label(2, 1, "运营商")
+        _field_label(1, 0, "档案类型")
+        _field_label(1, 1, "")
+        self.cmb_ptype = ttk.Combobox(pcfg, state="readonly",
+                                      values=["校园网认证（登录保活）", "普通WiFi/热点（只检测断网）"])
+        self.cmb_ptype.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(0, 4))
+        self.cmb_ptype.bind("<<ComboboxSelected>>", self._on_ptype_change)
+        self.lbl_ptype_hint = ttk.Label(pcfg, text="此档案会登录校园网并保活，认证服务器必填。",
+                                        style="Muted.TLabel", wraplength=520)
+        self.lbl_ptype_hint.grid(row=2, column=0, columnspan=2, sticky="w", padx=(0, 8), pady=(0, 6))
+
+        _field_label(3, 0, "档案名称")
+        _field_label(3, 1, "运营商")
         self.ent_name = ttk.Entry(pcfg)
-        _field(self.ent_name, 3, 0)
+        _field(self.ent_name, 4, 0)
         self.cmb_type = ttk.Combobox(pcfg, state="readonly",
                                      values=["移动互联网访问 (cmcc)", "联通互联网访问 (unicom)", "教师登录 (teacher)"])
-        _field(self.cmb_type, 3, 1)
+        _field(self.cmb_type, 4, 1)
 
-        _field_label(4, 0, "校园网账号")
-        _field_label(4, 1, "密码（macOS 钥匙串）" if core.IS_MACOS else "密码")
+        _field_label(5, 0, "校园网账号")
+        _field_label(5, 1, "密码（macOS 钥匙串）" if core.IS_MACOS else "密码")
         self.ent_user = ttk.Entry(pcfg)
-        _field(self.ent_user, 5, 0)
+        _field(self.ent_user, 6, 0)
         pwf = ttk.Frame(pcfg, style="Inner.TFrame")
-        pwf.grid(row=5, column=1, sticky="ew", padx=(8, 0), pady=(0, 4))
+        pwf.grid(row=6, column=1, sticky="ew", padx=(8, 0), pady=(0, 4))
         pwf.columnconfigure(0, weight=1)
         self.ent_pass = ttk.Entry(pwf, show="●")
         self.ent_pass.grid(row=0, column=0, sticky="ew")
         ttk.Button(pwf, text="显示", style="Quiet.TButton", command=self._toggle_pass).grid(row=0, column=1, padx=(5, 0))
 
-        _field_label(6, 0, "绑定 WiFi（SSID，可留空）")
-        _field_label(6, 1, "绑定网关（有线，可留空）")
+        _field_label(7, 0, "绑定 WiFi（SSID，可留空）")
+        _field_label(7, 1, "绑定网关（有线，可留空）")
         self.ent_ssid = ttk.Entry(pcfg)
-        _field(self.ent_ssid, 7, 0)
+        _field(self.ent_ssid, 8, 0)
         self.ent_gw = ttk.Entry(pcfg)
-        _field(self.ent_gw, 7, 1)
+        _field(self.ent_gw, 8, 1)
 
-        _field_label(8, 0, "检测间隔（秒）")
-        _field_label(8, 1, "认证服务器")
+        _field_label(9, 0, "检测间隔（秒）")
+        _field_label(9, 1, "认证服务器")
         self.cmb_interval = ttk.Combobox(pcfg, values=["60", "300", "600", "1800", "3600"])
-        _field(self.cmb_interval, 9, 0)
+        _field(self.cmb_interval, 10, 0)
         authf = ttk.Frame(pcfg, style="Inner.TFrame")
-        authf.grid(row=9, column=1, sticky="ew", padx=(8, 0), pady=(0, 4))
+        authf.grid(row=10, column=1, sticky="ew", padx=(8, 0), pady=(0, 4))
         authf.columnconfigure(0, weight=1)
         self.cmb_auth = ttk.Combobox(authf)
         self.cmb_auth.grid(row=0, column=0, sticky="ew")
@@ -300,7 +310,7 @@ class App(tk.Tk):
         self.btn_detect.grid(row=0, column=1, padx=(6, 0))
 
         btns = ttk.Frame(pcfg, style="Inner.TFrame")
-        btns.grid(row=10, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        btns.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         btns.columnconfigure(0, weight=1)
         btns.columnconfigure(1, weight=1)
         self.btn_save = ttk.Button(btns, text="保存档案", style="Accent.TButton", command=self.save_profile)
@@ -444,6 +454,36 @@ class App(tk.Tk):
         except Exception:
             self._load_form_from_current()
 
+    def _on_ptype_change(self, event=None):
+        """切换档案类型: 「普通WiFi」清空账号/认证服务器并置灰; 「校园网」恢复。"""
+        wifi = self.cmb_ptype.get() == "普通WiFi/热点（只检测断网）"
+        state = "disabled" if wifi else "normal"
+        for ent in (self.ent_user, self.ent_pass, self.cmb_auth):
+            try:
+                ent.configure(state=state)
+            except Exception:
+                pass
+        if wifi:
+            self.cmb_auth.set("")
+            self.btn_detect.configure(text="识别网络", state="normal")
+        else:
+            self.btn_detect.configure(text="探测", state="normal")
+        # 提示文案
+        hint = ("此档案不登录校园网，守护只检测是否断网，断网时通知你。"
+                if wifi else "此档案会登录校园网并保活，认证服务器必填。")
+        if hasattr(self, "lbl_ptype_hint"):
+            self.lbl_ptype_hint.configure(text=hint)
+
+    def _set_ptype_ui(self, profile):
+        """根据档案类型初始化类型下拉框和字段状态(加载档案时调用)。"""
+        wifi = core.profile_is_wifi(profile)
+        self.cmb_ptype.set("普通WiFi/热点（只检测断网）" if wifi else "校园网认证（登录保活）")
+        self._on_ptype_change()
+        if hasattr(self, "lbl_ptype_hint"):
+            self.lbl_ptype_hint.configure(
+                text="此档案不登录校园网，守护只检测是否断网，断网时通知你。" if wifi
+                else "此档案会登录校园网并保活，认证服务器必填。")
+
     def _refresh_profile_list(self):
         self._profile_map = {}
         displays = []
@@ -498,6 +538,8 @@ class App(tk.Tk):
         self.cmb_auth.set(cur)
         lt = p.get("login_type", "cmcc")
         self.cmb_type.current({"cmcc": 0, "unicom": 1, "teacher": 2}.get(lt, 0))
+        # 初始化档案类型下拉框并同步字段可用状态
+        self._set_ptype_ui(p)
 
     def _form_to_profile(self):
         lt = {0: "cmcc", 1: "unicom", 2: "teacher"}[self.cmb_type.current()]
@@ -508,7 +550,11 @@ class App(tk.Tk):
             "username": self.ent_user.get().strip(),
             "password": self.ent_pass.get().strip(),
             "login_type": lt,
-            "auth_url": self.cmb_auth.get().strip() or core.DEFAULT_AUTH_URL,
+            # 档案类型: 校园网认证(campus) / 普通WiFi热点(wifi)
+            "profile_type": "wifi" if self.cmb_ptype.get() == "普通WiFi/热点（只检测断网）" else "campus",
+            # 普通WiFi档案不填认证服务器
+            "auth_url": (self.cmb_auth.get().strip() or core.DEFAULT_AUTH_URL)
+            if self.cmb_ptype.get() != "普通WiFi/热点（只检测断网）" else "",
             "interval": max(10, int(self.cmb_interval.get() or 1800)),
         }
 
