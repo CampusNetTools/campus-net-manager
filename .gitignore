@@ -7,6 +7,7 @@ keepalive.log
 build/
 dist/
 *.spec
+!mobile/buildozer.spec
 .venv/
 release/
 __pycache__/
