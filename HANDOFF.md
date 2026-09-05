@@ -16,10 +16,10 @@
 ## 二、主项目路径（git 主仓库）
 
 ```
-/Users/nanyu/Documents/Codex/2026-08-28/hi-2/campus-net-manager
+/Users/nanyu/Desktop/校园连接助手
 ```
-- 这是**唯一**有 git remote（能 push GitHub）的目录。改代码请在这里改。
-- 其他位置的副本（桌面/Applications 安装的 app）只是构建产物，改了不会提交。
+- 2026-09-06 起以桌面目录为**唯一工作区**（用户决定），已对齐 GitHub main（cc70c60）。改代码请在这里改。
+- `/Users/nanyu/Documents/Codex/2026-08-28/hi-2/campus-net-manager` 为旧主仓库（停留在 cc70c60，不再更新）；/Applications 安装的 app 只是构建产物。
 
 ## 三、核心模块（都在主项目根目录）
 
