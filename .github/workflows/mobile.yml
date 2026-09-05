@@ -29,20 +29,27 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: 缓存 buildozer 依赖
+      - name: 缓存 buildozer 依赖 (SDK/NDK/下载)
         uses: actions/cache@v4
         with:
-          path: .buildozer_global
-          key: buildozer-${{ hashFiles('mobile/buildozer.spec') }}
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('mobile/buildozer.spec') }}
+          restore-keys: buildozer-${{ runner.os }}-
 
       - name: 安装 buildozer
         run: pip install buildozer cython==0.29.36
 
       - name: 构建 debug APK
-        env:
-          BUILDOZER_GLOBAL_DIR: ${{ github.workspace }}/.buildozer_global
         working-directory: build_mobile
-        run: buildozer android debug
+        run: |
+          # 首次运行 buildozer 自装 SDK 时会因许可未接受而失败:
+          # 先跑一遍让它装好 cmdline-tools, 接受许可后再正式构建
+          buildozer android debug || true
+          SDKMANAGER=$(find "$HOME/.buildozer" -name sdkmanager -type f 2>/dev/null | head -1)
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --licenses > /dev/null || true
+          fi
+          buildozer android debug
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
