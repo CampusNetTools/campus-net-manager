@@ -135,6 +135,7 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("PID eq 5678", s)
         self.assertIn("move /y", s)
 
+    @unittest.skipIf(os.name == "nt", "Windows 无可执行位语义")
     def test_write_script_executable(self):
         path = updater.write_apply_script("#!/bin/bash\necho hi\n", ".sh")
         try:
