@@ -123,4 +123,3 @@ def _fmt_duration(seconds):
 
 
 # ---------- 环境识别 ----------
-_NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0

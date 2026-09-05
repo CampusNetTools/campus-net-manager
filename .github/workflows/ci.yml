@@ -23,6 +23,16 @@ jobs:
         run: pip install -r requirements-dev.txt
       - name: 运行全部测试
         run: python -m unittest discover -s tests
+      - name: 静态检查（未定义名，防拆分漂移）
+        shell: bash
+        run: |
+          pip install pyflakes
+          python -m pyflakes core/*.py gui/*.py *.py mobile/main.py > flakes.txt || true
+          cat flakes.txt
+          if grep -q "undefined name '" flakes.txt; then
+            echo "::error::发现未定义名"
+            exit 1
+          fi
       - name: 版本号一致性校验
         run: python scripts/sync_version.py --check
 
