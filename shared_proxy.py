@@ -15,7 +15,7 @@ class SharedProxy:
     支持访问控制: allowed 集合 + on_ask 回调(新设备询问, 防开放代理被滥用)"""
 
     def __init__(self, port=8080, host="0.0.0.0", allowed=None, on_ask=None, pac_host=None,
-                 shared_key=None):
+                 shared_key=None, upstream_proxy=None):
         self.port = port
         self.host = host
         self.allowed = set(allowed or [])   # 已授权客户端 IP
@@ -24,6 +24,9 @@ class SharedProxy:
         # 防蹭网: 共享口令。客户端代理请求需带 X-Shared-Key 头, 与口令一致才放行。
         # 留空则不校验口令(仅靠 IP 白名单), 兼容旧用法。
         self.shared_key = shared_key or ""
+        # VPN 上游代理: dict {host, port, type('http'|'socks5')}。设置后, 本机收到的
+        # 所有设备流量经 CONNECT 隧道转发到该上游代理, 实现"电脑当网关+VPN全透明"。
+        self.upstream_proxy = upstream_proxy or None
         self._listener = None
         self._running = False
         self._threads = []
@@ -302,11 +305,50 @@ class SharedProxy:
                 pass
 
     def _connect(self, host, port, timeout=10):
+        """连接到目标主机。若配置了 VPN 上游代理, 则先连上游并发 CONNECT 隧道,
+        让目标流量经 VPN 转发 (实现电脑当网关+VPN全透明)。"""
+        if self.upstream_proxy:
+            return self._connect_via_upstream(host, port, timeout)
         try:
             u = socket.create_connection((host, port), timeout=timeout)
             u.settimeout(20)
             return u
         except Exception:
+            return None
+
+    def _connect_via_upstream(self, host, port, timeout=10):
+        """经 VPN 上游代理建立 CONNECT 隧道到目标, 返回隧道 socket。"""
+        up = self.upstream_proxy
+        if not up:
+            return None
+        u = None
+        try:
+            u = socket.create_connection((up["host"], up["port"]), timeout=timeout)
+            u.settimeout(20)
+            # 发送 HTTP CONNECT 请求给上游, 请求建立到目标的隧道
+            req = ("CONNECT %s:%d HTTP/1.1\r\nHost: %s:%d\r\n"
+                   "Proxy-Connection: keep-alive\r\n\r\n" % (
+                       host, port, host, port)).encode("utf-8")
+            u.sendall(req)
+            # 读上游响应头
+            resp = b""
+            while b"\r\n\r\n" not in resp and len(resp) < 65536:
+                chunk = u.recv(4096)
+                if not chunk:
+                    break
+                resp += chunk
+            # 上游代理可能需要认证 (407) 或直接拒绝 (403/502)
+            head = resp.split(b"\r\n", 1)[0].decode("utf-8", errors="ignore")
+            if " 200 " not in head and "200 connection" not in head.lower():
+                u.close()
+                return None
+            return u
+        except Exception:
+            if u is not None:
+                try:
+                    u.close()
+                except Exception:
+                    pass
             return None
 
     def _relay(self, a, b, first=b""):
