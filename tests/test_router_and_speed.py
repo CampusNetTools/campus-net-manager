@@ -115,7 +115,7 @@ class KeepAliveStatusTests(unittest.TestCase):
         environments = []
         daemon = core.KeepAliveDaemon(
             cfg,
-            on_status=lambda paths, authed, checked: statuses.append((paths, authed, checked)),
+            on_status=lambda paths, authed, checked, *rest: statuses.append((paths, authed, checked)),
             on_env=lambda *args: environments.append(args))
         offline = {"vpn": True, "current": True, "physical": True}
         online = {"vpn": True, "current": True, "physical": True}
