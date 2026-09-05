@@ -1252,6 +1252,40 @@ def is_campus_locked(profile, ssid, gw, respect_user_choice=False):
     return bool(ssid_bound or gw_bound or not ssid)
 
 
+def best_match_profile(cfg, ssid, gateway=None, auth_url=None):
+    """返回当前环境下的"最优匹配"档案 (用于智能自动切换)。
+    匹配优先级: SSID 精确匹配 > 网关精确匹配 > 认证可达的有账号校园网档案。
+    返回 (profile, reason); reason 描述匹配原因; 无匹配返回 (None, None)。
+    注意: 仅当匹配是"明确"的(精确SSID/网关, 或认证服务器可达的校园网)才建议切换,
+    避免在家 WiFi 场景被误切到校园网档案。"""
+    profiles = cfg.get("profiles", [])
+    # 1. SSID 精确匹配
+    if ssid:
+        for p in profiles:
+            if p.get("ssid") and p["ssid"] == ssid:
+                return p, "SSID 精确匹配「%s」" % ssid
+    # 2. 网关精确匹配 (有线接固定路由器)
+    if gateway:
+        for p in profiles:
+            if p.get("gateway") and p["gateway"] == gateway:
+                return p, "网关精确匹配 %s" % gateway
+    # 3. 认证服务器可达且在校园网: 用"认证可达"判定, 匹配任何指向该认证服务器的有账号校园网档案。
+    #    覆盖无SSID的有线接路由器(中继)场景 —— 此时SSID为None无法精确匹配, 但认证可达即校园网。
+    if auth_url and auth_reachable(auth_url):
+        for p in profiles:
+            if (profile_has_credentials(p) and p.get("auth_url") == auth_url
+                    and p.get("ssid") and p["ssid"] != ssid):
+                # 有SSID绑定但不匹配当前SSID: 仅当当前确实无法精确匹配时才选择
+                if not ssid:
+                    return p, "检测到校园网认证可用（%s），自动选用档案「%s」" % (
+                        ssid or "有线/经路由器", p["name"])
+        for p in profiles:
+            if (profile_has_credentials(p) and p.get("auth_url") == auth_url
+                    and not p.get("ssid")):
+                return p, "检测到校园网认证可用，切到档案「%s」" % p["name"]
+    return None, None
+
+
 def match_profile(cfg, ssid, gateway=None, respect_user_choice=False):
     """匹配档案: SSID 精确匹配 > 网关精确匹配(有线) > 默认档案 > 首个有账号档案。
 
@@ -1609,6 +1643,25 @@ class KeepAliveDaemon(threading.Thread):
                 self._in_campus = in_campus
                 self._user_any_network = user_any_network
 
+                # --- 智能档案自动切换 ---
+                # 若用户当前选的档案不匹配当前环境(可能误选「任意网络」/选错), 但存在
+                # 明确匹配的档案(SSID/网关精确匹配, 或认证可达的校园网档案), 自动切换过去。
+                best, reason = best_match_profile(self.cfg, ssid, gw, auth_url)
+                current_prof = next((p for p in self.cfg.get("profiles", [])
+                                     if p.get("name") == self.cfg.get("active_profile")), None)
+                if best and current_prof and best.get("name") != current_prof.get("name"):
+                    self.cfg["active_profile"] = best["name"]
+                    try:
+                        save_config(self.cfg)
+                    except Exception:
+                        pass
+                    self._log("检测到%s, 已自动切换到档案「%s」" % (reason, best["name"]))
+                    self._alert("检测到%s，已自动切换到档案「%s」" % (reason, best["name"]), "device")
+                    # 切换后重新走一轮完整检测(用新档案)
+                    if self._wait_or_break(5, fp):
+                        break
+                    continue
+
                 # 用户明确选了「任意网络使用」: 无论认证服务器探测结果如何, 一律视为非校园网,
                 # 直接休眠, 绝不尝试登录 —— 尊重用户选择, 避免在家 WiFi 等场景误登录。
                 if user_any_network:
@@ -1762,7 +1815,7 @@ def keep_awake_enabled():
 
 
 # ---------- 版本与诊断 ----------
-APP_VERSION = "2.9.2"
+APP_VERSION = "2.9.3"
 APP_NAME = "校园网连接管家"
 
 
