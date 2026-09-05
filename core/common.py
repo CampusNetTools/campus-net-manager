@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """公共导入与常量 (自 keepalive_core.py 拆分)"""
 
-__all__ = ['BASE_DIR', 'json', 'os', 're', 'copy', 'socket', 'subprocess', 'sys', 'threading', 'time', 'datetime', 'concurrent', 'ipaddress', 'plistlib', 'traceback', 'urllib', 'ET', 'uuid', 'IS_WINDOWS', 'IS_MACOS', 'CONFIG_PATH', 'LOG_PATH', 'LOCK_PATH', 'HISTORY_PATH', 'KEYCHAIN_SERVICE', 'DEFAULT_AUTH_URL', 'LIDA_PROFILE_ID', 'LIDA_PROFILE_NAME', 'LIDA_SSID', 'SUFFIX', 'METHOD_NAME']
+__all__ = ['BASE_DIR', '_NO_WINDOW', 'json', 'os', 're', 'copy', 'socket', 'subprocess', 'sys', 'threading', 'time', 'datetime', 'concurrent', 'ipaddress', 'plistlib', 'traceback', 'urllib', 'ET', 'uuid', 'IS_WINDOWS', 'IS_MACOS', 'CONFIG_PATH', 'LOG_PATH', 'LOCK_PATH', 'HISTORY_PATH', 'KEYCHAIN_SERVICE', 'DEFAULT_AUTH_URL', 'LIDA_PROFILE_ID', 'LIDA_PROFILE_NAME', 'LIDA_SSID', 'SUFFIX', 'METHOD_NAME']
 
 # -*- coding: utf-8 -*-
 """
@@ -61,3 +61,6 @@ METHOD_NAME = {"unicom": "联通", "cmcc": "移动", "teacher": "教师"}
 
 
 # ---------- 配置 ----------
+
+# Windows 隐藏子进程控制台窗口标志 (v2.x 遗留, 供 netinfo/speed/sysutils 使用)
+_NO_WINDOW = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
