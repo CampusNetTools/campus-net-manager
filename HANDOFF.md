@@ -42,10 +42,15 @@ gui/                # 界面包
   theme.py          # 深色主题常量
   profile_form.py / router_tools.py / speed_window.py / tunnel_ui.py
   preferences.py / tray.py / daemon_ctl.py / wizard.py   # 八个 Mixin
+  update_ui.py      # 自动更新弹窗/下载/自替换 (v3.1.0)
+  console_ui.py     # 网络控制台开关+地址/二维码窗口 (v3.1.0)
 shared_proxy.py     # 隧道共享代理 (HTTP CONNECT / VPN 上游 / PAC / 扫码页)
+updater.py          # 自动更新核心: 版本比较/Release检查/下载/自替换脚本 (v3.1.0)
+web_console.py      # 局域网 Web 控制台 HTTP 服务, 口令鉴权 (v3.1.0, 端口 8081)
+mobile/             # 手机版 (Kivy, Android): main.py + buildozer.spec + README (v1.0.0)
 diagnostics.py      # 诊断报告导出
 lida_keepalive.py   # 立达校区专用 CLI 保活脚本
-tests/              # unittest（84 项）
+tests/              # unittest（112 项）
 scripts/build_macos.sh    # macOS 构建
 scripts/sync_version.py   # 版本号单源同步
 scripts/split_core.py / split_gui.py   # v3.0.0 拆分脚本(留档)
