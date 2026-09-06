@@ -1,6 +1,6 @@
 # 校园网连接管家 (CampusNetManager)
 
-[![Release](https://img.shields.io/badge/下载-v3.1.8-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
+[![Release](https://img.shields.io/badge/下载-v4.0.0-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
 
 > Dr.COM 校园网自动保活 · 多设备共享上网 · Windows / macOS 桌面工具
 
@@ -41,6 +41,7 @@
 20. **自动更新**：启动时后台检查 GitHub 新版本（可关/可跳过），一键下载后自替换重启，永远用上最新版
 21. **网络控制台（Web 管理页）**：一键开启局域网控制台（口令+二维码），手机/电脑浏览器即可查看守护与网络状态、日志、断网时间线、管理隧道授权设备，还能远程启停守护
 22. **手机版（Android）**：`mobile/` 目录独立 Kivy App，复用同一套 Dr.COM 登录核心，手机直连校园网 WiFi 时一键登录 + 前台保活（CI 自动构建 debug APK）
+23. **独立窗口界面（v4.0）**：主窗口只保留状态条 + 守护开关 + 功能宫格；连接档案、隧道共享、网络控制台、热点分享、路由器检测、网络测速、新手向导、偏好设置、网络报告、软件更新、运行日志各自为独立窗口，点宫格卡片打开（单实例，重复点击置前），功能不再挤在一个窗口里
 
 VPN 开启时，主界面会分别判断 VPN/系统路径和校园网物理出口：两条都通显示“VPN 与校园网在线”；仅物理出口正常显示“校园网在线（VPN异常）”，不会再误报“假在线”或反复重登校园网。
 

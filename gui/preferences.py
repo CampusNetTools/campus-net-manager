@@ -90,13 +90,12 @@ class PreferencesMixin:
         """网络记录和系统通知集中设置，避免继续挤占主界面。"""
         core.ensure_preferences(self.cfg)
         win = tk.Toplevel(self)
-        win.title("偏好设置与网络报告")
+        win.title("偏好设置")
         win.configure(bg=BG)
-        win.geometry("620x700")
+        win.geometry("560x620")
         win.resizable(False, True)
-        win.minsize(620, 620)
+        win.minsize(540, 560)
         win.transient(self)
-        win.grab_set()
 
         card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))
         card.pack(fill="both", expand=True, padx=16, pady=16)
@@ -131,33 +130,6 @@ class PreferencesMixin:
         ttk.Checkbutton(card, text="启动时自动检查新版本（GitHub Release）",
                         variable=var_auto_update, style="Checkmark.TCheckbutton").pack(anchor="w")
 
-        report = ttk.Frame(card, style="Surface.TFrame", padding=(14, 12))
-        report.pack(fill="x", pady=(10, 14))
-        report_label = ttk.Label(report, text="", style="Surface.TLabel", justify="left", wraplength=535)
-        report_label.pack(anchor="w")
-
-        def refresh_report():
-            data = core.summarize_network_history(7)
-            c = data["counts"]
-            stable = ("%.0f%%" % data["stable_percent"] if data["stable_percent"] is not None else "暂无")
-            text = (
-                "最近 7 天网络概况\n%s\n\n"
-                "记录 %d 条 · 正常比例 %s · 掉线 %d 次 · 自动恢复 %d 次 · "
-                "恢复失败 %d 次 · VPN 异常 %d 次" % (
-                    data["summary"], data["events"], stable, c["disconnect"], c["recovery"],
-                    c["failure"], c["vpn_issue"]))
-            # 断网时间线: 每次掉线的时间点和时长
-            outages = core.analyze_outage_timeline(7)
-            if outages:
-                text += "\n\n—— 断网时间线（最近 7 天）——\n"
-                for idx, o in enumerate(outages, 1):
-                    text += "%d. %s 断网 → %s 恢复（持续 %s）\n" % (
-                        idx, o["start"], o["end"], o["duration"])
-                text += ("\n（提示：若断网集中在固定时段，多为路由器过热/链路问题；"
-                         "持续多次请检查路由器散热或考虑重启）")
-            report_label.configure(text=text)
-
-        refresh_report()
         ttk.Label(card, text="系统通知", style="Section.TLabel").pack(anchor="w")
         master_notify = ttk.Checkbutton(
             card, text="允许校园网连接管家发送通知", variable=var_notify,
@@ -209,27 +181,12 @@ class PreferencesMixin:
                 self._log("警告: 合盖保持运行启动失败 (可能非 macOS 或 caffeinate 不可用)")
             win.destroy()
 
-        # ---------- 软件更新 (内联, 不依赖弹窗) ----------
-        upd_card = ttk.Frame(card, style="Inner.TFrame", padding=(14, 10))
-        upd_card.pack(fill="x", pady=(10, 0))
-        ttk.Label(upd_card, text="软件更新", style="Section.TLabel").pack(anchor="w")
-        ttk.Label(upd_card, text="当前版本 v%s" % core.APP_VERSION,
-                  style="Muted.TLabel").pack(anchor="w", pady=(6, 0))
-        upd_line = ttk.Frame(upd_card, style="Inner.TFrame")
-        upd_line.pack(fill="x", pady=(4, 0))
-        self._upd_line_frame = upd_line
-        self._lbl_update = ttk.Label(upd_line, text="", style="Muted.TLabel")
-        self._lbl_update.pack(side="left")
-        ttk.Button(upd_line, text="检查更新", style="Gray.TButton",
-                   command=self._check_update_now).pack(side="right")
-        ttk.Label(upd_card, text="点击按钮联网检测 GitHub 最新版本；发现新版本后点击「立即更新」自动下载替换。",
-                  style="Muted.TLabel", wraplength=560).pack(anchor="w", pady=(4, 0))
-
         actions = ttk.Frame(card, style="Inner.TFrame")
         actions.pack(fill="x", side="bottom", pady=(14, 0))
-        ttk.Button(actions, text="刷新网络报告", style="Gray.TButton", command=refresh_report).pack(side="left")
         ttk.Button(actions, text="测试通知", style="Gray.TButton",
-                   command=lambda: core.send_system_notification("通知设置工作正常")).pack(side="left", padx=(8, 0))
+                   command=lambda: core.send_system_notification("通知设置工作正常")).pack(side="left")
+        ttk.Label(actions, text="网络报告与软件更新已移到独立窗口（主界面宫格入口）",
+                  style="Muted.TLabel").pack(side="left", padx=(12, 0))
         ttk.Button(actions, text="保存设置", style="Accent.TButton", command=save_preferences).pack(side="right")
 
     # ---------- 系统托盘 ----------

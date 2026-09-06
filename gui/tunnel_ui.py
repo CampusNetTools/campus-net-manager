@@ -27,18 +27,28 @@ except Exception:
 
 
 class TunnelUiMixin:
-    def toggle_share(self):
-        """隧道共享: 其他设备(手机/平板)借本机网络访问外网 (带访问控制)"""
+    def _stop_share(self):
+        """停止隧道共享并同步界面按钮。"""
         if self.proxy and self.proxy.running:
             self.proxy.stop()
-            # 保存授权设备列表
             allow = sorted(self.proxy.allowed)
             if allow != list(self.cfg.get("tunnel_allow", [])):
                 self.cfg["tunnel_allow"] = allow
                 core.save_config(self.cfg)
             self._log("隧道共享已停止 (授权设备 %d 台已记住)" % len(allow))
-            self.proxy = None
-            self.btn_share.configure(text="隧道共享", style="Gray.TButton")
+        self.proxy = None
+        btn = getattr(self, "btn_share", None)
+        if btn is not None:
+            try:
+                if btn.winfo_exists():
+                    btn.configure(text="隧道共享", style="Gray.TButton")
+            except Exception:
+                pass
+
+    def toggle_share(self):
+        """隧道共享: 其他设备(手机/平板)借本机网络访问外网 (带访问控制)"""
+        if self.proxy and self.proxy.running:
+            self._stop_share()
             return
         try:
             allowed = list(self.cfg.get("tunnel_allow", []))
@@ -138,7 +148,10 @@ class TunnelUiMixin:
                    command=lambda: self._copy_text(pac_url)).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="VPN 上游", style="Gray.TButton",
                    command=self._show_vpn_upstream_dialog).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="完成", style="Gray.TButton", command=win.destroy).pack(side="right")
+        ttk.Button(actions, text="停止共享", style="Danger.TButton",
+                   command=lambda: (self._stop_share(), win.destroy())).pack(side="right")
+        ttk.Button(actions, text="完成", style="Gray.TButton", command=win.destroy).pack(
+            side="right", padx=(0, 8))
 
 
     def _deploy_tunnel(self, win, myip, pac_url, setup_url):
