@@ -20,7 +20,8 @@ version = 1.0.0
 
 # (list) Application requirements
 # 纯 python 依赖; core 包只用到标准库
-requirements = python3,kivy
+# 固定 Python 版本: 不 pin 时 p4a 会选到 3.14, 依赖 wheel(cp314) 装不上
+requirements = python3==3.11.9,kivy==2.3.0
 
 # (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
 orientation = portrait
