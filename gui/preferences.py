@@ -212,17 +212,17 @@ class PreferencesMixin:
         upd_card = ttk.Frame(card, style="Inner.TFrame", padding=(14, 10))
         upd_card.pack(fill="x", pady=(10, 0))
         ttk.Label(upd_card, text="软件更新", style="Section.TLabel").pack(anchor="w")
+        ttk.Label(upd_card, text="当前版本 v%s" % core.APP_VERSION,
+                  style="Muted.TLabel").pack(anchor="w", pady=(6, 0))
         upd_line = ttk.Frame(upd_card, style="Inner.TFrame")
-        upd_line.pack(fill="x", pady=(6, 0))
+        upd_line.pack(fill="x", pady=(4, 0))
         self._upd_line_frame = upd_line
-        ttk.Label(upd_line, text="当前版本 v%s" % core.APP_VERSION,
-                  style="Muted.TLabel").pack(side="left")
         self._lbl_update = ttk.Label(upd_line, text="", style="Muted.TLabel")
-        self._lbl_update.pack(side="left", padx=(12, 0))
+        self._lbl_update.pack(side="left")
         ttk.Button(upd_line, text="检查更新", style="Gray.TButton",
                    command=self._check_update_now).pack(side="right")
         ttk.Label(upd_card, text="点击按钮联网检测 GitHub 最新版本；发现新版本后点击「立即更新」自动下载替换。",
-                  style="Muted.TLabel").pack(anchor="w", pady=(4, 0))
+                  style="Muted.TLabel", wraplength=560).pack(anchor="w", pady=(4, 0))
 
         actions = ttk.Frame(card, style="Inner.TFrame")
         actions.pack(fill="x", side="bottom", pady=(14, 0))
@@ -251,6 +251,10 @@ class PreferencesMixin:
     def _render_update_result(self, info):
         if not info:
             self._set_update_text("✓ 已是最新版本 v%s" % core.APP_VERSION)
+            # 已有立即更新按钮时收起, 避免状态与按钮语义不符
+            btn = getattr(self, "_btn_update_now", None)
+            if btn is not None:
+                btn.pack_forget()
             return
         self._update_info = info
         self._set_update_text("发现新版本 %s" % info["tag"])
@@ -258,9 +262,7 @@ class PreferencesMixin:
             self._btn_update_now = ttk.Button(
                 self._upd_line_frame, text="立即更新", style="Accent.TButton",
                 command=lambda: self._do_update(self._update_info))
-            self._btn_update_now.pack(side="right")
-        else:
-            self._btn_update_now.pack(side="right")
+        self._btn_update_now.pack(side="right")
 
     def _restore_preferences(self):
         """App 启动即恢复独立偏好: 合盖/休眠保持运行不依赖守护是否启动。
