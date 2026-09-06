@@ -61,6 +61,14 @@ class UpdateUiMixin:
         win.configure(bg=BG)
         win.geometry("520x420")
         win.transient(self)
+        # 置前防漏看: 窗口在托盘/后台时 Toplevel 可能不可见
+        try:
+            win.deiconify()
+            win.lift()
+            win.attributes("-topmost", True)
+            win.after(800, lambda: win.attributes("-topmost", False))
+        except Exception:
+            pass
 
         tk.Label(win, text="发现新版本 %s（当前 v%s）" % (info["tag"], core.APP_VERSION),
                  bg=BG, fg=FG, font=FONT_M).pack(anchor="w", padx=16, pady=(16, 4))
