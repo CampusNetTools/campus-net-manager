@@ -86,16 +86,17 @@ class TunnelUiMixin:
 
 
     def _show_tunnel_ready(self, myip, pac_url, setup_url, verified):
-        """用应用内统一样式展示一键隧道结果，避免系统消息框拥挤。"""
+        """用应用内统一样式展示一键隧道结果，避免系统消息框拥挤。
+        支持多网卡环境下手动切换给手机填的服务器 IP(校园网直连/热点网段不同)。"""
         win = tk.Toplevel(self)
         win.title("隧道共享")
         win.configure(bg=BG)
-        win.geometry("620x560")
+        win.geometry("640x600")
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
-        card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
-        card.pack(fill="both", expand=True, padx=18, pady=18)
+        card = ttk.Frame(win, style="Card.TFrame", padding=(24, 20))
+        card.pack(fill="both", expand=True, padx=18, pady=16)
         ttk.Label(card, text="隧道已经准备好", style="Section.TLabel").pack(anchor="w")
         gm = core.detect_gateway_mode()
         gm_txt = ""
@@ -103,49 +104,99 @@ class TunnelUiMixin:
             gm_txt = "检测到当前经路由器接入（%s）\n手机连路由器 Wi‑Fi 即可直接上网，无需代理；\n若需跨网段借网，可用下方代理。" % gm["description"]
         elif gm["mode"] == "computer":
             gm_txt = "检测到电脑直连网络\n手机/平板通过代理借用电脑网络上网。"
-        status_text = ("服务自检通过，自动配置地址已复制。\n\n%s" % gm_txt if verified else
+        status_text = ("服务自检通过。\n\n%s" % gm_txt if verified else
                        "服务已启动，但局域网自检未通过；请检查防火墙。\n\n%s" % gm_txt)
         ttk.Label(card, text=status_text,
-                  style="Muted.TLabel", justify="left", wraplength=480).pack(anchor="w", pady=(5, 18))
+                  style="Muted.TLabel", justify="left", wraplength=520).pack(anchor="w", pady=(5, 14))
+
+        st = {"ip": myip, "pac": pac_url, "setup": setup_url}
 
         content = ttk.Frame(card, style="Inner.TFrame")
         content.pack(fill="both", expand=True)
         left = ttk.Frame(content, style="Inner.TFrame")
         left.pack(side="left", fill="both", expand=True)
-        ttk.Label(left, text="手机自动代理地址", style="Field.TLabel").pack(anchor="w")
+        ttk.Label(left, text="手机自动代理地址 (PAC)", style="Field.TLabel").pack(anchor="w")
         value = ttk.Entry(left)
         value.insert(0, pac_url)
         value.configure(state="readonly")
-        value.pack(fill="x", pady=(6, 14))
+        value.pack(fill="x", pady=(6, 6))
 
-        guide = (
-            "手机与电脑连接同一 Wi‑Fi 后：\n"
-            "Wi‑Fi 详情  →  配置代理  →  自动  →  粘贴上面的地址。\n\n"
-            "没有“自动”选项时，改用手动代理：\n"
-            "服务器 %s    端口 8080\n\n"
-            "首次访问时，本机会询问是否允许该设备。\n"
-            "防蹭网口令：%s\n"
-            "（连接时需在代理头带上该口令）"
-            % (myip, self.tunnel_shared_key))
-        ttk.Label(left, text=guide, style="Card.TLabel", justify="left", wraplength=380).pack(anchor="w")
+        ttk.Label(left, text="手动代理(没有“自动”选项时)", style="Field.TLabel").pack(anchor="w", pady=(6, 2))
+        manual_ip = ttk.Label(left, text="服务器 %s · 端口 8080" % myip,
+                              style="Card.TLabel", foreground=ACCENT)
+        manual_ip.pack(anchor="w")
 
+        guide = ("手机须与电脑在同一个可互通的网络(同一校园网/同一路由器/连电脑热点)。\n\n"
+                 "自动：Wi‑Fi 详情 → 配置代理 → 自动 → 粘贴上面的地址。\n"
+                 "手动：配置代理 → 手动 → 填上面的 服务器/端口。\n\n"
+                 "首次访问时本机会弹窗询问是否允许该设备，点「允许」后自动记住。\n"
+                 "（无需在手机上输入口令）")
+        guide_lbl = ttk.Label(left, text=guide, style="Card.TLabel", justify="left",
+                              wraplength=400)
+        guide_lbl.pack(anchor="w", pady=(10, 0))
+
+        qr_label = None
         if HAS_QR:
-            qr_image = qrcode.make(setup_url).resize((150, 150))
-            qr_photo = ImageTk.PhotoImage(qr_image)
             qr_box = ttk.Frame(content, style="Surface.TFrame", padding=8)
-            qr_box.pack(side="right", anchor="n", padx=(16, 0))
-            qr_label = tk.Label(qr_box, image=qr_photo, bg="#ffffff", bd=0)
-            qr_label.image = qr_photo
+            qr_box.pack(side="right", anchor="n", padx=(14, 0))
+            qr_label = tk.Label(qr_box, bg="#ffffff", bd=0)
             qr_label.pack()
             ttk.Label(qr_box, text="手机扫码查看步骤", style="SurfaceMuted.TLabel").pack(pady=(6, 0))
 
+        def refresh_qr():
+            if qr_label is None:
+                return
+            qr_image = qrcode.make(st["setup"]).resize((150, 150))
+            photo = ImageTk.PhotoImage(qr_image)
+            qr_label.configure(image=photo)
+            qr_label.image = photo
+
+        def apply_ip(ip):
+            """切换到另一张网卡的地址: 更新 PAC host(服务按请求动态返回) + 界面。"""
+            st["ip"] = ip
+            st["pac"] = "http://%s:8080/proxy.pac" % ip
+            st["setup"] = "http://%s:8080/" % ip
+            if getattr(self, "proxy", None) is not None:
+                try:
+                    self.proxy.pac_host = ip
+                except Exception:
+                    pass
+            value.configure(state="normal")
+            value.delete(0, "end")
+            value.insert(0, st["pac"])
+            value.configure(state="readonly")
+            manual_ip.configure(text="服务器 %s · 端口 8080" % ip)
+            refresh_qr()
+            addr_btn.configure(text="地址：%s ▾" % ip)
+            self._log("隧道地址已切换为: %s:8080 (请按新地址配置手机)" % ip)
+
+        cands = shared_proxy.get_lan_ips()
+        if not cands:
+            cands = [myip]
+        if myip not in cands:
+            cands.insert(0, myip)
+        addr_row = ttk.Frame(card, style="Inner.TFrame")
+        addr_row.pack(fill="x", pady=(12, 4))
+        ttk.Label(addr_row, text="给手机用的电脑地址（多网卡时可切换）：", style="Muted.TLabel").pack(side="left")
+        addr_btn = ttk.Button(addr_row, text="地址：%s ▾" % myip, style="Gray.TButton")
+        addr_btn.pack(side="right")
+
+        if len(cands) > 1:
+            menu = tk.Menu(win, tearoff=0)
+            for ip in cands:
+                menu.add_command(label=ip + ("  ← 推荐" if ip == st["ip"] else ""),
+                                 command=lambda i=ip: apply_ip(i))
+            addr_btn.configure(command=lambda: menu.tk_popup(
+                addr_btn.winfo_rootx(), addr_btn.winfo_rooty() + addr_btn.winfo_height()))
+
+        refresh_qr()
+
         actions = ttk.Frame(card, style="Inner.TFrame")
-        actions.pack(fill="x", side="bottom", pady=(18, 0))
-        # 一键部署: 自动开启开机自启, 让隧道长期在线(日常主力)
+        actions.pack(fill="x", side="bottom", pady=(14, 0))
         ttk.Button(actions, text="🚀 一键部署(自动开启+开机自启)", style="Accent.TButton",
-                   command=lambda: self._deploy_tunnel(win, myip, pac_url, setup_url)).pack(side="left")
+                   command=lambda: self._deploy_tunnel(win, st["ip"], st["pac"], st["setup"])).pack(side="left")
         ttk.Button(actions, text="复制配置地址", style="Gray.TButton",
-                   command=lambda: self._copy_text(pac_url)).pack(side="left", padx=(8, 0))
+                   command=lambda: self._copy_text(st["pac"])).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="VPN 上游", style="Gray.TButton",
                    command=self._show_vpn_upstream_dialog).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="停止共享", style="Danger.TButton",
