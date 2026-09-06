@@ -385,18 +385,105 @@ class SharedProxy:
         t2.join()
 
 
-def get_lan_ips():
-    """返回本机局域网 IPv4 列表 (供其他设备填写代理服务器)"""
-    ips = []
+def _ip_int(ip):
+    """点分 IPv4 -> int (用于子网比较)"""
+    return int.from_bytes(socket.inet_aton(ip), "big")
+
+
+def _same_net(ip, other, mask_hex):
+    """判断两个 IP 是否同网段。mask_hex 形如 'ffffe000'。"""
     try:
-        hostname = socket.gethostname()
-        for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
-            ip = info[4][0]
-            if not ip.startswith(("127.", "169.254.")) and ip not in ips:
-                ips.append(ip)
+        m = int(mask_hex, 16)
+        return (_ip_int(ip) & m) == (_ip_int(other) & m)
+    except Exception:
+        return False
+
+
+def _iface_ips():
+    """返回 [(接口名, IPv4, 掩码hex), ...] (排除回环/链路本地)。"""
+    import re
+    import subprocess
+    try:
+        out = subprocess.check_output(["ifconfig"], stderr=subprocess.STDOUT,
+                                      timeout=3).decode("utf-8", "replace")
+    except Exception:
+        return []
+    cur, rows = None, []
+    for line in out.splitlines():
+        m = re.match(r"^([A-Za-z0-9_]+):", line.strip())
+        if m:
+            cur = m.group(1)
+            continue
+        m = re.search(r"inet (\d+\.\d+\.\d+\.\d+) netmask 0x([0-9a-fA-F]+)", line)
+        if m and cur:
+            ip = m.group(1)
+            if not ip.startswith(("127.", "169.254.")):
+                rows.append((cur, ip, m.group(2)))
+    return rows
+
+
+def _default_gateway_ip():
+    """当前"真实出口"默认网关 IP。
+
+    先试 `route get default`; 若默认路由被 VPN/Clash(TUN) 抢走导致无 gateway,
+    回退 netstat -rn 取第一条实体 IPv4 网关(跳过 link# 的虚拟默认路由)。
+    """
+    import re
+    import subprocess
+    ip_re = r"\d+\.\d+\.\d+\.\d+"
+    try:
+        out = subprocess.check_output(["route", "-n", "get", "default"],
+                                      stderr=subprocess.STDOUT,
+                                      timeout=3).decode("utf-8", "replace")
+        m = re.search(r"gateway:\s*(%s)" % ip_re, out)
+        if m:
+            return m.group(1)
     except Exception:
         pass
-    return ips
+    try:
+        out = subprocess.check_output(["netstat", "-rn", "-f", "inet"],
+                                      stderr=subprocess.STDOUT,
+                                      timeout=3).decode("utf-8", "replace")
+        for line in out.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] == "default":
+                gw = parts[1]
+                if re.match(r"^(%s)$" % ip_re, gw) and not gw.startswith("0."):
+                    return gw
+    except Exception:
+        pass
+    return None
+
+
+def get_lan_ips():
+    """返回本机"适合填给其他设备"的局域网 IPv4 列表, 按可用性排序:
+
+    - 排除虚拟隧道接口(utun/tun/ppp/awdl/llw 等)与 Clash 假 IP(198.18.0.0/15)——
+      这些地址手机/平板根本到不了;
+    - 保留真实网卡(en/eth) 与 bridge(电脑开热点时手机所在网段);
+    - 与默认网关同网段的最优先: 手机连同一校园网/同一路由器时最常用。
+    返回如 ['10.52.188.32', '192.168.3.1'] (前者为校园网出口)。
+    """
+    import re
+    _VIRT = re.compile(r"^(utun|tun|ppp|awdl|llw|gif|stf|ipsec|utap|tap|wg|zt|vmnet|vnic)", re.I)
+    gw = _default_gateway_ip()
+    phys, hot = [], []
+    for iface, ip, mask in _iface_ips():
+        if _VIRT.match(iface) or ip.startswith("198.18."):
+            continue                       # 纯虚拟/假 IP, 直接丢弃
+        if iface.startswith("bridge"):
+            hot.append((iface, ip, mask))  # 热点/共享网段, 放最后
+        else:
+            phys.append((iface, ip, mask))
+
+    def key(item):
+        iface, ip, mask = item
+        same = bool(gw and _same_net(ip, gw, mask))
+        return (0 if same else 1, iface)
+
+    phys.sort(key=key)
+    hot.sort(key=key)
+    return [ip for _iface, ip, _mask in (phys + hot)]
 
 
 def check_setup_page(host, port=8080, timeout=2):
