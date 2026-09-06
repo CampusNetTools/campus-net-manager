@@ -1,5 +1,36 @@
 # 更新记录
 
+## v4.0.4
+
+- **修复 iOS 描述文件只配 HTTP 不配 HTTPS 导致手机上不了网**:
+  - 现象: iPhone 扫码安装 mobileconfig 后, 浏览器仍上不了网 (HTTPS 站点全部超时, 表现成"配了代理但没生效").
+  - 根因: `shared_proxy._ios_mobileconfig` 只填了 `HTTPEnable/HTTPPort/HTTPProxy`, iPhone Safari 默认 HTTPS 直连, HTTP 代理服务器收不到 CONNECT 隧道请求。
+  - 修复: 同时填 `HTTPSEnable/HTTPSPort/HTTPSProxy` 三件套, iPhone Safari 自动 CONNECT HTTPS 到电脑 8080, 电脑代理转发到外网。
+  - 新增 `tests/test_mobileconfig_https.py` (4 项回归): HTTP 三件套 + HTTPS 三件套 + 顶层 ProxyServer/Port + plist 合法 XML。
+
+- **新增「路由器代理」独立窗口 + 主入口 (`gui/router_proxy.py` + 宫格 `路由器代理`)**:
+  - 思路: 路由器直连校园网并完成认证 → 路由器自身开 HTTP 代理 (默认 8080) → 手机连路由器 WiFi 但不登录校园网 → 手动代理到「路由器 IP:8080」即上网。比「路由器中继 (WISP)」占用同一账号名额但更稳定 (路由器始终在线, 电脑关掉也不影响)。
+  - 窗口四段:
+    - **A. 路由器识别 + 适配固件查询**: 复用 `core.router_fingerprint()` + `lookup_firmware_urls()`, 一键探测品牌/型号/硬件版本, 显示厂商官网 + OpenWrt ToH + Merlin (华硕) 入口。
+    - **B. 探测路由器 8080 端口**: 新增 `probe_router_proxy()` 函数, 通过 HTTP HEAD 探测常见端口 8080/8888/1080/3128/9090, 识别 `Proxy-Authenticate`/`Via`/`Server: squid|privoxy|tinyproxy|mikrotik|padavan|merlin|openwrt` 等代理特征。生成 PAC (data URL 形式, 路由器无需托管 PAC 文件) + 手动代理配置 + 设置页 URL + 二维码。
+    - **C. 在路由器上启动 HTTP 代理 (按固件分步)**: OpenWrt (tinyproxy / luci-app-squid) / Padavan (老毛子内置 HTTP 代理) / Merlin (华硕 entware + JFFS) / iKuaiOS (爱快) / 其它 (OpenWrt ToH 适配表 + 刷机风险提示) 五个 Tab。
+    - **D. 手机端配置步骤**: 按当前 IP/端口实时生成 iOS (WiFi 高级 → 配置代理 → 手动) + Android (WLAN 高级 → 代理 → 手动 / 自动) 详细步骤, 含 HTTPS CONNECT 兼容性说明。
+  - 主界面: `_build_feature_grid` 升级 9 → 10 项, 第 2 行从 3 列扩展为 4 列, "路由器三件套" 集中展示: 路由器中继 / **路由器代理** / 路由器检测 / 网络控制台。
+  - `App` 类继承 `RouterProxyMixin` (新增在 `gui/router_proxy.py`), 主入口走 `_fwin_open_legacy("router_proxy", self.show_router_proxy_window)` 单例。
+  - 复用 `core.detect_gateway_mode()` 自动填路由器 IP, 用户可手动覆盖。
+
+- **隧道共享窗口集成第三种上游模式 (③ 路由器代理)**:
+  - `_show_tunnel_ready` 在 ① 路由器中继 + ② 电脑直连 之外, 新增 **③ 路由器代理段**: 路由器自身开 HTTP 代理, 手机走代理到路由器 IP:8080 (路由器一次性认证, 电脑关掉也能用)。
+  - 段内含: 路由器 IP + 端口输入 + "生成设置页 + 复制" 按钮 + "打开「路由器代理」独立窗口" 跳转 + 4 步快速上手 (刷固件 → 装代理插件 → 手机配代理 → 上网)。
+  - 几何 760×780 → **760×820 滚动**, 三段都能完整展示。
+
+- **测试与回归**:
+  - 新增 `tests/test_router_proxy_window.py` (5 项): mixin 存在 / 窗口四段齐全 (A 识别 + B 探测 + C OpenWrt/Padavan/Merlin/iKuaiOS + D iOS/Android) / `probe_router_proxy` 签名 / `build_router_pac` 格式 / `App` 继承 `RouterProxyMixin` / `_show_tunnel_ready` 含 ③ 路由器代理段。
+  - 更新 `tests/test_main_grid_order.py`: 宫格 9 → 10 项, 第 2 行扩展为 4 列 (路由器中继 / 路由器代理 / 路由器检测 / 网络控制台)。
+  - **累计 199 项测试全部通过**。
+
+- **脚本登记**: `scripts/split_gui.py` 加注释说明 `gui/router_proxy.py` 不在 GROUPS 内 (一次性迁移工具不再处理新增 Mixin)。
+
 ## v4.0.3
 
 - **隧道共享窗口集成两种上游模式（路由器中继 + 电脑直连）**：

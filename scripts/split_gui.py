@@ -46,6 +46,9 @@ GROUPS = {
                      "new_profile", "del_profile", "save_profile"],
     "router_tools": ["open_router_admin", "_do_open_router", "show_router_assessment",
                      "show_hotspot"],
+    # NOTE: gui/router_proxy.py 是 v4.0.4 新增的独立 Mixin (RouterProxyMixin),
+    #       不在本 GROUPS 内 (split_gui.py 已不再迁移新增 Mixin).
+    #       关联方法 show_router_proxy_window 在 App 类里直接声明, 不依赖本脚本.
     "speed_window": ["show_speed_test"],
     "tunnel_ui": ["toggle_share", "_show_tunnel_ready", "_deploy_tunnel",
                   "_get_vpn_upstream", "_show_vpn_upstream_dialog", "_copy_text",
