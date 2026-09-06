@@ -1,6 +1,6 @@
 # 校园网连接管家 (CampusNetManager)
 
-[![Release](https://img.shields.io/badge/下载-v3.1.3-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
+[![Release](https://img.shields.io/badge/下载-v3.1.4-green)](https://github.com/CampusNetTools/campus-net-manager/releases/latest)
 
 > Dr.COM 校园网自动保活 · 多设备共享上网 · Windows / macOS 桌面工具
 

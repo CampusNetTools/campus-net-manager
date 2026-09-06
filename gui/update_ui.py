@@ -34,23 +34,30 @@ class UpdateUiMixin:
             pass
         self._bg_check_update(manual=False)
 
-    def _bg_check_update(self, manual=True):
+    def _bg_check_update(self, manual=True, on_result=None):
+        """检查更新。on_result(info) 提供后: 结果通过回调回报(内联 UI 用), 不再依赖弹窗。"""
         self._log("正在检查更新…" if manual else "后台自动检查更新…")
 
         def work():
             info = updater.check_for_update(core.APP_VERSION)
-            self._log(("发现新版本 %s, 准备弹窗" % info["tag"]) if info else "更新检查无结果")
-            self.after(0, lambda: self._on_update_checked(info, manual))
+            self._log(("发现新版本 %s" % info["tag"]) if info else "更新检查无结果")
+            self.after(0, lambda: self._on_update_checked(info, manual, on_result))
         threading.Thread(target=work, daemon=True).start()
 
-    def _on_update_checked(self, info, manual):
+    def _on_update_checked(self, info, manual, on_result=None):
         if not info:
+            if on_result:
+                on_result(None)
+                return
             if manual:
                 messagebox.showinfo("检查更新", "当前已是最新版本 v%s" % core.APP_VERSION, parent=self)
             return
         core.ensure_preferences(self.cfg)
         prefs = self.cfg
         if not manual and not updater.should_notify(prefs, info["tag"]):
+            return
+        if on_result:
+            on_result(info)
             return
         try:
             self._show_update_dialog(info)
