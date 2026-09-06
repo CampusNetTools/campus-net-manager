@@ -9,6 +9,11 @@
   - 体验优化: **"立即检查"按钮自动变身"立即更新"**——查到新版本时该按钮文字直接换成"立即更新" + command 换成 `_do_update`, 无需找按钮一键触达。
   - 新增 `tests/test_pref_update_button.py` (3 项回归)。
 
+- **修正 keepalive_core.APP_VERSION 4.0.3 → 4.0.4 (v4.0.4.2)**:
+  - 现象: 打包后的 .app 窗口标题栏写 "v4.0.3" 但代码已是 v4.0.4 (宫格 10 项、立即更新按钮等都对了)。
+  - 根因: PyInstaller 打包只改了 Info.plist 的版本号, 源码 `keepalive_core.APP_VERSION` 还是字符串 "4.0.3"。
+  - 修复: 同步源码版本号到 4.0.4, 重新打包。
+
 - **修复 iOS 描述文件只配 HTTP 不配 HTTPS 导致手机上不了网**:
   - 现象: iPhone 扫码安装 mobileconfig 后, 浏览器仍上不了网 (HTTPS 站点全部超时, 表现成"配了代理但没生效").
   - 根因: `shared_proxy._ios_mobileconfig` 只填了 `HTTPEnable/HTTPPort/HTTPProxy`, iPhone Safari 默认 HTTPS 直连, HTTP 代理服务器收不到 CONNECT 隧道请求。
