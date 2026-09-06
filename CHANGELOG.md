@@ -2,6 +2,13 @@
 
 ## v4.0.4
 
+- **修复偏好设置"立即更新"按钮不可见 (v4.0.4.1)**:
+  - 现象: 偏好设置 → 软件更新 → 点"立即检查"查到新版本后, 文案写"点'立即更新'自动下载"但**找不到"立即更新"按钮**。
+  - 根因: `_render_pref_update_result` 创建立即更新按钮时 `parent=self` (App 根窗口), `pack` 到根窗口被埋在底层不可见。
+  - 修复: 保存 `_pref_card` 引用 (偏好设置的 card Frame), 按钮 parent 改用 `_pref_card`。
+  - 体验优化: **"立即检查"按钮自动变身"立即更新"**——查到新版本时该按钮文字直接换成"立即更新" + command 换成 `_do_update`, 无需找按钮一键触达。
+  - 新增 `tests/test_pref_update_button.py` (3 项回归)。
+
 - **修复 iOS 描述文件只配 HTTP 不配 HTTPS 导致手机上不了网**:
   - 现象: iPhone 扫码安装 mobileconfig 后, 浏览器仍上不了网 (HTTPS 站点全部超时, 表现成"配了代理但没生效").
   - 根因: `shared_proxy._ios_mobileconfig` 只填了 `HTTPEnable/HTTPPort/HTTPProxy`, iPhone Safari 默认 HTTPS 直连, HTTP 代理服务器收不到 CONNECT 隧道请求。
