@@ -14,17 +14,17 @@ class TestMainViewLogInline(unittest.TestCase):
         self.assertFalse(hasattr(feature_windows, "open_log_window"))
 
     def test_app_gui_no_log_card(self):
-        """app_gui 宫格不再包含「运行日志」「导出诊断」「使用帮助」。"""
+        """v5 主窗功能导航不再包含「运行日志窗口」「导出诊断」「使用帮助」入口。"""
         import app_gui
-        # 静态扫描 _build_feature_grid 方法, 看是否还引用这些
+        # 静态扫描 _build_ui 方法, 看是否还引用这些
         import inspect
-        source = inspect.getsource(app_gui.App._build_feature_grid)
+        source = inspect.getsource(app_gui.App._build_ui)
         for removed in ("open_log_window", '"导出诊断"', '"使用帮助"'):
             self.assertNotIn(removed, source,
-                              f"_build_feature_grid 仍含已弃用入口: {removed!r}")
-        # 但「偏好设置」「连接档案」仍在
+                             f"_build_ui 仍含已弃用入口: {removed!r}")
+        # 「偏好设置」入口仍在右栏; 连接档案内嵌左栏
         self.assertIn("偏好设置", source)
-        self.assertIn("open_profile_window", source)
+        self.assertIn("连接档案", source)
 
 
 class TestPreferencesHelpSection(unittest.TestCase):

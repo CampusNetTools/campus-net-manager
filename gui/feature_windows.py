@@ -104,95 +104,19 @@ class FeatureWindowsMixin:
         if not hasattr(self, "_fwin_map"):
             self._fwin_map = {}
 
-    # ---------- 独立窗口: 连接档案 ----------
+    # ---------- 连接档案 (v5: 内嵌主窗左栏) ----------
 
     def open_profile_window(self):
-        """连接档案管理(独立窗口): 档案下拉 + 按类型动态表单。
-        - 校园网档案: 账号/密码/运营商/认证服务器/SSID/网关/检测间隔
-        - 普通WiFi档案: 仅档案名 + 绑定WiFi或网关 + 检测间隔(其他字段不存在, 不变灰)
-        切换档案类型会重建字段区, 不会留"变灰禁用"控件。
-        """
-        if self._fwin("profile"):
-            return
-        self._init_fwin_map()
-        win = tk.Toplevel(self)
-        win.title("连接档案管理")
-        win.configure(bg=BG)
-        win.geometry("780x620")
-        win.minsize(700, 560)
-        win.transient(self)
-        card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
-        card.pack(fill="both", expand=True, padx=18, pady=18)
-
-        ttk.Label(card, text="连接档案", style="DialogTitle.TLabel").grid(
-            row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(card, text="按类型匹配网络：校园网=登录保活；普通WiFi/热点=只检测断网不登录",
-                  style="Muted.TLabel", wraplength=700).grid(
-            row=1, column=0, columnspan=2, sticky="w", pady=(4, 10))
-
-        prof_row = ttk.Frame(card, style="Inner.TFrame")
-        prof_row.grid(row=2, column=0, columnspan=2, sticky="ew")
-        prof_row.columnconfigure(0, weight=1)
-        self.cmb_profile = ttk.Combobox(prof_row, state="readonly")
-        self.cmb_profile.grid(row=0, column=0, sticky="ew")
-        self.cmb_profile.bind("<<ComboboxSelected>>", self._on_profile_selected)
-        ttk.Button(prof_row, text="新建", style="Gray.TButton",
-                   command=self.new_profile).grid(row=0, column=1, padx=(12, 0))
-        ttk.Button(prof_row, text="删除", style="Quiet.TButton",
-                   command=self.del_profile).grid(row=0, column=2, padx=(8, 0))
-
-        # 类型选择器
-        type_row = ttk.Frame(card, style="Inner.TFrame")
-        type_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(16, 6))
-        ttk.Label(type_row, text="档案类型", style="Field.TLabel").pack(side="left")
-        self.cmb_ptype = ttk.Combobox(
-            type_row, state="readonly", width=32,
-            values=["校园网认证（登录保活）", "普通WiFi/热点（只检测断网）"])
-        self.cmb_ptype.pack(side="left", padx=(16, 0))
-        self.cmb_ptype.bind("<<ComboboxSelected>>",
-                            lambda e: self._profile_rebuild_form())
-
-        # 类型说明
-        self.lbl_ptype_hint = ttk.Label(card, text="", style="Muted.TLabel", wraplength=700)
-        self.lbl_ptype_hint.grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 8))
-
-        # 动态字段容器
-        self._profile_form_host = ttk.Frame(card, style="Inner.TFrame")
-        self._profile_form_host.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(6, 0))
-        card.rowconfigure(5, weight=1)
-
-        # 底部按钮行
-        btns = ttk.Frame(card, style="Inner.TFrame")
-        btns.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(16, 0))
-        btns.columnconfigure(0, weight=1)
-        btns.columnconfigure(1, weight=1)
-        btns.columnconfigure(2, weight=1)
-        btns.columnconfigure(3, weight=1)
-        self.btn_save = ttk.Button(btns, text="保存档案", style="Accent.TButton",
-                                   command=self.save_profile)
-        self.btn_save.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        self.btn_check = ttk.Button(btns, text="立即检测", style="Gray.TButton",
-                                    command=self.check_now)
-        self.btn_check.grid(row=0, column=1, sticky="ew", padx=6)
-        ttk.Button(btns, text="导入配置", style="Gray.TButton",
-                   command=self.import_config).grid(row=0, column=2, sticky="ew", padx=6)
-        ttk.Button(btns, text="导出配置", style="Gray.TButton",
-                   command=self.export_config).grid(row=0, column=3, sticky="ew", padx=(6, 0))
-
-        # 关窗时清理所有表单控件引用
-        def _closed():
-            for attr in ("cmb_profile", "ent_name", "ent_user", "ent_pass",
-                         "ent_ssid", "ent_gw", "cmb_type", "cmb_ptype",
-                         "cmb_interval", "cmb_auth", "btn_detect", "btn_save",
-                         "btn_check", "lbl_ptype_hint"):
-                if hasattr(self, attr):
-                    try:
-                        setattr(self, attr, None)
-                    except Exception:
-                        pass
-        self._fwin_open("profile", lambda: (self._refresh_profile_list(),
-                                            self._load_form_from_current(), win)[-1],
-                        on_close=_closed)
+        """v5.0.0 起连接档案表单内嵌在主窗口左栏, 本方法保留为兼容入口:
+        有外部代码(向导/测试)调用时, 只把主窗口置前即可, 不再创建独立窗口
+        (独立窗口会与主窗争夺 cmb_profile 等控件引用, 导致主窗表单失效)。"""
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
+        except Exception:
+            pass
+        return None
 
     def _profile_rebuild_form(self):
         """根据当前 cmb_ptype 重建档案表单字段区。"""

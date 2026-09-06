@@ -40,10 +40,11 @@ class TestWindowGeometry(unittest.TestCase):
     def test_main_window_size(self):
         from app_gui import App
         src = inspect.getsource(App.__init__)
-        # 主窗 1080x820 / minsize 960x740
-        self.assertIn("1080", src)
-        self.assertIn("820", src)
-        self.assertIn("960", src)
+        # v5 主窗 1140x880 / minsize 1020x780 (双栏布局需要更宽)
+        self.assertIn("1140", src)
+        self.assertIn("880", src)
+        self.assertIn("1020", src)
+        self.assertIn("780", src)
 
     def test_preferences_window_size(self):
         from gui.preferences import PreferencesMixin
@@ -54,11 +55,10 @@ class TestWindowGeometry(unittest.TestCase):
         self.assertIn("padding=(26, 24)", src)
 
     def test_profile_window_size(self):
+        """v5: 连接档案内嵌主窗, open_profile_window 只置前主窗(不再开 780x620 独立窗)。"""
         from gui.feature_windows import FeatureWindowsMixin
         src = inspect.getsource(FeatureWindowsMixin.open_profile_window)
-        self.assertIn("780", src)
-        self.assertIn("620", src)
-        self.assertIn("padding=(24, 22)", src)
+        self.assertNotIn("Toplevel", src)
 
     def test_hotspot_window_size(self):
         from gui.feature_windows import FeatureWindowsMixin
