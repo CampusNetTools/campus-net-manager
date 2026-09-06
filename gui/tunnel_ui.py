@@ -54,9 +54,19 @@ class TunnelUiMixin:
             allowed = list(self.cfg.get("tunnel_allow", []))
             ips = shared_proxy.get_lan_ips()
             myip = ips[0] if ips else None
-            # 防蹭网: 生成/复用共享口令。默认开启口令校验, 仅记住口令的设备能访问。
-            self.tunnel_shared_key = self.cfg.get("tunnel_shared_key") or core.gen_tunnel_key()
-            self.cfg["tunnel_shared_key"] = self.tunnel_shared_key
+            # v4.0.5: 默认不再强制开启「防蹭网口令」。
+            # 原因: PAC/手动代理客户端(iOS/Android)无法附加自定义 HTTP 头 (X-Shared-Key),
+            # 默认开启会导致所有手机/平板请求被 407 拒绝, 普通用户根本无法走通。
+            # 现在: 只有用户在隧道共享窗口里显式勾选「启用口令保护」时, 才生成口令。
+            # 兼容: 如果历史配置里已经存在 tunnel_shared_key (v4.0.4 强制写过),
+            #       自动读取, 不主动清空, 避免破坏「已开启口令保护」的用户。
+            if self.cfg.get("tunnel_require_key"):
+                self.tunnel_shared_key = self.cfg.get("tunnel_shared_key") or core.gen_tunnel_key()
+                self.cfg["tunnel_shared_key"] = self.tunnel_shared_key
+            else:
+                # 没勾选: 内存里也不带口令(代理直接放行任何同网段设备)。
+                self.tunnel_shared_key = None
+                # 但保留磁盘上的旧 key (用户随时可以再勾回来用)。
             core.save_config(self.cfg)
             self.proxy = shared_proxy.SharedProxy(port=8080, allowed=allowed,
                                                   on_ask=self._ask_tunnel_allow,
@@ -234,6 +244,79 @@ class TunnelUiMixin:
         ttk.Label(manual_row,
                   text="(首次访问时本机会弹窗询问是否允许该设备, 「允许」后自动记住)",
                   style="Muted.TLabel").pack(anchor="w", pady=(2, 0))
+
+        # v4.0.5: 防蹭网口令开关 (默认关闭, 因为 PAC/手动代理客户端无法附加自定义 HTTP 头)
+        pwd_row = ttk.Frame(computer_card, style="Inner.TFrame")
+        pwd_row.pack(fill="x", pady=(10, 6))
+
+        def _has_existing_key():
+            return bool(self.cfg.get("tunnel_shared_key"))
+
+        pwd_var = tk.BooleanVar(value=bool(self.cfg.get("tunnel_require_key")) and _has_existing_key())
+
+        def _toggle_pwd():
+            """切换口令保护开关: 关 → 重启 proxy 时不再带 shared_key;
+            开 → 生成新口令并要求重启 proxy (弹窗提示)。"""
+            try:
+                if pwd_var.get():
+                    # 用户刚勾上 → 生成新口令 + 写盘 + 重启 proxy (带 key)
+                    new_key = core.gen_tunnel_key()
+                    self.tunnel_shared_key = new_key
+                    self.cfg["tunnel_shared_key"] = new_key
+                    self.cfg["tunnel_require_key"] = True
+                    core.save_config(self.cfg)
+                    # 重启 proxy
+                    if self.proxy and self.proxy.running:
+                        host = self.proxy.pac_host or myip
+                        port = self.proxy.port
+                        self._stop_share()
+                        self.proxy = shared_proxy.SharedProxy(
+                            port=port, allowed=list(self.proxy.allowed),
+                            on_ask=self._ask_tunnel_allow, pac_host=host,
+                            shared_key=new_key, upstream_proxy=self._get_vpn_upstream())
+                        self.proxy.start()
+                        self._log("已开启口令保护, 新口令: %s" % new_key)
+                    messagebox.showinfo(
+                        "口令已开启",
+                        "防蹭网口令: %s\n\n"
+                        "手机端配 PAC/手动代理已可上网;\n"
+                        "若以后想用 VPN 客户端/自定义脚本调用本机代理, "
+                        "需在 HTTP 请求里附带:\n"
+                        "  X-Shared-Key: %s\n\n"
+                        "(关闭本开关可随时取消口令保护。)"
+                        % (new_key, new_key),
+                        parent=win)
+                else:
+                    # 用户取消勾选 → 内存里清空口令, 重启 proxy 不带 key
+                    self.cfg["tunnel_require_key"] = False
+                    core.save_config(self.cfg)
+                    if self.proxy and self.proxy.running:
+                        host = self.proxy.pac_host or myip
+                        port = self.proxy.port
+                        self._stop_share()
+                        self.proxy = shared_proxy.SharedProxy(
+                            port=port, allowed=list(self.proxy.allowed),
+                            on_ask=self._ask_tunnel_allow, pac_host=host,
+                            shared_key=None, upstream_proxy=self._get_vpn_upstream())
+                        self.proxy.start()
+                        self._log("已关闭口令保护")
+            except Exception as e:
+                messagebox.showerror("切换失败", str(e), parent=win)
+
+        pwd_chk = ttk.Checkbutton(
+            pwd_row,
+            text="启用口令保护 (防蹭网, 需在调用方附加 X-Shared-Key 头)",
+            variable=pwd_var,
+            command=_toggle_pwd,
+            style="TCheckbutton")
+        pwd_chk.pack(side="left", anchor="w")
+
+        if _has_existing_key() and not self.cfg.get("tunnel_require_key"):
+            # v4.0.4 残留: 磁盘有口令但未开启, 提示用户
+            ttk.Label(pwd_row,
+                      text="(v4.0.4 残留口令, 需勾选才生效)",
+                      style="Muted.TLabel",
+                      foreground="#cc8800").pack(side="left", padx=(12, 0))
 
         ip_switch = ttk.Frame(computer_card, style="Inner.TFrame")
         ip_switch.pack(fill="x", pady=(8, 6))
