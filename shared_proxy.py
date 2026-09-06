@@ -202,6 +202,9 @@ class SharedProxy:
             '        <key>HTTPEnable</key><integer>1</integer>\n'
             '        <key>HTTPPort</key><integer>%d</integer>\n'
             '        <key>HTTPProxy</key><string>%s</string>\n'
+            '        <key>HTTPSEnable</key><integer>1</integer>\n'
+            '        <key>HTTPSPort</key><integer>%d</integer>\n'
+            '        <key>HTTPSProxy</key><string>%s</string>\n'
             '      </dict>\n'
             '    </dict>\n  </array>\n'
             '  <key>PayloadDescription</key><string>校园网隧道共享代理配置</string>\n'
@@ -213,7 +216,7 @@ class SharedProxy:
             '  <key>PayloadUUID</key><string>%s</string>\n'
             '  <key>PayloadVersion</key><integer>1</integer>\n'
             '</dict>\n</plist>\n'
-            % (label, payload_uuid[:8], payload_uuid, host, port, port, host, prof_uuid)
+            % (label, payload_uuid[:8], payload_uuid, host, port, port, host, port, host, prof_uuid)
         )
         return xml.encode("utf-8")
 

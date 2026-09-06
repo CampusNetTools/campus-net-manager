@@ -30,6 +30,7 @@ except Exception:
 from gui.theme import *  # noqa: F401,F403
 from gui.profile_form import ProfileFormMixin  # noqa: F401
 from gui.router_tools import RouterToolsMixin  # noqa: F401
+from gui.router_proxy import RouterProxyMixin  # noqa: F401
 from gui.speed_window import SpeedWindowMixin  # noqa: F401
 from gui.tunnel_ui import TunnelUiMixin  # noqa: F401
 from gui.preferences import PreferencesMixin  # noqa: F401
@@ -41,7 +42,7 @@ from gui.console_ui import ConsoleUiMixin  # noqa: F401
 from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -305,7 +306,7 @@ class App(ProfileFormMixin, RouterToolsMixin, SpeedWindowMixin, TunnelUiMixin, P
         return btn
 
     def _build_feature_grid(self, grid):
-        """主界面 9 项功能宫格: 4 核心 → 路由器 → 网络 → 工具 → 设置。"""
+        """主界面 10 项功能宫格 (v4.0.4: 路由器三件套展开为中继/代理/检测)。"""
         self.btn_share = None
         self.btn_console = None
         # 第 1 行: 连接档案 / 隧道共享 / 热点分享 (核心接入)
@@ -318,14 +319,17 @@ class App(ProfileFormMixin, RouterToolsMixin, SpeedWindowMixin, TunnelUiMixin, P
         self._feature_card(grid, 0, 2, "热点分享",
                         "电脑开系统热点，设备连接即上网（只占 1 名额）",
                         self.open_hotspot_window)
-        # 第 2 行: 路由器中继 / 路由器检测 / 网络控制台
+        # 第 2 行: 路由器三件套 + 网络控制台
         self._feature_card(grid, 1, 0, "路由器中继",
                         "路由器连校园网 → 家里 WiFi 不刷固件（按品牌分步）",
                         lambda: self._fwin_open_legacy("router_relay", self.show_router_relay_window))
-        self._feature_card(grid, 1, 1, "路由器检测",
+        self._feature_card(grid, 1, 1, "路由器代理",
+                        "路由器自身开 HTTP 代理 → 手机不认证走代理到路由器",
+                        lambda: self._fwin_open_legacy("router_proxy", self.show_router_proxy_window))
+        self._feature_card(grid, 1, 2, "路由器检测",
                         "识别品牌 / 型号 / 管理页 + 官方固件查询",
                         lambda: self._fwin_open_legacy("router", self.show_router_assessment))
-        self._feature_card(grid, 1, 2, "网络控制台",
+        self._feature_card(grid, 1, 3, "网络控制台",
                         "手机浏览器远程看状态 / 日志 / 管授权设备",
                         self.toggle_console, attr="btn_console")
         # 第 3 行: 网络测速 / 新手向导 / 偏好设置

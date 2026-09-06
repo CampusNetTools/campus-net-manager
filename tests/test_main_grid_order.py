@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""v4.0.3 主界面宫格顺序 + 路由器中继独立窗口回归。"""
+"""v4.0.3 主界面宫格顺序 + 路由器中继独立窗口回归。
+v4.0.4 升级: 宫格改为 10 项, 新增「路由器代理」; 详细见 test_router_proxy_window.py.
+"""
 import inspect
 import re
 import unittest
@@ -8,7 +10,7 @@ import keepalive_core as core  # noqa
 
 
 class TestMainGridOrder(unittest.TestCase):
-    """主界面 9 宫格按用户指定顺序排列。"""
+    """主界面 10 宫格按用户指定顺序排列 (v4.0.4)。"""
 
     def test_grid_cards_in_order(self):
         """按 row, col 抽取 _build_feature_grid 调用的 title 列表, 验证顺序."""
@@ -24,18 +26,18 @@ class TestMainGridOrder(unittest.TestCase):
         # 按 (row, col) 排
         cards.sort()
         titles = [c[2] for c in cards]
-        # 期望顺序 (用户上一轮指定的)
+        # v4.0.4 期望顺序 (10 项: 3 + 4 + 3)
         expected = ["连接档案", "隧道共享", "热点分享",
-                    "路由器中继", "路由器检测", "网络控制台",
+                    "路由器中继", "路由器代理", "路由器检测", "网络控制台",
                     "网络测速", "新手向导", "偏好设置"]
         self.assertEqual(titles, expected,
                          f"主界面宫格顺序不对: 实际 {titles}")
 
-    def test_grid_has_nine_cards(self):
-        """确认是 9 项宫格 (3x3)."""
+    def test_grid_has_ten_cards(self):
+        """v4.0.4 确认是 10 项宫格 (3 + 4 + 3)."""
         from app_gui import App
         src = inspect.getsource(App._build_feature_grid)
-        self.assertEqual(src.count("_feature_card("), 9)
+        self.assertEqual(src.count("_feature_card("), 10)
 
 
 class TestRouterWindowsSplit(unittest.TestCase):

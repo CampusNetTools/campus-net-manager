@@ -290,6 +290,101 @@ class TunnelUiMixin:
 
         render_qr()
 
+        # ---------- ③ 路由器代理卡 ----------
+        router_proxy_card = ttk.Frame(scroll_frame, style="Inner.TFrame")
+        router_proxy_card.pack(fill="x", pady=(0, 16))
+        ttk.Label(router_proxy_card,
+                  text="③ 路由器代理(路由器自身开 HTTP 代理, 手机走代理到路由器 IP)",
+                  style="Section.TLabel").pack(anchor="w")
+        rp_intro = (
+            "原理: 路由器直连校园网并完成认证 → 路由器自身开 HTTP 代理 (默认 8080) → "
+            "手机连路由器的 WiFi (不需要登录校园网) → 手动代理到「路由器 IP:8080」即上网。\n\n"
+            "优点: ① 路由器一次性认证, 后续手机永远免登录; ② 手机 0 配置 PAC, 出国/校内分流交给路由器; "
+            "③ 比「电脑一直开着 + 手机连电脑 WiFi」省一台电脑。\n"
+            "前提: 路由器需刷 OpenWrt / Padavan / Merlin / iKuaiOS 等支持自定义服务的固件 "
+            "(具体看主界面「路由器代理」窗口的官方固件查询和刷机教程)。"
+        )
+        ttk.Label(router_proxy_card, text=rp_intro, style="Card.TLabel",
+                  justify="left", wraplength=680).pack(anchor="w", pady=(6, 8))
+
+        # 路由器代理配置 UI: 路由器 IP + 端口 + 生成 PAC / 手动代理 / 打开路由器代理窗口
+        rp_row = ttk.Frame(router_proxy_card, style="Inner.TFrame")
+        rp_row.pack(fill="x", pady=(4, 4))
+        ttk.Label(rp_row, text="路由器 LAN IP", style="Field.TLabel").pack(side="left")
+        rp_ip_var = tk.StringVar(value=shared_proxy.get_lan_ips()[0]
+                                  if shared_proxy.get_lan_ips() else "192.168.1.1")
+        ttk.Entry(rp_row, textvariable=rp_ip_var, width=18).pack(side="left", padx=(8, 0))
+        ttk.Label(rp_row, text="代理端口", style="Field.TLabel").pack(side="left", padx=(14, 0))
+        rp_port_var = tk.StringVar(value="8080")
+        ttk.Entry(rp_row, textvariable=rp_port_var, width=8).pack(side="left", padx=(8, 0))
+
+        rp_actions = ttk.Frame(router_proxy_card, style="Inner.TFrame")
+        rp_actions.pack(fill="x", pady=(8, 0))
+        rp_state = {"url": ""}
+
+        def gen_rp_setup():
+            ip = rp_ip_var.get().strip()
+            port = rp_port_var.get().strip() or "8080"
+            if not ip:
+                messagebox.showwarning("IP 缺失", "请先填路由器 LAN IP", parent=win)
+                return
+            url = "http://%s:%s/" % (ip, port)
+            rp_state["url"] = url
+            try:
+                self.clipboard_clear()
+                self.clipboard_append(url)
+                self.update_idletasks()
+            except Exception:
+                pass
+            rp_url_lbl.configure(text="设置页: %s  (已复制到剪贴板)" % url)
+            if HAS_QR and rp_qr_holder is not None:
+                try:
+                    qr_image = qrcode.make(url).resize((110, 110))
+                    photo = ImageTk.PhotoImage(qr_image)
+                    rp_qr_holder.configure(image=photo)
+                    rp_qr_holder.image = photo
+                except Exception:
+                    pass
+
+        ttk.Button(rp_actions, text="生成路由器代理设置页 + 复制链接",
+                   style="Accent.TButton", command=gen_rp_setup).pack(side="left")
+        ttk.Button(rp_actions, text="打开「路由器代理」独立窗口",
+                   style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy("router_proxy",
+                                                           self.show_router_proxy_window)
+                   ).pack(side="left", padx=(8, 0))
+
+        rp_url_lbl = ttk.Label(router_proxy_card, text="(还没生成设置页链接)",
+                                style="Muted.TLabel", wraplength=680)
+        rp_url_lbl.pack(anchor="w", pady=(6, 4))
+
+        rp_qr_box = ttk.Frame(router_proxy_card, style="Inner.TFrame")
+        rp_qr_box.pack(fill="x", pady=(4, 0))
+        rp_qr_holder = None
+        if HAS_QR:
+            rp_qr_holder = tk.Label(rp_qr_box, bg="#ffffff", bd=0)
+            rp_qr_holder.pack(side="left")
+            ttk.Label(rp_qr_box,
+                      text="手机扫码直接打开「路由器代理」配置页 (含 PAC / 手动代理一键填)。",
+                      style="Muted.TLabel", justify="left",
+                      wraplength=420).pack(side="left", padx=(12, 0))
+        else:
+            ttk.Label(rp_qr_box, text="(未安装 Pillow+qrcode, 仅文字步骤)",
+                      style="Muted.TLabel").pack(side="left")
+
+        rp_guide = (
+            "路由器代理快速上手:\n"
+            "  ① 路由器先刷 OpenWrt/Padavan/Merlin/iKuaiOS (具体品牌步骤 → 「路由器代理」窗口);\n"
+            "  ② 在路由器里安装 HTTP 代理插件 (OpenWrt: luci-app-squid / Padavan: 内置 HTTP 代理 "
+            "/ Merlin: 自定义脚本 + nginx) 并监听 8080;\n"
+            "  ③ 手机连路由器 WiFi 但**不登录校园网** → WiFi 高级 → 代理 → 手动 → 服务器填上方 IP, "
+            "端口 8080 → 保存;\n"
+            "  ④ 手机打开任意网页就能上网, 流量全走路由器, 路由器替手机完成校园网认证。\n"
+            "  ※ 该方案**不需要本软件隧道在电脑运行**, 电脑关了也能用。"
+        )
+        ttk.Label(router_proxy_card, text=rp_guide, style="Card.TLabel",
+                  justify="left", wraplength=680).pack(anchor="w", pady=(10, 0))
+
         # ---------- 常见问题 ----------
         info = ttk.Frame(scroll_frame, style="Inner.TFrame")
         info.pack(fill="x", pady=(12, 0))
