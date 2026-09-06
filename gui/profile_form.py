@@ -65,24 +65,14 @@ class ProfileFormMixin:
 
 
     def _on_ptype_change(self, event=None):
-        """切换档案类型: 「普通WiFi」清空账号/认证服务器并置灰; 「校园网」恢复。"""
-        wifi = self.cmb_ptype.get() == "普通WiFi/热点（只检测断网）"
-        state = "disabled" if wifi else "normal"
-        for ent in (self.ent_user, self.ent_pass, self.cmb_auth):
-            try:
-                ent.configure(state=state)
-            except Exception:
-                pass
-        if wifi:
-            self.cmb_auth.set("")
-            self.btn_detect.configure(text="识别网络", state="normal")
-        else:
-            self.btn_detect.configure(text="探测", state="normal")
-        # 提示文案
-        hint = ("此档案不登录校园网，守护只检测是否断网，断网时通知你。"
-                if wifi else "此档案会登录校园网并保活，认证服务器必填。")
-        if hasattr(self, "lbl_ptype_hint"):
-            self.lbl_ptype_hint.configure(text=hint)
+        """类型切换由 feature_windows._profile_rebuild_form 接管(动态重建)。
+        保留此方法仅为不破坏既有 patch 调用; 不再尝试"原地变灰", 那体验不好。"""
+        try:
+            host = getattr(self, "_profile_form_host", None)
+            if host is not None:
+                self._profile_rebuild_form()
+        except Exception:
+            pass
 
 
     def _set_ptype_ui(self, profile):
@@ -134,64 +124,106 @@ class ProfileFormMixin:
 
 
     def _load_form_from_current(self):
+        """重建表单字段并填充当前档案值(顶层入口, 由 _fwin_open 调用)。
+        内部不递归 _profile_rebuild_form, 而是走 _fill_form_for_current_profile。"""
         p = self._current_profile()
-        if not p:
-            return
         cmb = getattr(self, "cmb_profile", None)
         try:
             if cmb is not None and not cmb.winfo_exists():
                 cmb = None
         except Exception:
             cmb = None
-        if cmb is None:
-            # 档案窗口未打开: 表单控件不存在, 无需填充(下次打开时 open_profile_window 会重新填充)
+        if cmb is None or p is None:
             return
-        def setv(ent, v):
-            ent.delete(0, "end")
-            ent.insert(0, str(v or ""))
-        setv(self.ent_name, p.get("name", ""))
-        setv(self.ent_ssid, p.get("ssid", ""))
-        setv(self.ent_gw, p.get("gateway", ""))
-        setv(self.ent_user, p.get("username", ""))
-        setv(self.ent_pass, p.get("password", ""))
-        self.cmb_interval.set(str(p.get("interval", 1800)))
-        history = self.cfg.get("auth_history") or []
-        # 任意网络使用档案: 不强制预填学校认证服务器, 留空让用户探测/自行填写。
-        is_any = not p.get("ssid") and not p.get("gateway") and not p.get("username")
-        cur = "" if is_any else (p.get("auth_url", "") or "")
-        # 若档案存了 auth_url 则用它; 否则留空(任意网络可探测)
-        saved_auth = p.get("auth_url", "")
-        if is_any and not saved_auth:
-            cur = ""
-        elif saved_auth:
-            cur = saved_auth
-        if cur and cur not in history:
-            history = [cur] + history
-        self.cmb_auth["values"] = history[-15:]
-        self.cmb_auth.set(cur)
-        lt = p.get("login_type", "cmcc")
-        self.cmb_type.current({"cmcc": 0, "unicom": 1, "teacher": 2}.get(lt, 0))
-        # 初始化档案类型下拉框并同步字段可用状态
-        self._set_ptype_ui(p)
+        try:
+            wifi = core.profile_is_wifi(p)
+            self.cmb_ptype.set("普通WiFi/热点（只检测断网）" if wifi
+                               else "校园网认证（登录保活）")
+        except Exception:
+            pass
+        self._profile_rebuild_form()  # 重建字段区
+        self._fill_form_for_current_profile()
+
+    def _fill_form_for_current_profile(self):
+        """按当前档案类型填充已构建好的表单控件。不再触发 rebuild, 避免递归。"""
+        p = self._current_profile()
+        if p is None:
+            return
+        wifi = core.profile_is_wifi(p)
+        if wifi:
+            if self.ent_name is not None:
+                self.ent_name.delete(0, "end")
+                self.ent_name.insert(0, p.get("name", ""))
+            if self.ent_ssid is not None:
+                self.ent_ssid.delete(0, "end")
+                self.ent_ssid.insert(0, p.get("ssid", ""))
+            if self.ent_gw is not None:
+                self.ent_gw.delete(0, "end")
+                self.ent_gw.insert(0, p.get("gateway", ""))
+            if self.cmb_interval is not None:
+                self.cmb_interval.set(str(p.get("interval", 60)))
+            return
+        # 校园网档案
+        if self.ent_name is not None:
+            self.ent_name.delete(0, "end")
+            self.ent_name.insert(0, p.get("name", ""))
+        if self.ent_user is not None:
+            self.ent_user.delete(0, "end")
+            self.ent_user.insert(0, p.get("username", ""))
+        if self.ent_pass is not None:
+            self.ent_pass.delete(0, "end")
+            self.ent_pass.insert(0, p.get("password", ""))
+        if self.ent_ssid is not None:
+            self.ent_ssid.delete(0, "end")
+            self.ent_ssid.insert(0, p.get("ssid", ""))
+        if self.ent_gw is not None:
+            self.ent_gw.delete(0, "end")
+            self.ent_gw.insert(0, p.get("gateway", ""))
+        if self.cmb_interval is not None:
+            self.cmb_interval.set(str(p.get("interval", 1800)))
+        if self.cmb_type is not None:
+            lt = p.get("login_type", "cmcc")
+            self.cmb_type.current({"cmcc": 0, "unicom": 1, "teacher": 2}.get(lt, 0))
+        if self.cmb_auth is not None:
+            history = list(self.cfg.get("auth_history") or [])
+            cur = p.get("auth_url", "")
+            if cur and cur not in history:
+                history = [cur] + history
+            self.cmb_auth["values"] = history[-15:]
+            self.cmb_auth.set(cur)
 
 
     def _form_to_profile(self):
-        lt = {0: "cmcc", 1: "unicom", 2: "teacher"}[self.cmb_type.current()]
-        return {
-            "name": self.ent_name.get().strip(),
-            "ssid": self.ent_ssid.get().strip(),
-            "gateway": self.ent_gw.get().strip(),
-            "username": self.ent_user.get().strip(),
-            "password": self.ent_pass.get().strip(),
-            "login_type": lt,
-            # 档案类型: 校园网认证(campus) / 普通WiFi热点(wifi)
-            "profile_type": "wifi" if self.cmb_ptype.get() == "普通WiFi/热点（只检测断网）" else "campus",
-            # 普通WiFi档案不填认证服务器
-            "auth_url": (self.cmb_auth.get().strip() or core.DEFAULT_AUTH_URL)
-            if self.cmb_ptype.get() != "普通WiFi/热点（只检测断网）" else "",
+        is_wifi = self._is_wifi_form()
+        data = {
+            "name": self.ent_name.get().strip() if self.ent_name else "",
+            "profile_type": "wifi" if is_wifi else "campus",
             "interval": max(10, int(self.cmb_interval.get() or 1800)),
         }
+        # 普通WiFi档案: 只记 ssid / gateway(至少一个), 其他一律不写(避免空字段堆积)
+        if is_wifi:
+            data["ssid"] = self.ent_ssid.get().strip() if self.ent_ssid else ""
+            data["gateway"] = self.ent_gw.get().strip() if self.ent_gw else ""
+            return data
+        # 校园网档案: 完整字段
+        data["ssid"] = self.ent_ssid.get().strip() if self.ent_ssid else ""
+        data["gateway"] = self.ent_gw.get().strip() if self.ent_gw else ""
+        data["username"] = self.ent_user.get().strip() if self.ent_user else ""
+        data["password"] = self.ent_pass.get().strip() if self.ent_pass else ""
+        data["login_type"] = {0: "cmcc", 1: "unicom", 2: "teacher"}.get(
+            self.cmb_type.current(), "cmcc") if self.cmb_type else "cmcc"
+        data["auth_url"] = (self.cmb_auth.get().strip() or core.DEFAULT_AUTH_URL) \
+            if self.cmb_auth else core.DEFAULT_AUTH_URL
+        return data
 
+
+    def _is_wifi_form(self):
+        """判断当前窗口选中的档案类型 — wifi 类型整个表单结构不同。"""
+        try:
+            return bool(self.cmb_ptype) and self.cmb_ptype.winfo_exists() \
+                and self.cmb_ptype.get() == "普通WiFi/热点（只检测断网）"
+        except Exception:
+            return False
 
     def new_profile(self):
         base = "新档案"
@@ -199,7 +231,10 @@ class ProfileFormMixin:
         names = [p["name"] for p in self.cfg.get("profiles", [])]
         while base + str(i) in names:
             i += 1
-        self.cfg.setdefault("profiles", []).append(core.default_profile(base + str(i)))
+        # 默认建 wifi 档案(更贴近新用户: 家庭/热点只想检测断网)
+        # 立达专属档案在 ensure_lida_profile 里已存在
+        self.cfg.setdefault("profiles", []).append(
+            core.default_profile(base + str(i), profile_type="wifi"))
         self.cfg["active_profile"] = base + str(i)
         core.save_config(self.cfg)
         self._refresh_profile_list()
@@ -234,23 +269,45 @@ class ProfileFormMixin:
             if not data["name"]:
                 messagebox.showwarning("提示", "档案名称不能为空")
                 return
-            if not data["username"] or not data["password"]:
-                messagebox.showwarning("提示", "账号和密码不能为空")
-                return
+            if data["profile_type"] == "wifi":
+                # 普通WiFi档案: 必须绑定 SSID 或 网关 之一, 否则没有任何网络可匹配
+                if not data["ssid"] and not data["gateway"]:
+                    messagebox.showwarning("提示",
+                        "请绑定一个 WiFi 名称(SSID)或网关，否则守护找不到对应网络。")
+                    return
+                # wifi 档案不写 username/password/auth_url/login_type(避免堆积空字段)
+                data["username"] = ""
+                data["password"] = ""
+                data["auth_url"] = ""
+                data["login_type"] = ""
+            else:
+                # 校园网档案: 必须有账号密码
+                if not data["username"] or not data["password"]:
+                    messagebox.showwarning("提示", "校园网档案需要填写账号和密码")
+                    return
+                if not data["auth_url"]:
+                    messagebox.showwarning("提示", "请填写认证服务器地址，或点「探测」自动寻找")
+                    return
             p = self._current_profile()
             if p:
                 p.update(data)
+            else:
+                self.cfg.setdefault("profiles", []).append(data)
             self.cfg["active_profile"] = data["name"]
-            # 记录认证服务器历史
-            hist = [h for h in (self.cfg.get("auth_history") or []) if h != data["auth_url"]]
-            self.cfg["auth_history"] = [data["auth_url"]] + hist
-            self.cfg["auth_history"] = self.cfg["auth_history"][-15:]
+            # 认证服务器历史(只对校园网有意义)
+            if data["profile_type"] == "campus" and data.get("auth_url"):
+                hist = [h for h in (self.cfg.get("auth_history") or [])
+                        if h != data["auth_url"]]
+                self.cfg["auth_history"] = [data["auth_url"]] + hist
+                self.cfg["auth_history"] = self.cfg["auth_history"][-15:]
             core.save_config(self.cfg, sync_secrets=True)
             self._refresh_profile_list()
             self._log("档案已保存: %s (%s)" % (data["name"], data["ssid"] or "默认"))
-            secure_note = "\n密码已安全保存到 macOS 钥匙串。" if core.IS_MACOS else ""
-            messagebox.showinfo("已保存", "档案「%s」已保存。%s\n\n换网络后 App 会根据 WiFi 自动匹配对应档案。" % (
-                data["name"], secure_note))
+            if data["profile_type"] == "campus":
+                secure_note = "\n密码已安全保存到 macOS 钥匙串。" if core.IS_MACOS else ""
+                messagebox.showinfo("已保存",
+                    "档案「%s」已保存。%s\n\n换网络后 App 会根据 WiFi 自动匹配对应档案。" % (
+                        data["name"], secure_note))
         except Exception as e:
             messagebox.showerror("保存失败", str(e))
 
