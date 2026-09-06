@@ -58,15 +58,28 @@ class _ServerFixture(unittest.TestCase):
 
 
 class AuthTests(_ServerFixture):
-    def test_no_key_forbidden(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._get("/")
-        self.assertEqual(ctx.exception.code, 403)
+    # v4.0.3 修复: iOS Safari 对 403 会缓存"未接入互联网"误导文案.
+    # 鉴权失败改为返 200 KEY_ENTRY_HTML, 引导用户重新输口令.
+    def test_no_key_returns_entry_html(self):
+        resp = self._get("/")
+        self.assertEqual(resp.status, 200)
+        html = resp.read().decode("utf-8")
+        self.assertIn("访问口令", html)
+        self.assertIn("no-store", resp.headers.get("Cache-Control", ""))
 
-    def test_wrong_key_forbidden(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._get("/api/status", key="wrong")
-        self.assertEqual(ctx.exception.code, 403)
+    def test_wrong_key_returns_entry_html(self):
+        resp = self._get("/api/status", key="wrong")
+        self.assertEqual(resp.status, 200)
+        html = resp.read().decode("utf-8")
+        self.assertIn("访问口令", html)
+        self.assertNotIn('"error"', html)
+
+    # /api/key 是鉴权查询接口, 永远返 JSON(供引导页实时校验)
+    def test_api_key_query(self):
+        bad = json.loads(self._get("/api/key", key="wrong").read().decode("utf-8"))
+        self.assertEqual(bad, {"authed": False})
+        ok = json.loads(self._get("/api/key", key=self.KEY).read().decode("utf-8"))
+        self.assertEqual(ok, {"authed": True})
 
     def test_query_key_ok(self):
         resp = self._get("/?key=%s" % self.KEY)
@@ -114,10 +127,12 @@ class ApiTests(_ServerFixture):
         self.assertTrue(data["ok"])
         self.assertEqual(self.actions, ["toggle_daemon"])
 
-    def test_post_requires_key(self):
-        with self.assertRaises(urllib.error.HTTPError) as ctx:
-            self._post("/api/daemon/toggle")
-        self.assertEqual(ctx.exception.code, 403)
+    # v4.0.3 修复: POST 鉴权失败返 200 引导页(不再 403)
+    def test_post_requires_key_returns_entry_html(self):
+        resp = self._post("/api/daemon/toggle")
+        self.assertEqual(resp.status, 200)
+        html = resp.read().decode("utf-8")
+        self.assertIn("访问口令", html)
 
 
 if __name__ == "__main__":
