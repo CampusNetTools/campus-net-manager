@@ -21,6 +21,8 @@ version = 1.0.0
 # (list) Application requirements
 # 纯 python 依赖; core 包只用到标准库
 requirements = python3,kivy
+# 尝试绕开 master 的 Python 3.14 迁移: pin 到 2024.01.21 稳定版(默认 python 3.11.x)
+p4a.branch = v2024.01.21
 
 # (str) Supported orientation (one of landscape, sensorLandscape, portrait or all)
 orientation = portrait

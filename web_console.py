@@ -93,7 +93,10 @@ function row(k, v) { return '<div class="row"><span>' + k + '</span><span>' + v 
 
 function refresh() {
   api('/api/status').then(s => {
-    document.getElementById('ver').textContent = 'v' + s.version + ' · ' + (s.platform || '');
+    document.getElementById('ver').textContent = 'v' + s.version + ' · ' + (s.platform || '')
+        + ' · ' + (s.hostname || '');
+    const lanRow = (s.lan_ips && s.lan_ips.length)
+      ? row('本机局域网 IP', s.lan_ips.join(', ')) : '';
     const env = s.in_campus === null ? '未知' : (s.in_campus ? '校园网环境' : '非校园网（休眠）');
     const net = s.authed ? (s.internet ? '已认证·可上网' : '已认证·出口异常') : '未认证/掉线';
     document.getElementById('status').innerHTML =
@@ -103,7 +106,7 @@ function refresh() {
       row('当前档案', s.profile || '—') +
       row('接入方式', s.mode + (s.ssid ? ' · ' + s.ssid : '') + (s.gateway ? ' · 网关 ' + s.gateway : '')) +
       row('隧道共享', dot(s.proxy_running, true) + (s.proxy_running ? '已开启' : '未开启')) +
-      row('最近检测', s.last_check || '—');
+      row('最近检测', s.last_check || '—') + lanRow;
     document.getElementById('btn-daemon').textContent = s.daemon_running ? '停止守护' : '启动守护';
   }).catch(e => toast(e.message));
 

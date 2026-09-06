@@ -41,9 +41,12 @@ class ConsoleUiMixin:
             pass
         profile = self._current_profile()
         proxy = getattr(self, "proxy", None)
+        import platform
         return {
             "version": core.APP_VERSION,
             "platform": "macOS" if core.IS_MACOS else "Windows",
+            "hostname": platform.node(),
+            "lan_ips": shared_proxy.get_lan_ips(),
             "daemon_running": running,
             "authed": getattr(self, "_last_authed", False),
             "internet": getattr(self, "_last_internet", False),

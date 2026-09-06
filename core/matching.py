@@ -90,6 +90,15 @@ def match_profile(cfg, ssid, gateway=None, respect_user_choice=False):
         for p in profiles:
             if p.get("gateway") and p["gateway"] == gateway:
                 return p
+    # ---- 活跃档案优先 (根治: 空绑定默认档案抢用用户显式选择) ----
+    # 无 SSID/网关精确匹配后, 若用户显式选中的档案(下拉框激活)本身可登录
+    # (有凭据 + 指向认证服务器), 则代表用户当前意图 —— 例如用手机热点/中继
+    # 接入校园网时 SSID 与档案绑定的 LIDA-UNIVERSITY 不一致, 但用户就是想让
+    # 这个账号登录。历史上此处会被"SSID/网关全空的默认档案"先抢走,
+    # 导致用错档案登录(陆冠霖的热点事故)。
+    active = next((p for p in profiles if p.get("name") == cfg.get("active_profile")), None)
+    if active and profile_has_credentials(active) and (active.get("auth_url") or "").strip():
+        return active
     # 默认档案: ssid / gateway 均为空
     for p in profiles:
         if not p.get("ssid") and not p.get("gateway"):
