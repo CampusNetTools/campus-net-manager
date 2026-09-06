@@ -25,7 +25,7 @@ from core.daemon import *  # noqa: F401,F403
 from core import config, netinfo, router, sysutils  # noqa: F401
 
 
-APP_VERSION = "3.1.3"
+APP_VERSION = "3.1.4"
 APP_NAME = "校园网连接管家"
 
 

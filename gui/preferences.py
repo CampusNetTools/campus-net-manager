@@ -92,7 +92,7 @@ class PreferencesMixin:
         win = tk.Toplevel(self)
         win.title("偏好设置与网络报告")
         win.configure(bg=BG)
-        win.geometry("620x570")
+        win.geometry("620x640")
         win.resizable(False, False)
         win.transient(self)
         win.grab_set()
@@ -208,16 +208,59 @@ class PreferencesMixin:
                 self._log("警告: 合盖保持运行启动失败 (可能非 macOS 或 caffeinate 不可用)")
             win.destroy()
 
+        # ---------- 软件更新 (内联, 不依赖弹窗) ----------
+        upd_card = ttk.Frame(card, style="Inner.TFrame", padding=(14, 10))
+        upd_card.pack(fill="x", pady=(10, 0))
+        ttk.Label(upd_card, text="软件更新", style="Section.TLabel").pack(anchor="w")
+        upd_line = ttk.Frame(upd_card, style="Inner.TFrame")
+        upd_line.pack(fill="x", pady=(6, 0))
+        self._upd_line_frame = upd_line
+        ttk.Label(upd_line, text="当前版本 v%s" % core.APP_VERSION,
+                  style="Muted.TLabel").pack(side="left")
+        self._lbl_update = ttk.Label(upd_line, text="", style="Muted.TLabel")
+        self._lbl_update.pack(side="left", padx=(12, 0))
+        ttk.Button(upd_line, text="检查更新", style="Gray.TButton",
+                   command=self._check_update_now).pack(side="right")
+        ttk.Label(upd_card, text="点击按钮联网检测 GitHub 最新版本；发现新版本后点击「立即更新」自动下载替换。",
+                  style="Muted.TLabel").pack(anchor="w", pady=(4, 0))
+
         actions = ttk.Frame(card, style="Inner.TFrame")
         actions.pack(fill="x", side="bottom", pady=(14, 0))
         ttk.Button(actions, text="刷新网络报告", style="Gray.TButton", command=refresh_report).pack(side="left")
         ttk.Button(actions, text="测试通知", style="Gray.TButton",
                    command=lambda: core.send_system_notification("通知设置工作正常")).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="检查更新", style="Gray.TButton",
-                   command=lambda: self._bg_check_update(manual=True)).pack(side="left", padx=(8, 0))
         ttk.Button(actions, text="保存设置", style="Accent.TButton", command=save_preferences).pack(side="right")
 
     # ---------- 系统托盘 ----------
+
+    def _check_update_now(self):
+        """偏好设置内联更新检查: 点击即查, 结果写回标签, 发现新版内联给「立即更新」。"""
+        self._log("手动检查更新")
+        self._set_update_text("正在检查…")
+
+        def on_result(info):
+            self.after(0, lambda: self._render_update_result(info))
+        self._bg_check_update(manual=True, on_result=on_result)
+
+    def _set_update_text(self, text):
+        try:
+            self._lbl_update.configure(text=text)
+        except Exception:
+            pass
+
+    def _render_update_result(self, info):
+        if not info:
+            self._set_update_text("✓ 已是最新版本 v%s" % core.APP_VERSION)
+            return
+        self._update_info = info
+        self._set_update_text("发现新版本 %s" % info["tag"])
+        if getattr(self, "_btn_update_now", None) is None:
+            self._btn_update_now = ttk.Button(
+                self._upd_line_frame, text="立即更新", style="Accent.TButton",
+                command=lambda: self._do_update(self._update_info))
+            self._btn_update_now.pack(side="right")
+        else:
+            self._btn_update_now.pack(side="right")
 
     def _restore_preferences(self):
         """App 启动即恢复独立偏好: 合盖/休眠保持运行不依赖守护是否启动。
