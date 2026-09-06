@@ -1,5 +1,10 @@
 # 更新记录
 
+## v3.1.6
+
+- 自动更新端到端验证（v3.1.5 实测）：打包 App 的启动自动检测已能在日志输出"已是最新/发现新版本"，本版用于在真机验证"发现新版本→弹窗→立即更新→自替换重启"完整链路。
+- certifi 证书兜底同时覆盖 Windows 打包版（requirements 同步生效）。
+
 ## v3.1.5
 
 - 【重要修复】更新检查在打包后的 App 里一直静默失败的真因：PyInstaller 冻结包找不到系统 CA 证书链，连 GitHub 报 `CERTIFICATE_VERIFY_FAILED`，导致"打开软件自动检查更新→有新版本弹窗"从未真正触发。修复：内置 certifi 证书包兜底（requirements 增加 certifi，updater 用 `_ssl_context()` 加载）。此版起"启动自动检测+非最新弹窗"真正可用。
