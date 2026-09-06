@@ -92,8 +92,9 @@ class PreferencesMixin:
         win = tk.Toplevel(self)
         win.title("偏好设置与网络报告")
         win.configure(bg=BG)
-        win.geometry("620x640")
-        win.resizable(False, False)
+        win.geometry("620x700")
+        win.resizable(False, True)
+        win.minsize(620, 620)
         win.transient(self)
         win.grab_set()
 
