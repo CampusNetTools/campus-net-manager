@@ -130,7 +130,14 @@ class KeepAliveDaemon(threading.Thread):
                 best, reason = matching.best_match_profile(self.cfg, ssid, gw, auth_url)
                 current_prof = next((p for p in self.cfg.get("profiles", [])
                                      if p.get("name") == self.cfg.get("active_profile")), None)
-                if best and current_prof and best.get("name") != current_prof.get("name"):
+                # 守卫(根治热点事故): 用户显式选中的档案本身可登录且当前校园网可达时,
+                # 不因"认证可用"而切去别的空绑定默认档案。仅当 best 是 SSID/网关精确匹配,
+                # 或当前活跃档案无法服务(无凭据/wifi/非校园网)才允许自动切换。
+                active_serves = bool(current_prof and matching.profile_has_credentials(current_prof)
+                                     and in_campus)
+                precise = bool(reason and ("精确匹配" in reason))
+                if (best and current_prof and best.get("name") != current_prof.get("name")
+                        and (precise or not active_serves)):
                     self.cfg["active_profile"] = best["name"]
                     try:
                         config.save_config(self.cfg)
