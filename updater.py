@@ -10,10 +10,30 @@ import datetime
 import json
 import os
 import re
+import ssl
 import stat
 import sys
 import tempfile
 import urllib.request
+import urllib.error
+
+try:
+    import certifi
+    HAS_CERTIFI = True
+except Exception:
+    HAS_CERTIFI = False
+
+
+def _ssl_context():
+    """带证书包的 SSL 上下文: PyInstaller 冻结包找不到系统 CA 时用 certifi 兜底
+    (根因 2026-09-06: 冻结 App 检查 GitHub 报 CERTIFICATE_VERIFY_FAILED, 更新弹窗从未真正触发)。"""
+    ctx = ssl.create_default_context()
+    if HAS_CERTIFI:
+        try:
+            ctx.load_verify_locations(certifi.where())
+        except Exception:
+            pass
+    return ctx
 
 REPO = "CampusNetTools/campus-net-manager"
 API_LATEST = "https://api.github.com/repos/%s/releases/latest" % REPO
@@ -47,11 +67,15 @@ def check_for_update(current_version, timeout=10, opener=None):
 
     返回: {tag, version, notes, page, assets: [{name, url, size}]}
     """
-    open_fn = opener.open if opener else urllib.request.urlopen
     try:
         req = urllib.request.Request(API_LATEST, headers=_UA)
-        with open_fn(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        if opener:
+            with opener.open(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        else:
+            with urllib.request.urlopen(req, timeout=timeout,
+                                        context=_ssl_context()) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
     except Exception as exc:
         _log("更新检查失败: %r (%s)" % (exc, API_LATEST))
         return None
@@ -84,9 +108,12 @@ def pick_asset(assets, platform=None):
 
 def download(url, dest, progress=None, timeout=60, opener=None, chunk_size=65536):
     """下载到 dest, progress(已下载, 总大小) 回调。返回 dest。"""
-    open_fn = opener.open if opener else urllib.request.urlopen
     req = urllib.request.Request(url, headers=_UA)
-    with open_fn(req, timeout=timeout) as resp:
+    if opener:
+        ctx_resp = opener.open(req, timeout=timeout)
+    else:
+        ctx_resp = urllib.request.urlopen(req, timeout=timeout, context=_ssl_context())
+    with ctx_resp as resp:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         with open(dest, "wb") as f:
