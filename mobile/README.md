@@ -20,9 +20,14 @@
 
 ## 构建 APK
 
-CI 自动构建：改动 `mobile/` 或 `core/` 推送后，GitHub Actions「手机版 APK」工作流会产出 debug APK（Actions 运行页 Artifacts 下载，debug 签名可直接安装）。
+> ⚠️ **CI 自动构建暂被上游阻塞**（2026-09-06）：python-for-android 最新稳定版
+> v2026.05.09 及 master 正迁移到 Python 3.14.2，纯 Python 依赖的 Android wheel 安装链路
+> 存在 bug（host pip 拒绝 android 标签 wheel：`charset_normalizer ... is not a supported wheel`）。
+> 「手机版 APK」工作流已改为手动触发（Actions 页 → 手机版 APK → Run workflow），
+> 待 p4a 上游修复后一键验证。
 
-本地构建（需 Linux 或 macOS + buildozer 环境）：
+本地构建（需 Linux 或 macOS + buildozer 环境；macOS 本机因同样上游问题暂无法出包，
+建议用 Windows 的 WSL2/Linux 或 Docker 完成）：
 
 ```bash
 mkdir -p build_mobile
