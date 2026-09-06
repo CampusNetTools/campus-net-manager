@@ -1,8 +1,8 @@
 name: 手机版 APK
 
-# ⚠️ 当前 APK CI 被上游阻塞(2026-09-06): python-for-android v2026.05.09/master 正迁移到
-# Python 3.14.2, 其纯 python 依赖的 android wheel 安装链路有 bug(host pip 拒绝 android 标签 wheel)。
-# 修复等待 p4a 上游。本地构建方式见 mobile/README.md。此工作流保留手动触发供上游修复后验证。
+# APK CI (手动触发, 构建约 18 分钟): python-for-android 必须 pin 到旧稳定版
+# (buildozer.spec: p4a.branch = v2024.01.21), master/v2026.05.09 卡在 Python 3.14 迁移
+# (纯 python 依赖 android wheel 装不上)。产物: Actions 页 Artifacts 下载 debug APK。
 on:
   workflow_dispatch:
 
