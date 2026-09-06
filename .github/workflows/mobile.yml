@@ -9,7 +9,9 @@ on:
 jobs:
   build-apk:
     name: 构建 Android APK (debug)
-    runs-on: ubuntu-latest
+    # p4a 的 libffi 配方与 Ubuntu 24.04 的 autoconf 2.72/libtool 不兼容
+    # (configure.ac: LT_SYS_SYMBOL_USCORE possibly undefined macro), 22.04 可正常构建
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
@@ -20,20 +22,58 @@ jobs:
           cp -r core build_mobile/
           ls build_mobile
 
-      # ArtemSBulgakov/buildozer-action 封装 kivy/buildozer 官方 Docker 镜像
-      # (镜像内自带 Android SDK/NDK/autotools, 许可已接受)。
-      # runner 裸装 buildozer 的坑已全部踩过(见 git log):
-      #  SDK 许可 / sdkmanager 旧布局 / ubuntu24.04 libffi 配方 / p4a master 默认 Python 3.14 无 android wheel
-      - name: 构建 debug APK (buildozer Docker)
-        uses: ArtemSBulgakov/buildozer-action@v1
+      - uses: actions/setup-java@v4
         with:
-          command: buildozer android debug
-          workdir: build_mobile
-          buildozer_version: stable
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 缓存 buildozer 依赖 (SDK/NDK/下载)
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('mobile/buildozer.spec') }}
+          restore-keys: buildozer-${{ runner.os }}-
+
+      - name: 安装 Android 交叉编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential zip unzip \
+            autoconf automake libtool pkg-config autoconf-archive \
+            gettext autopoint
+          echo "ACLOCAL_PATH=/usr/share/aclocal" >> "$GITHUB_ENV"
+
+      - name: 安装 buildozer
+        run: pip install buildozer cython==0.29.36
+
+      - name: 配置使用 runner 预装 Android SDK（许可已接受）
+        run: |
+          python3 -c "
+          import os
+          p = 'build_mobile/buildozer.spec'
+          s = open(p).read()
+          assert 'android.sdk_path' not in s
+          s = s.replace('[app]', '[app]\nandroid.sdk_path = ' + os.environ['ANDROID_HOME'], 1)
+          open(p, 'w').write(s)
+          print([ln for ln in s.splitlines() if 'sdk_path' in ln])
+          "
+          ls "$ANDROID_HOME/build-tools"
+          # p4a 按旧布局找 $SDK/tools/bin/sdkmanager, 新 SDK 在 cmdline-tools 下, 建符号链接兼容
+          mkdir -p "$ANDROID_HOME/tools/bin"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager" || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+
+      - name: 构建 debug APK
+        working-directory: build_mobile
+        run: buildozer android debug
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
         with:
           name: 校园网连接管家-android-debug-apk
           path: build_mobile/bin/*.apk
-          if-no-files-found: error
