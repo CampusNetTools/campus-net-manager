@@ -62,7 +62,8 @@ jobs:
         run: |
           PYTHON_BIN=python bash scripts/build_macos.sh
           cd dist/macos
-          zip -rq "校园网连接管家-macOS-arm64-${GITHUB_REF_NAME}.zip" "校园网连接管家.app"
+          # 资产名用 ASCII: 中文名经 actions/glob 上传会被剥成前导 "-"
+          zip -rq "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip" "校园网连接管家.app"
 
       - name: 构建 Windows exe
         if: matrix.target == 'windows'
@@ -80,7 +81,7 @@ jobs:
         if: matrix.target == 'macos'
         uses: softprops/action-gh-release@v2
         with:
-          files: "dist/macos/校园网连接管家-macOS-arm64-${{ github.ref_name }}.zip"
+          files: "dist/macos/CampusNetManager-macOS-arm64-${{ github.ref_name }}.zip"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
