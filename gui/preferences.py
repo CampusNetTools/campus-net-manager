@@ -103,6 +103,8 @@ class PreferencesMixin:
 
         card = ttk.Frame(win, style="Card.TFrame", padding=(26, 24))
         card.pack(fill="both", expand=True, padx=18, pady=18)
+        # 保存 card 引用供内联「立即更新」按钮挂靠
+        self._pref_card = card
         ttk.Label(card, text="偏好设置", style="DialogTitle.TLabel").pack(anchor="w")
         ttk.Label(card, text="只记录连接状态，不记录浏览内容、账号或密码。",
                   style="Muted.TLabel").pack(anchor="w", pady=(4, 14))
@@ -478,16 +480,26 @@ class PreferencesMixin:
             self._pref_update_info = None
             return
         self._pref_update_info = info
-        self._set_pref_upd_text("发现新版本 %s（当前 v%s）。点「立即更新」自动下载并重启完成替换。" % (
+        self._set_pref_upd_text("发现新版本 %s（当前 v%s）。检查按钮已自动切换为「立即更新」，点一下自动下载并重启完成替换。" % (
             info["tag"], core.APP_VERSION))
+        # 把 "立即检查" 按钮原地变身为 "立即更新" —— 用户无需再找按钮
+        if getattr(self, "_btn_pref_check", None) is not None:
+            try:
+                self._btn_pref_check.configure(
+                    text="立即更新",
+                    command=lambda: self._do_update(self._pref_update_info),
+                    style="Accent.TButton")
+            except Exception:
+                pass
         if getattr(self, "_btn_pref_update_now", None) is None:
+            # parent 必须挂到偏好设置 card 上, 否则 pack 到根窗口会被埋在底层看不见
+            parent = getattr(self, "_pref_card", None) or self
             self._btn_pref_update_now = ttk.Button(
-                self, text="立即更新", style="Accent.TButton",
+                parent, text="立即更新", style="Accent.TButton",
                 command=lambda: self._do_update(self._pref_update_info))
-        # 重新布局: 放在 _lbl_pref_upd 同一张卡的下方
-        try:
-            self._btn_pref_update_now.pack(anchor="w", pady=(10, 0))
-        except Exception:
-            pass
+            try:
+                self._btn_pref_update_now.pack(anchor="w", pady=(10, 0))
+            except Exception:
+                pass
 
 
