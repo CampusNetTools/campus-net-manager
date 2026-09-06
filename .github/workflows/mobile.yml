@@ -36,6 +36,15 @@ jobs:
           key: buildozer-${{ runner.os }}-${{ hashFiles('mobile/buildozer.spec') }}
           restore-keys: buildozer-${{ runner.os }}-
 
+      - name: 安装 Android 交叉编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential zip unzip \
+            autoconf automake libtool pkg-config autoconf-archive \
+            gettext autopoint
+          echo "ACLOCAL_PATH=/usr/share/aclocal" >> "$GITHUB_ENV"
+
       - name: 安装 buildozer
         run: pip install buildozer cython==0.29.36
 
