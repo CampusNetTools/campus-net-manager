@@ -33,6 +33,15 @@ def is_newer(latest, current):
     return bool(lv and cv and lv > cv)
 
 
+def _log(msg):
+    """写日志; 桌面端定位到 core.sysutils, 失败静默(独立环境不阻塞)。"""
+    try:
+        from core import sysutils
+        sysutils.log(msg)
+    except Exception:
+        pass
+
+
 def check_for_update(current_version, timeout=10, opener=None):
     """查询最新 Release。有更新返回信息 dict; 已最新/失败返回 None。
 
@@ -43,10 +52,12 @@ def check_for_update(current_version, timeout=10, opener=None):
         req = urllib.request.Request(API_LATEST, headers=_UA)
         with open_fn(req, timeout=timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
+    except Exception as exc:
+        _log("更新检查失败: %r (%s)" % (exc, API_LATEST))
         return None
     tag = data.get("tag_name", "")
     if not is_newer(tag, current_version):
+        _log("更新检查: 已是最新 (%s)" % tag)
         return None
     assets = [{"name": a.get("name", ""),
                "url": a.get("browser_download_url", ""),

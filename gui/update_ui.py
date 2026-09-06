@@ -39,6 +39,7 @@ class UpdateUiMixin:
 
         def work():
             info = updater.check_for_update(core.APP_VERSION)
+            self._log(("发现新版本 %s, 准备弹窗" % info["tag"]) if info else "更新检查无结果")
             self.after(0, lambda: self._on_update_checked(info, manual))
         threading.Thread(target=work, daemon=True).start()
 
@@ -51,11 +52,26 @@ class UpdateUiMixin:
         prefs = self.cfg
         if not manual and not updater.should_notify(prefs, info["tag"]):
             return
-        self._show_update_dialog(info)
+        try:
+            self._show_update_dialog(info)
+            self._log("更新弹窗已创建")
+        except Exception as exc:
+            self._log("更新弹窗创建失败: %r" % exc)
+            try:
+                messagebox.showinfo("发现新版本", "发现新版本 %s" % info["tag"], parent=self)
+            except Exception:
+                pass
 
     # ---------- 弹窗 ----------
 
     def _show_update_dialog(self, info):
+        # 先恢复主窗口可见(在托盘/后台时先回前台), 否则 Toplevel 可能不显示
+        try:
+            if self.state() == "withdrawn":
+                self.deiconify()
+            self.lift()
+        except Exception:
+            pass
         win = tk.Toplevel(self)
         win.title("发现新版本 %s" % info["tag"])
         win.configure(bg=BG)
@@ -67,6 +83,7 @@ class UpdateUiMixin:
             win.lift()
             win.attributes("-topmost", True)
             win.after(800, lambda: win.attributes("-topmost", False))
+            win.focus_force()
         except Exception:
             pass
 
