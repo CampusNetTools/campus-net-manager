@@ -1,5 +1,20 @@
 # 更新记录
 
+## v4.0.5
+
+- **修复「v4.0.4 默认开启防蹭网口令」导致手机 PAC/手动代理全部 407 被拒、上不了网**:
+  - 现象: v4.0.4 起「隧道共享」每次启动都自动生成 `tunnel_shared_key` (共享口令) 并要求所有设备附带 `X-Shared-Key` HTTP 头, 但**iOS/Android 的 PAC/手动代理客户端根本无法附加自定义 HTTP 头**, 导致所有手机请求被代理以 `407 Proxy Authentication Required` 拒绝, 表现成「配了代理但完全没网」。
+  - 根因: v4.0.4 引入的 `shared_key` 防蹭网特性默认开启且 UI 没暴露关闭入口, 普通用户(包括本次出问题的用户)根本没法让代理走通。
+  - 修复 (3 处):
+    1. `gui/tunnel_ui.py::toggle_share`: 默认不再生成口令 (`shared_key=None`)。只有当用户显式勾选 `cfg.tunnel_require_key=True` 时才生成。
+    2. `gui/tunnel_ui.py::_show_tunnel_ready`: 在「② 电脑模式」卡里新增 **「启用口令保护」复选框**, 默认不勾。勾上时弹窗显示新生成的口令、提示需要在自定义调用里附 `X-Shared-Key: <key>`, 并热重启 SharedProxy 实例; 取消勾选时同样热重启到无口令模式。
+    3. 配置持久化字段 `tunnel_require_key` 写入 `core/config.json`, v4.0.4 残留的口令 (有 `tunnel_shared_key` 但没 `tunnel_require_key`) 自动保持关闭状态, 不强制激活 (避免突然「被加密」)。
+  - 新增 `tests/test_tunnel_default_no_key.py` (10 项回归): 默认无 key / 显式开 key / 5 种 v4.0.4 残留配置下的决策矩阵。
+  - **操作步骤让手机立即能上网**:
+    1. 更新到 v4.0.5 (一键更新或官网下载)。
+    2. 重新点「隧道共享」开关一次 (旧实例仍在用 v4.0.4 的口令策略, 重启才能生效)。
+    3. 手机 PAC 保持现状 (`http://10.52.188.32:8080/proxy.pac`) 即可——会自动走通。
+
 ## v4.0.4
 
 - **修复偏好设置"立即更新"按钮不可见 (v4.0.4.1)**:
