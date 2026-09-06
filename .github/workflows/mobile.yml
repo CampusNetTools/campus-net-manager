@@ -9,7 +9,9 @@ on:
 jobs:
   build-apk:
     name: 构建 Android APK (debug)
-    runs-on: ubuntu-latest
+    # p4a 的 libffi 配方与 Ubuntu 24.04 的 autoconf 2.72/libtool 不兼容
+    # (configure.ac: LT_SYS_SYMBOL_USCORE possibly undefined macro), 22.04 可正常构建
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
