@@ -1,43 +1,28 @@
 # -*- coding: utf-8 -*-
-"""v4.0.3 主界面宫格顺序 + 路由器中继独立窗口回归。
-v4.0.4 升级: 宫格改为 10 项, 新增「路由器代理」; 详细见 test_router_proxy_window.py.
+"""v5.0.0 主界面双栏布局回归 (v4 宫格测试已随宫格删除而重写)。
+路由器中继独立窗口断言保留。
 """
 import inspect
-import re
 import unittest
 
 import keepalive_core as core  # noqa
 
 
-class TestMainGridOrder(unittest.TestCase):
-    """主界面 10 宫格按用户指定顺序排列 (v4.0.4)。"""
+class TestV5LayoutReplacesGrid(unittest.TestCase):
+    """v4 的 10 宫格已由 v5 双栏(左档案表单+右功能导航)取代。"""
 
-    def test_grid_cards_in_order(self):
-        """按 row, col 抽取 _build_feature_grid 调用的 title 列表, 验证顺序."""
+    def test_grid_methods_removed(self):
         from app_gui import App
-        src = inspect.getsource(App._build_feature_grid)
-        # 用 regex 抽取每个 "_feature_card(grid, ROW, COL, \"title\", ..."
-        pat = re.compile(r'_feature_card\(\s*grid\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*"([^"]+)"',
-                          re.M)
-        cards = []
-        for m in pat.finditer(src):
-            row, col, title = int(m.group(1)), int(m.group(2)), m.group(3)
-            cards.append((row, col, title))
-        # 按 (row, col) 排
-        cards.sort()
-        titles = [c[2] for c in cards]
-        # v4.0.4 期望顺序 (10 项: 3 + 4 + 3)
-        expected = ["连接档案", "隧道共享", "热点分享",
-                    "路由器中继", "路由器代理", "路由器检测", "网络控制台",
-                    "网络测速", "新手向导", "偏好设置"]
-        self.assertEqual(titles, expected,
-                         f"主界面宫格顺序不对: 实际 {titles}")
+        self.assertFalse(hasattr(App, "_build_feature_grid"),
+                         "v5 已删除 _build_feature_grid")
 
-    def test_grid_has_ten_cards(self):
-        """v4.0.4 确认是 10 项宫格 (3 + 4 + 3)."""
+    def test_nav_uses_fwin_single_instance(self):
+        """右栏导航按钮仍走 _fwin_open_legacy 单实例机制。"""
         from app_gui import App
-        src = inspect.getsource(App._build_feature_grid)
-        self.assertEqual(src.count("_feature_card("), 10)
+        src = inspect.getsource(App._build_ui)
+        self.assertIn("_fwin_open_legacy", src)
+        # 计数: 路由器中继/代理/检测 + 测速 + 向导 + 偏好 = 6 处
+        self.assertEqual(src.count("_fwin_open_legacy"), 6)
 
 
 class TestRouterWindowsSplit(unittest.TestCase):

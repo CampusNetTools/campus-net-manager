@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-校园网连接管家 - 桌面端
+校园网连接管家 - 桌面端 (v5.0.0 双栏版)
+排版: v2 双栏(左=连接档案内嵌表单 / 右=功能导航) + v4 全功能整合
 功能: 多档案配置(按 WiFi 自动匹配) / 环境识别(非校园网自动休眠) / 运行状态 / 实时日志
 用法: python app_gui.py
 """
@@ -52,12 +53,13 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         self.title("校园网连接管家 v" + core.APP_VERSION)
         screen_w = self.winfo_screenwidth()
         screen_h = self.winfo_screenheight()
-        width = min(1080, max(960, screen_w - 100))
-        height = min(820, max(740, screen_h - 160))
+        # v5: 双栏布局需要更宽; 高度给足, 保证默认尺寸下左栏表单完整可见(无文字截断)
+        width = min(1140, max(1040, screen_w - 80))
+        height = min(880, max(812, screen_h - 100))
         x = max(20, (screen_w - width) // 2)
         y = max(40, (screen_h - height) // 2)
         self.geometry("%dx%d+%d+%d" % (width, height, x, y))
-        self.minsize(min(960, screen_w - 40), min(740, screen_h - 100))
+        self.minsize(min(1020, screen_w - 40), min(780, screen_h - 60))
         self.configure(bg=BG)
         self._style()
 
@@ -71,6 +73,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         self._build_ui()
         self._refresh_profile_list()
         self._load_form_from_current()
+        self._refresh_vpn_status()
 
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.after(200, self._poll_log)
@@ -125,8 +128,12 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         s.configure("Title.TLabel", background=BG, foreground=FG, font=FONT_L)
         s.configure("Sub.TLabel", background=BG, foreground=MUTED, font=FONT_S)
         s.configure("Section.TLabel", background=CARD, foreground=FG, font=FONT_M)
+        s.configure("CardSubTitle.TLabel", background=CARD, foreground=FG,
+                    font=("PingFang SC", 12, "bold"))
         s.configure("Field.TLabel", background=CARD, foreground=MUTED, font=FONT_S)
         s.configure("Status.TLabel", background=CARD, foreground=FG, font=FONT_S)
+        s.configure("NavSep.TLabel", background=CARD, foreground=MUTED,
+                    font=("PingFang SC", 10, "bold"))
         s.configure("TEntry", fieldbackground=CARD2, foreground=FG, insertcolor=FG,
                     font=FONT, bordercolor=BORDER, lightcolor=BORDER, darkcolor=BORDER,
                     padding=(8, 5), relief="flat")
@@ -154,11 +161,6 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         s.configure("Quiet.TButton", background=CARD, foreground=MUTED, font=FONT_S,
                     borderwidth=0, padding=(6, 4), anchor="center")
         s.map("Quiet.TButton", background=[("active", CARD2)], foreground=[("active", FG)])
-        s.configure("Feature.TButton", background=CARD2, foreground=FG,
-                    font=("PingFang SC", 14), borderwidth=1, bordercolor=BORDER,
-                    padding=(10, 11), anchor="w")
-        s.map("Feature.TButton", background=[("active", "#243653"), ("pressed", "#17243a")],
-              foreground=[("active", FG)])
         s.configure("Danger.TButton", background="#8f4051", foreground="#ffffff", font=FONT,
                     borderwidth=0, padding=(12, 7), anchor="center")
         s.map("Danger.TButton", background=[("active", "#a64a5d"), ("pressed", "#793645")])
@@ -202,20 +204,24 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
     # ---------- UI ----------
 
     def _build_ui(self):
-        # 顶栏: 品牌在左 + 版本在右。  内边距 24/18/24/12 让上方留点呼吸。
-        top = ttk.Frame(self, padding=(24, 16, 24, 10))
+        # ===== 顶栏: 品牌在左 + 版本/检查更新在右 =====
+        top = ttk.Frame(self, padding=(24, 16, 24, 8))
         top.pack(fill="x")
         brand = ttk.Frame(top)
         brand.pack(side="left")
         ttk.Label(brand, text="校园网连接管家", style="Title.TLabel").pack(anchor="w")
         ttk.Label(brand, text="自动识别网络 · 保持校园网稳定在线", style="Sub.TLabel").pack(
-            anchor="w", pady=(4, 0))
-        ttk.Label(top, text="v" + core.APP_VERSION, style="Sub.TLabel").pack(
-            side="right", anchor="n", pady=(10, 0))
+            anchor="w", pady=(3, 0))
+        verbox = ttk.Frame(top)
+        verbox.pack(side="right", anchor="n", pady=(8, 0))
+        ttk.Label(verbox, text="v" + core.APP_VERSION, style="Sub.TLabel").pack(side="left")
+        ttk.Button(verbox, text="检查更新", style="Quiet.TButton",
+                   command=lambda: self._bg_check_update(manual=True)).pack(
+                       side="left", padx=(10, 0))
 
-        # 状态条 (总览, 不归属任何功能窗口) —— 16/12 内边距, 卡片间间隔 12
-        status = ttk.Frame(self, style="Card.TFrame", padding=(20, 14))
-        status.pack(fill="x", padx=24, pady=(4, 12))
+        # ===== 状态条: 守护 / 网络 / 环境 =====
+        status = ttk.Frame(self, style="Card.TFrame", padding=(20, 12))
+        status.pack(fill="x", padx=24, pady=(2, 12))
         for col in (1, 3, 5):
             status.columnconfigure(col, weight=1)
 
@@ -238,111 +244,244 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         self.lbl_last = ttk.Label(envbox, text="上次检测：—", style="Muted.TLabel")
         self.lbl_last.pack(anchor="w", pady=(2, 0))
 
-        # 守护控制带 —— 16/14 内边距
-        ctl = ttk.Frame(self, style="Card.TFrame", padding=(18, 14))
-        ctl.pack(fill="x", padx=24, pady=(0, 14))
-        ctl.columnconfigure(1, weight=1)
-        self.btn_guard = ttk.Button(ctl, text="启动守护", style="Green.TButton",
+        # ===== 主体双栏: 左=连接档案(内嵌动态表单) / 右=功能导航 =====
+        body = ttk.Frame(self)
+        body.pack(fill="both", expand=True, padx=24)
+        body.columnconfigure(0, weight=3, minsize=520)
+        body.columnconfigure(1, weight=2, minsize=336)
+        body.rowconfigure(0, weight=1)
+
+        # ---- 左栏: 连接档案 ----
+        pcard = ttk.Frame(body, style="Card.TFrame", padding=(18, 14))
+        pcard.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        pcard.columnconfigure(0, weight=1)
+        pcard.columnconfigure(1, weight=1)
+
+        head = ttk.Frame(pcard, style="Inner.TFrame")
+        head.grid(row=0, column=0, columnspan=2, sticky="ew")
+        ttk.Label(head, text="连接档案", style="Section.TLabel").pack(side="left")
+        ttk.Label(head, text="按 WiFi / 网关自动匹配, 换网自动切换", style="Muted.TLabel").pack(
+            side="left", padx=(12, 0))
+
+        prof_row = ttk.Frame(pcard, style="Inner.TFrame")
+        prof_row.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        prof_row.columnconfigure(0, weight=1)
+        self.cmb_profile = ttk.Combobox(prof_row, state="readonly")
+        self.cmb_profile.grid(row=0, column=0, sticky="ew")
+        self.cmb_profile.bind("<<ComboboxSelected>>", self._on_profile_selected)
+        ttk.Button(prof_row, text="新建", style="Gray.TButton",
+                   command=self.new_profile).grid(row=0, column=1, padx=(8, 0))
+        ttk.Button(prof_row, text="删除", style="Quiet.TButton",
+                   command=self.del_profile).grid(row=0, column=2, padx=(4, 0))
+
+        type_row = ttk.Frame(pcard, style="Inner.TFrame")
+        type_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        ttk.Label(type_row, text="档案类型", style="Field.TLabel").pack(side="left")
+        self.cmb_ptype = ttk.Combobox(
+            type_row, state="readonly", width=30,
+            values=["校园网认证（登录保活）", "普通WiFi/热点（只检测断网）"])
+        self.cmb_ptype.pack(side="left", padx=(12, 0))
+        self.cmb_ptype.bind("<<ComboboxSelected>>",
+                            lambda e: self._profile_rebuild_form())
+        ttk.Button(type_row, text="自动探查当前网络", style="Gray.TButton",
+                   command=self._profile_auto_probe).pack(side="right")
+
+        self.lbl_ptype_hint = ttk.Label(pcard, text="", style="Muted.TLabel",
+                                        wraplength=520, justify="left")
+        self.lbl_ptype_hint.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
+        # 动态字段容器 (由 _profile_rebuild_form 填充)
+        self._profile_form_host = ttk.Frame(pcard, style="Inner.TFrame")
+        self._profile_form_host.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
+        pcard.rowconfigure(4, weight=1)
+
+        btns = ttk.Frame(pcard, style="Inner.TFrame")
+        btns.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        btns.columnconfigure(0, weight=1)
+        btns.columnconfigure(1, weight=1)
+        btns.columnconfigure(2, weight=1)
+        btns.columnconfigure(3, weight=1)
+        self.btn_save = ttk.Button(btns, text="保存档案", style="Accent.TButton",
+                                   command=self.save_profile)
+        self.btn_save.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.btn_check = ttk.Button(btns, text="立即检测", style="Gray.TButton",
+                                    command=self.check_now)
+        self.btn_check.grid(row=0, column=1, sticky="ew", padx=6)
+        ttk.Button(btns, text="导入配置", style="Quiet.TButton",
+                   command=self.import_config).grid(row=0, column=2, sticky="ew", padx=6)
+        ttk.Button(btns, text="导出配置", style="Quiet.TButton",
+                   command=self.export_config).grid(row=0, column=3, sticky="ew", padx=(6, 0))
+
+        # ---- 右栏: 功能导航 ----
+        nav = ttk.Frame(body, style="Card.TFrame", padding=(16, 14))
+        nav.grid(row=0, column=1, sticky="nsew")
+        nav.columnconfigure(0, weight=1)
+        nav.columnconfigure(1, weight=1)
+
+        ttk.Label(nav, text="功能导航", style="Section.TLabel").grid(
+            row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(nav, text="按场景分组, 点按钮直达", style="Muted.TLabel").grid(
+            row=0, column=1, columnspan=1, sticky="e")
+
+        def _sep(row, text):
+            ttk.Label(nav, text="—— %s ——" % text, style="NavSep.TLabel").grid(
+                row=row, column=0, columnspan=2, sticky="ew", pady=(12, 2))
+
+        # 连接
+        self.btn_guard = ttk.Button(nav, text="启动守护", style="Green.TButton",
                                     command=self.toggle_daemon)
-        self.btn_guard.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 14))
+        self.btn_guard.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+        ttk.Button(nav, text="立即检测", style="Gray.TButton",
+                   command=self.check_now).grid(row=2, column=0, sticky="ew", padx=(0, 6),
+                                                pady=(6, 0))
         self.var_auto = tk.BooleanVar(value=core.autostart_enabled())
-        self.btn_auto = ttk.Button(ctl, text="开机自启：关闭", style="AutoOff.TButton",
+        self.btn_auto = ttk.Button(nav, text="开机自启：关闭", style="AutoOff.TButton",
                                    command=self._toggle_autostart)
-        self.btn_auto.grid(row=0, column=1, sticky="ew", padx=(0, 4), pady=(0, 4))
-        ttk.Button(ctl, text="立即检测", style="Gray.TButton",
-                   command=self.check_now).grid(row=1, column=1, sticky="ew", padx=(0, 4))
+        self.btn_auto.grid(row=2, column=1, sticky="ew", pady=(6, 0))
         self._update_auto_btn()
-        ttk.Label(ctl, text="守护 = 自动检测并恢复校园网登录。掉线自动重登、防踢保活、唤醒即检。",
-                  style="Muted.TLabel", wraplength=360, justify="right").grid(
-            row=0, column=2, rowspan=2, sticky="e", padx=(14, 0))
 
-        # 功能宫格: 4×3 (8 项) + 底部实时运行日志
-        grid_host = ttk.Frame(self)
-        grid_host.pack(fill="x", padx=24, pady=(0, 12))
-        grid_host.columnconfigure(0, weight=1)
-        grid_host.rowconfigure(0, weight=1)
-        grid = ttk.Frame(grid_host)
-        grid.grid(row=0, column=0, sticky="nsew")
-        for c in range(3):
-            grid.columnconfigure(c, weight=1)
-        self._build_feature_grid(grid)
+        # 共享上网
+        _sep(3, "共享上网")
+        self.btn_share = ttk.Button(nav, text="隧道共享（手机借电脑网上网）",
+                                    style="Gray.TButton", command=self.toggle_share)
+        self.btn_share.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        ttk.Button(nav, text="热点分享", style="Gray.TButton",
+                   command=self.open_hotspot_window).grid(row=5, column=0, sticky="ew",
+                                                          padx=(0, 6), pady=(6, 0))
+        self.btn_console = ttk.Button(nav, text="网络控制台", style="Gray.TButton",
+                                      command=self.toggle_console)
+        self.btn_console.grid(row=5, column=1, sticky="ew", pady=(6, 0))
 
-        # 底部运行日志：实时滚动，无需另开窗口
-        log_card = ttk.Frame(self, style="Card.TFrame", padding=(18, 14))
-        log_card.pack(fill="both", expand=True, padx=24, pady=(0, 18))
-        log_card.columnconfigure(0, weight=1)
-        log_card.rowconfigure(1, weight=1)
+        # VPN 加速
+        _sep(6, "VPN 加速")
+        self.lbl_vpn = ttk.Label(nav, text="", style="Muted.TLabel", wraplength=300,
+                                 justify="left")
+        self.lbl_vpn.grid(row=7, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        ttk.Button(nav, text="配置 VPN 代理", style="Accent.TButton",
+                   command=self._vpn_open_dialog).grid(row=8, column=0, sticky="ew",
+                                                       padx=(0, 6), pady=(6, 0))
+        ttk.Button(nav, text="一键填本机 7890", style="Gray.TButton",
+                   command=self._vpn_preset_local).grid(row=8, column=1, sticky="ew",
+                                                        pady=(6, 0))
+        self.btn_vpn_disable = ttk.Button(nav, text="停用 VPN 加速", style="Quiet.TButton",
+                                          command=self._vpn_disable)
+        self.btn_vpn_disable.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+
+        # 路由器
+        _sep(10, "路由器")
+        ttk.Button(nav, text="路由器中继", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "router_relay", self.show_router_relay_window)).grid(
+                           row=11, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
+        ttk.Button(nav, text="路由器代理", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "router_proxy", self.show_router_proxy_window)).grid(
+                           row=11, column=1, sticky="ew", pady=(4, 0))
+        ttk.Button(nav, text="路由器检测（品牌/固件查询）", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "router", self.show_router_assessment)).grid(
+                           row=12, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+
+        # 工具
+        _sep(13, "工具")
+        ttk.Button(nav, text="网络测速", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "speed", self.show_speed_test)).grid(
+                           row=14, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
+        ttk.Button(nav, text="新手向导", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "wizard", self.show_wizard)).grid(
+                           row=14, column=1, sticky="ew", pady=(4, 0))
+        ttk.Button(nav, text="偏好设置", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "prefs", self.show_preferences)).grid(
+                           row=15, column=0, columnspan=2, sticky="ew", pady=(6, 0))
+
+        # ===== 底部: 可收起运行日志 (默认收起, 展开时自动加高窗口) =====
+        log_card = ttk.Frame(self, style="Card.TFrame", padding=(18, 8))
+        log_card.pack(fill="x", padx=24, pady=(10, 14))
+        self.log_card = log_card
         log_head = ttk.Frame(log_card, style="Inner.TFrame")
-        log_head.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        ttk.Label(log_head, text="运行日志", style="DialogTitle.TLabel").pack(side="left")
-        ttk.Label(log_head, text="守护与网络事件实时记录（也会写入日志文件，重启不丢失）",
-                  style="Muted.TLabel").pack(side="left", padx=(12, 0))
-        log_body = ttk.Frame(log_card, style="Inner.TFrame")
-        log_body.grid(row=1, column=0, sticky="nsew")
-        log_body.columnconfigure(0, weight=1)
-        log_body.rowconfigure(0, weight=1)
-        self.txt_log = tk.Text(log_body, bg="#09101c", fg="#b7c4d8",
+        log_head.pack(fill="x")
+        ttk.Label(log_head, text="运行日志", style="Section.TLabel").pack(side="left")
+        ttk.Label(log_head, text="守护与网络事件实时记录", style="Muted.TLabel").pack(
+            side="left", padx=(12, 0))
+        self.log_expanded = False
+        self.btn_log_toggle = ttk.Button(log_head, text="展开", style="Quiet.TButton",
+                                         command=self._toggle_log)
+        self.btn_log_toggle.pack(side="right")
+        self.log_body = ttk.Frame(log_card, style="Inner.TFrame")
+        self.txt_log = tk.Text(self.log_body, bg="#09101c", fg="#b7c4d8",
                                font=("Menlo", 10), relief="flat", wrap="none",
                                state="disabled", insertbackground=FG,
-                               selectbackground=ACCENT, height=10,
+                               selectbackground=ACCENT, height=8,
                                padx=8, pady=6)
-        self.txt_log.grid(row=0, column=0, sticky="nsew")
-        self._scroll_log_bar = ttk.Scrollbar(log_body, orient="vertical",
+        self._scroll_log_bar = ttk.Scrollbar(self.log_body, orient="vertical",
                                              command=self.txt_log.yview)
-        self._scroll_log_bar.grid(row=0, column=1, sticky="ns")
         self.txt_log.configure(yscrollcommand=self._scroll_log_bar.set)
         self.txt_log.bind("<MouseWheel>", self._scroll_log)
         self._load_existing_log()
 
-    def _feature_card(self, parent, row, col, title, desc, command, attr=None):
-        cell = ttk.Frame(parent, style="Card.TFrame", padding=(14, 12))
-        cell.grid(row=row, column=col, sticky="nsew", padx=6, pady=6)
-        btn = ttk.Button(cell, text=title, style="Feature.TButton", command=command)
-        btn.pack(fill="x")
-        if attr:
-            setattr(self, attr, btn)
-        ttk.Label(cell, text=desc, style="Muted.TLabel", wraplength=220,
-                  justify="left").pack(anchor="w", pady=(6, 0))
-        return btn
+    # ---------- VPN 加速 (主窗直达) ----------
 
-    def _build_feature_grid(self, grid):
-        """主界面 10 项功能宫格 (v4.0.4: 路由器三件套展开为中继/代理/检测)。"""
-        self.btn_share = None
-        self.btn_console = None
-        # 第 1 行: 连接档案 / 隧道共享 / 热点分享 (核心接入)
-        self._feature_card(grid, 0, 0, "连接档案",
-                        "多网络账号配置，按 WiFi/网关自动匹配",
-                        self.open_profile_window)
-        self._feature_card(grid, 0, 1, "隧道共享",
-                        "一个账号带全部设备（代理 / PAC / 扫码一键配置）",
-                        self.toggle_share, attr="btn_share")
-        self._feature_card(grid, 0, 2, "热点分享",
-                        "电脑开系统热点，设备连接即上网（只占 1 名额）",
-                        self.open_hotspot_window)
-        # 第 2 行: 路由器三件套 + 网络控制台
-        self._feature_card(grid, 1, 0, "路由器中继",
-                        "路由器连校园网 → 家里 WiFi 不刷固件（按品牌分步）",
-                        lambda: self._fwin_open_legacy("router_relay", self.show_router_relay_window))
-        self._feature_card(grid, 1, 1, "路由器代理",
-                        "路由器自身开 HTTP 代理 → 手机不认证走代理到路由器",
-                        lambda: self._fwin_open_legacy("router_proxy", self.show_router_proxy_window))
-        self._feature_card(grid, 1, 2, "路由器检测",
-                        "识别品牌 / 型号 / 管理页 + 官方固件查询",
-                        lambda: self._fwin_open_legacy("router", self.show_router_assessment))
-        self._feature_card(grid, 1, 3, "网络控制台",
-                        "手机浏览器远程看状态 / 日志 / 管授权设备",
-                        self.toggle_console, attr="btn_console")
-        # 第 3 行: 网络测速 / 新手向导 / 偏好设置
-        self._feature_card(grid, 2, 0, "网络测速",
-                        "VPN 对比测速 / 延迟抖动 / 质量评分",
-                        lambda: self._fwin_open_legacy("speed", self.show_speed_test))
-        self._feature_card(grid, 2, 1, "新手向导",
-                        "三种上网方式分步引导（直连 / 中继 / 隧道）",
-                        lambda: self._fwin_open_legacy("wizard", self.show_wizard))
-        self._feature_card(grid, 2, 2, "偏好设置",
-                        "网络历史 / 报告 / 自动更新 / 诊断 / 帮助 / 通知 / 保活",
-                        lambda: self._fwin_open_legacy("prefs", self.show_preferences))
+    def _refresh_vpn_status(self):
+        vpn = self.cfg.get("vpn_upstream") or {}
+        host = (vpn.get("host") or "").strip()
+        port = vpn.get("port")
+        if host and port:
+            self.lbl_vpn.configure(
+                text="✓ 已启用: 隧道共享的设备流量经 %s:%s 转发 (VPN 全透明)" % (host, port),
+                foreground="#3fae7f")
+            try:
+                self.btn_vpn_disable.configure(state="normal")
+            except Exception:
+                pass
+        else:
+            self.lbl_vpn.configure(
+                text="未启用: 设备流量直连校园网出口。填入本机 VPN 客户端 (Clash 等) 的 HTTP 端口即可透明加速。",
+                foreground=MUTED)
+            try:
+                self.btn_vpn_disable.configure(state="disabled")
+            except Exception:
+                pass
 
+    def _vpn_open_dialog(self):
+        self._show_vpn_upstream_dialog(on_done=self._refresh_vpn_status)
+
+    def _vpn_preset_local(self):
+        self.cfg["vpn_upstream"] = {"host": "127.0.0.1", "port": 7890, "type": "http"}
+        core.save_config(self.cfg)
+        self._refresh_vpn_status()
+        self._log("VPN 加速: 已预设本机 Clash 端口 127.0.0.1:7890 (隧道共享自动生效)")
+
+    def _vpn_disable(self):
+        self.cfg.pop("vpn_upstream", None)
+        core.save_config(self.cfg)
+        self._refresh_vpn_status()
+        self._log("VPN 加速: 已停用, 设备流量恢复直连校园网出口")
+
+    # ---------- 日志收起/展开 ----------
+
+    def _toggle_log(self):
+        if self.log_expanded:
+            self.log_body.pack_forget()
+            self.btn_log_toggle.configure(text="展开")
+            self.log_expanded = False
+        else:
+            self.log_body.pack(fill="both", expand=True, pady=(6, 0))
+            self._scroll_log_bar.pack(side="right", fill="y")
+            self.txt_log.pack(side="left", fill="both", expand=True)
+            self.btn_log_toggle.configure(text="收起")
+            self.log_expanded = True
+            # 展开时若屏幕还有余量, 自动加高窗口, 避免挤压左栏表单
+            try:
+                screen_h = self.winfo_screenheight()
+                h = self.winfo_height()
+                want = min(h + 170, screen_h - 60)
+                if want > h + 20:
+                    self.geometry("%dx%d" % (self.winfo_width(), want))
+            except Exception:
+                pass
 
     def _scroll_log(self, event):
         """鼠标位于日志窗口时只滚动日志，不移动主界面。"""
@@ -358,17 +497,11 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
             txt.yview_scroll(-1 if event.delta > 0 else 1, "units")
         return "break"
 
-
-    def _toggle_log(self):
-        pass
-
-
     def _row(self, parent, row, label):
         ttk.Label(parent, text=label, style="Card.TLabel").grid(row=row, column=0, sticky="e", padx=(0, 8), pady=4)
         ent = ttk.Entry(parent, width=24)
         ent.grid(row=row, column=1, sticky="w", pady=4)
         return ent
-
 
     def _load_existing_log(self):
         txt = getattr(self, "txt_log", None)
@@ -387,7 +520,6 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         except Exception:
             pass
 
-
     def _append_log(self, text):
         txt = getattr(self, "txt_log", None)
         if txt is None:
@@ -405,7 +537,6 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         if int(txt.index("end-1c").split(".")[0]) > 500:
             txt.delete("1.0", "200.0")
         txt.configure(state="disabled")
-
 
     def _poll_log(self):
         try:

@@ -1,36 +1,9 @@
 # -*- coding: utf-8 -*-
-"""v4.0.4 主界面宫格顺序回归 + 路由器代理独立窗口 Mixin 验证。"""
+"""v4.0.4 路由器代理独立窗口 Mixin 验证。
+(v5.0.0 起 v4 主界面 10 宫格已由双栏布局取代, 相关断言迁移到 test_v5_main_layout.py)
+"""
 import inspect
-import re
 import unittest
-
-
-class TestMainGridOrderV4(unittest.TestCase):
-    """v4.0.4: 主界面 10 宫格, 第 2 行扩展为路由器三件套 + 网络控制台."""
-
-    def test_grid_cards_in_order(self):
-        """按 row, col 抽取 _build_feature_grid 调用的 title 列表, 验证顺序."""
-        from app_gui import App
-        src = inspect.getsource(App._build_feature_grid)
-        pat = re.compile(r'_feature_card\(\s*grid\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*"([^"]+)"',
-                          re.M)
-        cards = []
-        for m in pat.finditer(src):
-            row, col, title = int(m.group(1)), int(m.group(2)), m.group(3)
-            cards.append((row, col, title))
-        cards.sort()
-        titles = [c[2] for c in cards]
-        expected = ["连接档案", "隧道共享", "热点分享",
-                    "路由器中继", "路由器代理", "路由器检测", "网络控制台",
-                    "网络测速", "新手向导", "偏好设置"]
-        self.assertEqual(titles, expected,
-                         f"主界面宫格顺序不对: 实际 {titles}")
-
-    def test_grid_has_ten_cards(self):
-        """v4.0.4: 宫格升级为 10 项 (3+4+3)."""
-        from app_gui import App
-        src = inspect.getsource(App._build_feature_grid)
-        self.assertEqual(src.count("_feature_card("), 10)
 
 
 class TestRouterProxyWindow(unittest.TestCase):

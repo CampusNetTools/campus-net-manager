@@ -528,8 +528,8 @@ class TunnelUiMixin:
         return {"host": host, "port": port, "type": vpn.get("type") or "http"}
 
 
-    def _show_vpn_upstream_dialog(self):
-        """VPN 上游代理配置对话框。"""
+    def _show_vpn_upstream_dialog(self, on_done=None):
+        """VPN 上游代理配置对话框。on_done: 保存/关闭后回调(用于刷新主窗状态)。"""
         import tkinter.simpledialog as simpledialog
         win = tk.Toplevel(self)
         win.title("VPN 上游代理")
@@ -570,10 +570,16 @@ class TunnelUiMixin:
             core.save_config(self.cfg)
             self._log("VPN 上游代理: %s" % (host and ("%s:%s" % (host, port)) or "已关闭"))
             win.destroy()
+            if on_done:
+                try:
+                    on_done()
+                except Exception:
+                    pass
         actions = ttk.Frame(card, style="Inner.TFrame")
         actions.pack(fill="x", side="bottom", pady=(14, 0))
         ttk.Button(actions, text="保存并应用", style="Accent.TButton", command=save).pack(side="right")
-        ttk.Button(actions, text="取消", style="Gray.TButton", command=win.destroy).pack(side="right", padx=(0, 8))
+        ttk.Button(actions, text="取消", style="Gray.TButton",
+                   command=lambda: (win.destroy(), on_done() if on_done else None)).pack(side="right", padx=(0, 8))
 
 
     def _copy_text(self, text):
