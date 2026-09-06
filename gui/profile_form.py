@@ -28,8 +28,19 @@ except Exception:
 
 class ProfileFormMixin:
     def _current_profile(self):
-        disp = self.cmb_profile.get()
-        name = getattr(self, "_profile_map", {}).get(disp, disp)
+        """当前档案: 优先读档案窗口下拉框(已打开时); 窗口关闭时退回 cfg 的 active_profile。
+        守护进程/Web 控制台可能在档案窗口未打开时调用, 不能依赖界面控件。"""
+        name = None
+        cmb = getattr(self, "cmb_profile", None)
+        if cmb is not None:
+            try:
+                if cmb.winfo_exists():
+                    disp = cmb.get()
+                    name = getattr(self, "_profile_map", {}).get(disp, disp)
+            except Exception:
+                name = None
+        if name is None:
+            name = self.cfg.get("active_profile", "") if getattr(self, "cfg", None) else ""
         for p in self.cfg.get("profiles", []):
             if p["name"] == name:
                 return p
@@ -97,15 +108,25 @@ class ProfileFormMixin:
                 d = "立达专属 · " + d
             self._profile_map[d] = p["name"]
             displays.append(d)
-        self.cmb_profile["values"] = displays
+        cmb = getattr(self, "cmb_profile", None)
+        try:
+            alive = cmb is not None and cmb.winfo_exists()
+        except Exception:
+            alive = False
+        if not alive:
+            # 档案窗口未打开: 只需维护映射, 界面写入等窗口打开时进行
+            if not displays and self.cfg.get("profiles"):
+                self.cfg["active_profile"] = self.cfg["profiles"][0]["name"]
+            return
+        cmb["values"] = displays
         active = self.cfg.get("active_profile")
         if active and active in self._profile_map.values():
             for d, n in self._profile_map.items():
                 if n == active:
-                    self.cmb_profile.set(d)
+                    cmb.set(d)
                     break
         elif displays:
-            self.cmb_profile.set(displays[0])
+            cmb.set(displays[0])
 
 
     def _toggle_pass(self):
@@ -115,6 +136,15 @@ class ProfileFormMixin:
     def _load_form_from_current(self):
         p = self._current_profile()
         if not p:
+            return
+        cmb = getattr(self, "cmb_profile", None)
+        try:
+            if cmb is not None and not cmb.winfo_exists():
+                cmb = None
+        except Exception:
+            cmb = None
+        if cmb is None:
+            # 档案窗口未打开: 表单控件不存在, 无需填充(下次打开时 open_profile_window 会重新填充)
             return
         def setv(ent, v):
             ent.delete(0, "end")
