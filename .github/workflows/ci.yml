@@ -62,8 +62,11 @@ jobs:
         run: |
           PYTHON_BIN=python bash scripts/build_macos.sh
           cd dist/macos
-          # 资产名用 ASCII: 中文名经 actions/glob 上传会被剥成前导 "-"
-          zip -rq "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip" "校园网连接管家.app"
+          # 资产名/包内名都 ASCII: 中文经 actions/glob 上传被剥前导"-", 且 zip 中文条目名
+          # 在部分解压器(python zipfile)会乱码
+          mv "校园网连接管家.app" CampusNetManager.app
+          zip -rq "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip" CampusNetManager.app
+          mv CampusNetManager.app "校园网连接管家.app"
 
       - name: 构建 Windows exe
         if: matrix.target == 'windows'
