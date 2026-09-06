@@ -5,7 +5,9 @@ shared_proxy.py - 局域网 HTTP 代理隧道服务
 只需在 Wi-Fi 设置里把代理指向本机 IP:端口)。
 支持: HTTP CONNECT 隧道(HTTPS) + 绝对URL转发(HTTP)
 """
+import re
 import socket
+import subprocess
 import threading
 import urllib.request
 
@@ -30,6 +32,11 @@ class SharedProxy:
         self._listener = None
         self._running = False
         self._threads = []
+        # 电脑自己所有 IPv4 接口(127.0.0.1 + en0/bridge0/bridge100/awdl0/...).
+        # 收到 host 是自己的绝对 URL 时, 视同内嵌路径处理(返回引导页/mobileconfig/PAC),
+        # 避免代理到 192.168.3.1:80 / 10.52.188.32:80 失败返 502, 触发 iOS Safari
+        # "未接入互联网"误导文案。
+        self._my_ips = self._collect_my_ips()
 
     @property
     def running(self):
@@ -82,6 +89,34 @@ class SharedProxy:
             except Exception:
                 pass
         return False
+
+    @staticmethod
+    def _collect_my_ips():
+        """列出本机所有 IPv4 接口(用于识别对'代理自己'的绝对 URL 请求)。"""
+        ips = {"127.0.0.1"}
+        try:
+            out = subprocess.check_output(["ifconfig"], text=True, timeout=3,
+                                          stderr=subprocess.DEVNULL)
+            for m in re.finditer(r"inet (\d+\.\d+\.\d+\.\d+)", out):
+                ips.add(m.group(1))
+        except Exception:
+            pass
+        return ips
+
+    def _is_loopback_url(self, url):
+        """绝对 URL 形式的 GET host 是否就是代理自己(任意接口)。"""
+        if not url.startswith("http://"):
+            return False
+        rest = url[7:]
+        host, _, _path = rest.partition("/")
+        # 去掉 :port
+        host_only = host.split(":", 1)[0].strip("[]")  # 兼容 IPv6
+        if not host_only:
+            return False
+        # 主机名(本机 hostname)也算
+        if host_only.lower() == socket.gethostname().lower():
+            return True
+        return host_only in self._my_ips
 
     @staticmethod
     def _detect_ua(head):
@@ -212,6 +247,49 @@ class SharedProxy:
             if len(parts) < 2:
                 return
             method, target = parts[0].upper(), parts[1]
+            # loopback 绝对 URL 识别: 手机 Safari 访问 http://192.168.3.1/ 或
+            # http://10.52.188.32:8081/?key=... 时, host 是代理自己。
+            # 代理到自己:80 会 502 触发 Safari "未接入互联网"误导。三种处理:
+            #   1) host 是代理自己 + port 是本地服务端口(如 8081 控制台) -> 代理到 127.0.0.1:port
+            #   2) host 是代理自己 + port 缺省或 == 代理端口(8080) -> 视同相对路径, 走引导页/mobileconfig
+            #   3) host 是代理自己 + 其他 port -> 代理到 127.0.0.1:port (本地服务透传)
+            if method == b"GET" and target.startswith(b"http://"):
+                t = target.decode(errors="ignore")
+                rest = t[7:]
+                hp, _, path_only = rest.partition("/")
+                host_only = hp.split(":", 1)[0].strip("[]")
+                port_only = None
+                if ":" in hp:
+                    _, _, ps = hp.rpartition(":")
+                    if ps.isdigit():
+                        port_only = int(ps)
+                is_self = (host_only.lower() == socket.gethostname().lower()
+                           or host_only in self._my_ips)
+                if is_self:
+                    qs = ("?" + rest.split("?", 1)[1]) if "?" in rest else ""
+                    if port_only and port_only != self.port:
+                        # 代理到本地服务(例如控制台 8081)
+                        upstream = self._connect("127.0.0.1", port_only)
+                        if not upstream:
+                            client.sendall(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
+                            return
+                        new_path = ("/" + path_only) if path_only else "/"
+                        new_target = (new_path + qs).encode()
+                        out_lines = []
+                        for ln in lines:
+                            if ln.startswith(b"Proxy-Connection"):
+                                continue
+                            if ln.startswith(method + b" "):
+                                out_lines.append(method + b" " + new_target + b" HTTP/1.1")
+                            else:
+                                out_lines.append(ln)
+                        new_head = b"\r\n".join(out_lines) + b"\r\n\r\n"
+                        rest2 = data.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in data else b""
+                        self._relay(client, upstream, new_head + rest2)
+                        return
+                    # port 缺省 / 等于代理端口 -> 视同相对路径, 走下面 / /setup.mobileconfig / proxy.pac
+                    target = (("/" + path_only) if path_only else "/") + qs
+                    target = target.encode()
             if method == b"GET" and target.split(b"?", 1)[0] in (b"/proxy.pac", b"/wpad.dat"):
                 host = self.pac_host or client.getsockname()[0]
                 pac = ('function FindProxyForURL(url, host) { return "PROXY %s:%d; DIRECT"; }'

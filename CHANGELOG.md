@@ -1,5 +1,72 @@
 # 更新记录
 
+## v4.0.3
+
+- **隧道共享窗口集成两种上游模式（路由器中继 + 电脑直连）**：
+  - 原 _show_tunnel_ready 把路由器/电脑模式只在状态文本里各提一句，重写为**滚动布局 + 两段独立卡片**：
+    - **① 路由器中继（手机连路由器 WiFi）** — 路由器模式下强调「不用配任何代理」；电脑模式下提示「直接连路由器 WiFi 即可，无需本软件隧道」「若手机不在路由器覆盖范围 → 向下滚到 ② 段」
+    - **② 电脑直连校园网（手机配代理）** — PAC + 手动代理 + IP 切换 + 二维码 + 4 步教程（PAC/手动/iOS/Android/首次授权/校园网覆盖范围内上网）
+  - 顶部状态栏根据实际模式给精确文案（不模式时显示「未识别，下面两条独立方案按你实际情况选用」），保证任何上游情况都能用。
+  - 几何 640×600 → **760×780 滚动**，方便内容超出屏幕。
+  - 新增 tests/test_tunnel_mode_split.py (3 项回归) — 路由器模式 + 电脑模式文案分支 + detect_gateway_mode 不抛错。累计 191 项测试全绿。
+
+- **网络控制台鉴权修复（解决手机浏览器刷新报"未接入互联网"）**：
+  - 现象：手机连校园网不认证扫码访问控制台，第一次能打开、刷新就 403。iOS Safari 对 403 会展示并缓存"未接入互联网"误导文案，需重启 WiFi 才能恢复。
+  - 修复：所有鉴权失败（GET / POST / API）改返 200 `KEY_ENTRY_HTML`（口令输入引导页），不再 403。
+  - 响应头加固 `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` + `Pragma: no-cache` + `Connection: close`，防止 Safari 缓存失败状态、防止后台连接断开被误判断网。
+  - `/api/key` 旁路鉴权接口：永远返 JSON `{"authed": true|false}`，供引导页实时校验，避免跳到控制台后所有 API 返 HTML 导致页面卡死。
+  - 引导页 enter() 先 fetch `/api/key` 校验，成功再跳转；失败提示"口令错误, 请重新复制"。
+  - 引导页底部加 iOS Safari 缓存旁路提示文案。
+- v4.0.2 同步：档案窗口按类型动态表单 / 自动探查当前网络 / 新建默认 wifi / save_profile 按类型校验。
+- 新增 tests/test_web_console_auth.py（7 项鉴权回归）+ tests/test_shared_proxy_loopback.py（5 项 loopback URL 回归）；修整 tests/test_web_console.py 的 3 项旧 403 期望。累计 137 项测试全部通过。
+- **共享代理识别"代理自己"的绝对 URL（解决 iPhone Safari 报未接入）**：
+  - 现象：iPhone 通过 HTTP 代理访问 `http://192.168.3.1/`（电脑 bridge0 NAT 网关）或扫码 `http://10.52.188.32:8081/?key=...`（电脑 en0 IP 控制台）时，shared_proxy 把请求当外网转发到 host 自身 `:80`/`:8081`，返回 502 触发 Safari "未接入互联网"误导。
+  - 修复：shared_proxy 启动时采集本机所有 IPv4 接口（en0/bridge0/bridge100/127.0.0.1 等）。收到 GET 绝对 URL 时若 host 是自己，分三路处理：
+    1. host 是自己 + port 缺省/等于代理端口 → 视同相对路径走引导页/mobileconfig/PAC（避免 502）
+    2. host 是自己 + port 等于本地服务端口（如 8081 控制台）→ 代理到 `127.0.0.1:port`（手机能正常拿到控制台）
+    3. host 是自己 + 其他 port → 同样代理到 `127.0.0.1:port`（本地服务透传）
+
+- **热点窗口：macOS 文案诚实化 + Windows 一键开热点 + 跨平台设备列表/流量**：
+  - **macOS 文案**：明确写"不支持 Wi-Fi→Wi-Fi 共享（系统级硬限制，App 无法绕过）"，给出"USB 线连手机 / 改用隧道共享"两条替代方案，不再夸大功能。
+  - **Windows 一键开启**：`start_mobile_hotspot()` 优先 PowerShell `Start-MobileHotspot`，netsh `wlan start hostednetwork` 兜底，返 `(ok, msg)` 给 UI。失败 fallback 跳系统设置页。
+  - **设备列表 + 流量**：`list_hotspot_clients()` 跨平台识别 NAT 网关接口（macOS bridge0/bridge100；Windows 192.168.x/24 热点接口），用 arp 表 + OUI 拿客户端 IP/MAC/厂家。
+  - **macOS 流量**：按 IP 拆分需 sudo（系统限制），改为显示 bridge0 接口总 RX/TX 字节 + 标注"粗略"。
+  - **Windows 流量**：用 PowerShell `Get-NetIPStatistics` 精确按 IP 拿上传下载字节。
+  - 热点窗口 Treeview 表格展示：IP / MAC / 厂家 / 接收 / 发送 + 底部说明提示。
+  - 新增 `fmt_bytes()` 字节数 -> 人类可读 (B/KiB/MiB/GiB/TiB)。
+  - 新增 tests/test_hotspot_clients.py（13 项回归）。累计 150 项测试全部通过 + 热点窗口 Tk 冒烟通过。
+- **iPhone 配套说明**：HTTP 代理 server IP 应改为电脑当前 en0 局域网 IP（10.52.188.32），而不是 bridge0 的 NAT 网关（192.168.3.1）；后者只在 iPhone 连电脑热点子网时才可达。
+- **「软件更新」融入偏好设置**：主界面宫格删除"软件更新"独立入口（偏好设置卡片说明加"自动更新"）。偏好设置里新增 inline 段：当前版本 + "立即检查"按钮 + 检查中/已是最新/发现新版本三态内联 + "立即更新"按钮（点击触发下载+自替换，不再弹模态窗口）。复用 `_bg_check_update(manual=True, on_result=on_result)` / `_do_update` 已有链路，仅换 UI 容器。
+- **「网络报告」融入偏好设置**：主界面宫格删除"网络报告"独立入口（偏好设置卡片说明加"报告"）。偏好设置底部新增"网络报告"段：7 天稳定性摘要（summary + 5 项统计）+ 断网时间线（含持续时长）+ 「刷新报告」「导出诊断」两个按钮。`history_enabled=False` 时整段自动灰显 + 提示文案，引导用户去上方勾选保存历史。开启/取消勾选历史时实时同步报告段状态；切换保存路径后报告同步跟随 `cfg["history_log_path"]`。
+- **「运行日志」回到主界面底部**：删 `open_log_window` 独立窗口。`app_gui._build_ui` 在功能宫格下方直接构造 `Card.TFrame` 包裹 `Text` + `Scrollbar`（深色等宽字体 + 滚动条 + 鼠标滚轮绑定），启动即调 `_load_existing_log` 灌入最近 50 条历史，`_poll_log` 持续实时滚动。功能宫格从 12 缩为 8 项（4×3 后两行拆除）。
+- **「导出诊断」「使用帮助」融入偏好设置**：主界面宫格再删两个。偏好设置底部新增"诊断与帮助"段：「导出诊断」按钮（复用 `export_diag`，弹保存对话框 + 复制到剪贴板）+ 「使用帮助」按钮（复用 `show_help` 弹出原弹窗 — 内容多、需要滚动）。偏好设置卡片描述收敛为 8 项。
+- 新增 tests/test_main_view_log_inline.py（3 项回归：open_log_window 已删/宫格不再引用旧入口/show_help 实现存在）。累计 167 项测试全部通过 + 主界面/偏好设置窗口 Tk 冒烟通过。
+- **整体排版升级 PASS**：4 个窗体按 8px 网格统一几何 + 内边距 + 字段间距，主窗更舒展、子窗更宽松、字段对齐。
+  - theme.py 新增排版系统常量: `PAD_XS/S/M/L/XL/XXL = 4/8/12/16/20/24`, `CARD_PAD_MAIN=(12, 10)` `CARD_PAD_SUB=(24, 22)` `WINDOW_PAD=(18, 18)`, `GAP_SECTION=20`, 各种 `DESC_WRAP_*` + `FONT_MONO`。
+  - 主窗 1060x760 → 1080x820, minsize 920x700 → 960x740。顶栏内边距 14→18, 状态条 14/8→20/14, 守护控制 14/10→18/14, 底部日志 14/10→18/14 + 内边距 8/6 + height 8→10, 卡片 10/9→14/12, 卡片描述 wraplength 250→220 让 3 列下换行更整齐, 状态点 font 11→12。
+  - 档案窗 720x560 → 780x620 (minsize 640x520→700x560), 卡片 18/14→24/22, 字段之间 column padx 12→16, 上下间隔 pady 4/2 → 10/4, 按钮间距 6→8-10。
+  - 热点窗 640x560 → 720x620, 卡片 22/18→24/22, wraplength 580→640, 表格列宽 80→90-100。
+  - 偏好设置 620x740 → 680x800 (minsize 580x600→640x660), 卡片 22/18→26/24, 段间距 14→20, 小间距 4→8, wraplength 460/560→600。
+  - 所有按钮横向间距统一 GAP_BUTTON_X=8px，按钮区域上下间距 12-20px。
+- 新增 tests/test_typography_polish.py（7 项回归：theme 常量存在 / 主窗/偏好/档案/热点几何 + 主界面 inline 日志）。累计 174 项测试全部通过。
+- **「路由器方案」合并检测 + 中继 + 固件适配查询（主界面宫格改名 + 窗口重写）**：
+  - 主界面「路由器检测」宫格 → 「路由器方案」，描述："检测 + 中继校园网步骤 + 官方固件查询"。
+  - 窗口重写为三段式滚动布局: **A. 路由器识别**（品牌/型号/硬件版本/网关/MAC/管理页入口，保留原有保存/打开管理页按钮）+ **B. 路由器中继校园网方案**（内嵌 `core.router_guide()` + 自定义上游 SSID / 是否需认证 → 自动生成分步路径：华为/小米/TP-LINK/水星/迅捷/腾达/华硕/网件/中兴/360/D-Link/斐讯 各自品牌路径 + 通用模板）+ **C. 固件统一准备**（按品牌列 OpenWrt 适配入口 + 厂商官网 + 华硕 Merlin，按「查询官方适配」按钮一键生成）。
+  - **核心 `lookup_firmware_urls(brand, model, revision)`**: 内置 12 品牌厂商查询 + OpenWrt ToH 直链，未识别品牌 fallback 到 openwrt.org/toh/start。
+  - **核心 `download_firmware(url, save_path, expected_sha256, progress_cb)`**: 后台下载 + 进度回调 + 校验和（自动删除不完整文件）。这是关键边界 —— **本软件仅下载 + 校验，不刷入路由器**；用户在路由器 Web 管理页「系统升级」手动选文件升级。
+  - **核心 `sha256_of_file(path)`**: 计算文件 SHA256，用于刷机前比对官方发布值，确保包完整/未被篡改。
+  - 「下载到本地（不刷入）」按钮: 弹 URL + SHA256 输入对话框 + 选择保存位置 + 后台下载 + 进度条 + 校验失败自动回滚 + 完成后状态显示 SHA256。
+- **主界面宫格重排（9 项 4 个路由器方案拆分）**：
+  - 顺序按用户指定：连接档案 → 隧道共享 → 热点分享 → **路由器中继**(新独立宫格) → 路由器检测 → 网络控制台 → 网络测速 → 新手向导 → 偏好设置。
+  - **「路由器中继」(新独立宫格)**：含 router_guide 中继方案 + 固件查询/下载到本地/B 段，与"路由器检测"分开。原来混在「路由器方案」窗口里的 B/C 段全部搬到 `show_router_relay_window`。
+  - **「路由器检测」(精简)**：A 段保留（品牌/型号/硬件版本/网关/MAC/管理入口 + 检测/保存/打开管理页），底部按钮新增"去路由器中继方案"快捷跳转。
+  - 路由器中继窗口独立 (`router_relay` 单例)，路由器检测窗口仍走 `router` 单例，不互相干扰。
+- **未做（说明）**：「透明代理（系统级 TPROXY）」当前不在本软件内做（需要 tun 设备 + sudo + 跨平台 pf/iptables 差异大）；当前「电脑当网关 + VPN 全透明」用 **隧道共享窗口的「VPN 上游」按钮**实现 HTTP 流量转发（已存在，文档化在隧道窗内）。
+- 新增 tests/test_router_firmware_lookup.py（10 项回归：12 品牌覆盖 + 未识别 fallback + sha256 + 文件下载 + 进度回调 + SHA256 校验失败回滚 + 异常 URL + router_guide 不抛错）。累计 184 项测试全部通过 + 路由方案窗口 Tk 冒烟通过。
+- **稳定性历史保存地址可选**：`core.history.effective_log_path(cfg)` + `set_log_path()` + 模块级 reader 切换。`record_network_history` / `summarize_network_history` / `analyze_outage_timeline` 三处 reader 都跟随用户指定路径；启动时 `_restore_preferences` 调 `_sync_history_log_path()` 同步。`cfg["history_log_path"]` 默认空（走 `common.HISTORY_PATH`）。
+  - **偏好设置里勾选行为**：勾选「保存网络稳定性历史」立即弹保存对话框（默认 `~/Downloads/campus_net_history.jsonl`，类型 `*.jsonl/*.txt/*.*`），用户取消则回滚勾选。已勾选时显示当前路径 + "更改"按钮，可随时重新指定。save_preferences 落盘 + 同步 history 模块 + 立刻写一条 "online" 探针事件，让文件可被读到。
+  - 新增 tests/test_preferences_history_path.py（10 项回归）+ tests/test_preferences_report_inline.py（4 项网络报告渲染回归）。累计 164 项测试全部通过 + 偏好设置窗口 Tk 冒烟通过。
+
 ## v4.0.2
 
 - **档案窗口按类型动态表单**：

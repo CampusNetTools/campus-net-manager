@@ -4,19 +4,57 @@ from core.common import *  # noqa: F401,F403
 from core import common  # noqa: F401
 from core import sysutils  # noqa: F401
 
-__all__ = ['record_network_history', 'summarize_network_history', 'analyze_outage_timeline', '_fmt_duration']
+__all__ = ['record_network_history', 'summarize_network_history', 'analyze_outage_timeline', '_fmt_duration', 'set_log_path', 'get_log_path', 'effective_log_path']
+
+# 运行时可切换的写入/读取路径。  默认值在第一次访问时填充为 common.HISTORY_PATH。
+# 调用入口 cfg 里的 history_log_path 始终优先; 模块变量是为了让 summarize/analyze 也能读到
+# 用户自定义路径(它们签名里不收 cfg)。
+_LOG_PATH = None  # type: ignore[var-annotated]
+
+
+def effective_log_path(cfg):
+    """cfg 里有 history_log_path 且非空时使用它, 否则默认 common.HISTORY_PATH。"""
+    custom = (cfg or {}).get("history_log_path") or ""
+    if custom and os.path.isabs(custom):
+        return custom
+    if custom:
+        # 相对路径按 BASE_DIR 解析, 避免当前工作目录漂移导致打不开
+        return os.path.join(common.BASE_DIR, custom)
+    return common.HISTORY_PATH
+
+
+def get_log_path():
+    """reader(summarize/analyze) 用此拿到当前应读取的历史文件路径。
+
+    未显式设置时跟随 common.HISTORY_PATH(测试可 patch 它); 用户通过偏好设置后
+    会显式调 set_log_path, 一旦设置就锁定为用户指定的路径, 不会被 common.HISTORY_PATH 覆盖。
+    """
+    if _LOG_PATH is not None:
+        return _LOG_PATH
+    return common.HISTORY_PATH
+
+
+def set_log_path(path):
+    """启动 / 偏好变更后调用, 让模块级 reader 也切到新路径。  立即生效。"""
+    global _LOG_PATH
+    _LOG_PATH = path or common.HISTORY_PATH
+
 
 def record_network_history(cfg, event, message, **details):
     if not cfg.get("history_enabled", False):
         return False
     item = {"time": sysutils.now_str(), "event": event, "message": message, "details": details}
+    target = effective_log_path(cfg)
     try:
-        with open(common.HISTORY_PATH, "a", encoding="utf-8") as handle:
+        # 切到自定义路径时, 同步给 reader, 后续 summarize/analyze 都看到新文件
+        if get_log_path() != target:
+            set_log_path(target)
+        with open(target, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(item, ensure_ascii=False) + "\n")
-        if os.path.getsize(common.HISTORY_PATH) > 2 * 1024 * 1024:
-            with open(common.HISTORY_PATH, "r", encoding="utf-8", errors="replace") as handle:
+        if os.path.getsize(target) > 2 * 1024 * 1024:
+            with open(target, "r", encoding="utf-8", errors="replace") as handle:
                 lines = handle.readlines()[-5000:]
-            with open(common.HISTORY_PATH, "w", encoding="utf-8") as handle:
+            with open(target, "w", encoding="utf-8") as handle:
                 handle.writelines(lines)
         return True
     except Exception:
@@ -28,7 +66,7 @@ def summarize_network_history(days=7):
     cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
     events = []
     try:
-        with open(common.HISTORY_PATH, "r", encoding="utf-8") as handle:
+        with open(get_log_path(), "r", encoding="utf-8") as handle:
             for line in handle:
                 try:
                     item = json.loads(line)
@@ -63,7 +101,7 @@ def analyze_outage_timeline(days=7):
     cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
     events = []
     try:
-        with open(common.HISTORY_PATH, "r", encoding="utf-8") as handle:
+        with open(get_log_path(), "r", encoding="utf-8") as handle:
             for line in handle:
                 try:
                     item = json.loads(line)

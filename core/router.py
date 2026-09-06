@@ -4,7 +4,7 @@ from core.common import *  # noqa: F401,F403
 from core import common  # noqa: F401
 from core import netinfo  # noqa: F401
 
-__all__ = ['OUI_BRANDS', '_arp_entries', 'get_gateway_mac', 'get_router_admin_url', '_private_http_url', 'parse_upnp_device_description', 'discover_router_upnp', 'inspect_router_admin', 'gen_tunnel_key', 'detect_gateway_mode', 'relay_stealth_check', 'vender_lookup', 'router_fingerprint', 'detect_router_hardware', 'evaluate_flash_readiness', 'hotspot_on', 'open_wifi_settings', 'open_hotspot_settings', 'get_router_brand', '_brand_relay_guide', 'router_guide']
+__all__ = ['OUI_BRANDS', '_arp_entries', 'get_gateway_mac', 'get_router_admin_url', '_private_http_url', 'parse_upnp_device_description', 'discover_router_upnp', 'inspect_router_admin', 'gen_tunnel_key', 'detect_gateway_mode', 'relay_stealth_check', 'vender_lookup', 'router_fingerprint', 'detect_router_hardware', 'evaluate_flash_readiness', 'hotspot_on', 'open_wifi_settings', 'open_hotspot_settings', 'get_router_brand', '_brand_relay_guide', 'router_guide', 'list_hotspot_clients', 'start_mobile_hotspot', 'fmt_bytes', 'lookup_firmware_urls', 'download_firmware', 'sha256_of_file']
 
 OUI_BRANDS = {
     "D4:02:BC": "华为", "88:6B:0F": "华为", "90:9A:4A": "华为", "C0:25:06": "华为",
@@ -399,6 +399,205 @@ def open_hotspot_settings():
         return False
 
 
+# ---------- 热点客户端列表 + 流量估算 ----------
+
+def _iface_total_bytes(iface):
+    """读取接口累计收发字节(ifconfig / netstat -I); 失败返 None。"""
+    try:
+        if common.IS_MACOS:
+            out = netinfo._run_decode(["ifconfig", iface], timeout=3)
+        else:
+            # Windows: 用 netstat -e 拿全接口汇总(不够精确, 但无依赖)
+            out = netinfo._run_decode(["netstat", "-e"], timeout=3)
+            return None  # Windows 走 Get-NetAdapterStatistics 路径, 这里不解析
+        m = re.search(r"RX bytes:(\d+).*?TX bytes:(\d+)", out, re.S)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+    except Exception:
+        pass
+    return None
+
+
+def _iface_list():
+    """列出本机所有 IPv4 接口名(macOS 用 ifconfig, Windows 用 Get-NetAdapter)."""
+    if common.IS_MACOS:
+        out = netinfo._run_decode(["ifconfig", "-l"], timeout=3)
+        return [x for x in out.split() if x]
+    # Windows: PowerShell 拿 adapter 名
+    out = netinfo._run_decode([
+        "powershell", "-NoProfile", "-Command",
+        "Get-NetAdapter -ErrorAction SilentlyContinue | "
+        "Where-Object {$_.Status -eq 'Up'} | Select-Object -ExpandProperty Name"
+    ], timeout=8)
+    return [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+
+def list_hotspot_clients():
+    """返回连接到本机热点/共享 NAT 的设备列表 + 流量估算。
+    每项 dict: {ip, mac, vendor, tx_bytes, rx_bytes, iface, since, note}
+    跨平台: macOS 走 arp + ifconfig bridge0; Windows 走 Get-NetNeighbor + Get-NetIPStatistics。
+    无热点/共享时返 [].
+    """
+    # 1) 找当前作为热点/共享 NAT 网关的接口
+    #    - macOS: bridge0/bridge100 等(系统开 Internet Sharing 时自动创建)
+    #    - Windows: "本地连接*XX" / "Wi-Fi" + Microsoft Wi-Fi Direct Virtual Adapter
+    candidates = _hotspot_iface_candidates()
+    if not candidates:
+        return []
+    clients = []
+    seen = set()
+    for iface in candidates:
+        for entry in _iface_clients(iface):
+            key = entry.get("ip", "") + "|" + entry.get("mac", "")
+            if key in seen:
+                continue
+            seen.add(key)
+            clients.append(entry)
+    return clients
+
+
+def _hotspot_iface_candidates():
+    """识别作为热点/共享 NAT 的接口名。"""
+    names = set()
+    if common.IS_MACOS:
+        # macOS Internet Sharing 时会创建 bridge100 (NAT 子网), 客户端在 bridge100 子网
+        # 也可能是用户手动创建的 bridge0. 通过 ifconfig 看 inet 192.168.x.1
+        out = netinfo._run_decode(["ifconfig"], timeout=4)
+        current = None
+        for line in out.splitlines():
+            m = re.match(r"^([a-z]+\d*):", line)
+            if m:
+                current = m.group(1)
+                continue
+            if current and re.search(r"inet (\d+\.\d+\.\d+\.\d+).*netmask 0xffffff00", line):
+                # 256 地址子网通常是 NAT 网关(192.168.x.1)
+                ipm = re.search(r"inet (\d+\.\d+\.\d+\.\d+)", line)
+                if ipm and ipm.group(1).endswith(".1"):
+                    names.add(current)
+        # 也接受 bridge100 等已知共享接口(防漏检)
+        for b in ("bridge0", "bridge100", "bridge101", "bridge102"):
+            if re.search(rf"^{b}:.*\n.*inet ", out, re.M | re.S):
+                names.add(b)
+    else:
+        # Windows: 移动热点 = Microsoft Wi-Fi Direct Virtual Adapter (Netwtw 之类),
+        # 也可能是 "本地连接*XX" (ICS). 用 PowerShell 查 v4 子网不是 APIPA 的
+        out = netinfo._run_decode([
+            "powershell", "-NoProfile", "-Command",
+            "Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | "
+            "Where-Object { $_.IPAddress -like '192.168.*' -and $_.PrefixLength -le 24 } | "
+            "Select-Object InterfaceAlias,IPAddress"
+        ], timeout=8)
+        for ln in out.splitlines():
+            parts = ln.strip().split()
+            if len(parts) >= 2 and re.match(r"^\d+\.\d+\.\d+\.\d+$", parts[-1]):
+                names.add(parts[0])
+    return sorted(names)
+
+
+def _iface_clients(iface):
+    """拿指定接口下的客户端 IP+MAC+流量(平台分支)."""
+    out = []
+    if common.IS_MACOS:
+        # macOS: arp -an 看整个表, 过滤落在 iface 子网内的 IP. 流量的"按 IP 估算"靠
+        # netstat -f inet 抽样(普通用户能跑); 标注 (粗略) + 加上 bridge0 接口总流量给上下文.
+        # 1) 找 iface 子网
+        ifc = netinfo._run_decode(["ifconfig", iface], timeout=3)
+        sub = re.search(r"inet (\d+\.\d+\.\d+)\.\d+ netmask 0x(..)(..)(..)", ifc)
+        if not sub:
+            return []
+        base = sub.group(1)
+        # netmask bytes -> mask length
+        nm = int(sub.group(2), 16) * 65536 + int(sub.group(3), 16) * 256 + int(sub.group(4), 16)
+        bits = bin(nm).count("1")
+        # 2) 抽样 netstat -an 看每个 src IP 的字节(粗略但 sudo-free)
+        sample = netinfo._run_decode(["netstat", "-an", "-f", "inet", "-p", "tcp"], timeout=4)
+        # netstat -I iface -b 在 macOS 需要 sudo; 退化用 ifconfig 总字节 + 客户端数均分
+        total = _iface_total_bytes(iface)
+        total_note = ""
+        if total:
+            total_note = "bridge %s 总 RX/TX: %s / %s" % (
+                iface, fmt_bytes(total[0]), fmt_bytes(total[1]))
+        # 3) arp 表筛子网内
+        for ip, mac in _arp_entries():
+            if ip.startswith(base + ".") and ip != "%s.1" % base and ip != "%s.255" % base:
+                vendor = vender_lookup(mac)
+                out.append({
+                    "ip": ip, "mac": mac, "vendor": vendor,
+                    "rx_bytes": None, "tx_bytes": None,
+                    "iface": iface, "since": None,
+                    "note": total_note or None,
+                })
+    else:
+        # Windows: Get-NetNeighbor 拿热点客户端, Get-NetIPStatistics 拿每 IP 流量
+        neigh = netinfo._run_decode([
+            "powershell", "-NoProfile", "-Command",
+            f"Get-NetNeighbor -InterfaceAlias '{iface}' -ErrorAction SilentlyContinue | "
+            "Where-Object {$_.State -eq 'Reachable'} | "
+            "Select-Object -ExpandProperty IPAddress"
+        ], timeout=8)
+        ips = [ln.strip() for ln in neigh.splitlines() if re.match(r"^\d+\.\d+\.\d+\.\d+$", ln.strip())]
+        # 每 IP 流量
+        ipstat = {}
+        if ips:
+            stats = netinfo._run_decode([
+                "powershell", "-NoProfile", "-Command",
+                "Get-NetIPStatistics -ErrorAction SilentlyContinue | "
+                "Where-Object {$_.IPAddress -in @(%s)} | "
+                "Select-Object IPAddress,BytesReceived,BytesSent" % ",".join("'%s'" % x for x in ips)
+            ], timeout=10)
+            for ln in stats.splitlines()[3:]:  # 跳过表头
+                m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+(\d+)", ln)
+                if m:
+                    ipstat[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+        # arp 表查 MAC
+        arp_map = {ip: mac for ip, mac in _arp_entries()}
+        for ip in ips:
+            mac = arp_map.get(ip, "")
+            out.append({
+                "ip": ip, "mac": mac, "vendor": vender_lookup(mac),
+                "rx_bytes": ipstat.get(ip, (None, None))[0],
+                "tx_bytes": ipstat.get(ip, (None, None))[1],
+                "iface": iface, "since": None, "note": None,
+            })
+    return out
+
+
+def fmt_bytes(n):
+    """字节数 -> 人类可读 (KiB/MiB/GiB)"""
+    try:
+        n = int(n)
+    except Exception:
+        return str(n)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if n < 1024:
+            return "%.1f %s" % (n, unit) if unit != "B" else "%d %s" % (n, unit)
+        n /= 1024
+    return "%.1f PiB" % n
+
+
+def start_mobile_hotspot():
+    """Windows 一键开启移动热点 (PowerShell 优先, netsh 兜底).
+    macOS 上 Internet Sharing 无法脚本化, 返 False 让调用方跳系统设置.
+    返回: (ok: bool, message: str)."""
+    if common.IS_MACOS:
+        return False, "macOS 互联网共享不支持脚本化, 请手动到「系统设置 → 通用 → 共享」开启"
+    # 1) 优先 PowerShell Start-MobileHotspot (需要 Windows 10+ 且网卡支持)
+    out = netinfo._run_decode([
+        "powershell", "-NoProfile", "-Command",
+        "Start-MobileHotspot -ErrorAction SilentlyContinue; "
+        "if ($?) { 'OK' } else { 'FAIL' }"
+    ], timeout=15)
+    if "OK" in out:
+        return True, "已通过 PowerShell 启动移动热点"
+    # 2) 兜底: netsh hostednetwork (老 Win 支持)
+    out2 = netinfo._run_decode([
+        "netsh", "wlan", "start", "hostednetwork"
+    ], timeout=10)
+    if "started" in out2.lower() or "已启动" in out2 or "Started" in out2:
+        return True, "已通过 netsh 启动 hostednetwork 热点"
+    return False, "网卡可能不支持 hostednetwork, 请到「设置 → 移动热点」手动开启"
+
+
 def get_router_brand():
     """返回 (品牌, 管理地址); 识别不到返回 (None, 网关)"""
     gw = netinfo.get_gateway()
@@ -453,3 +652,165 @@ def router_guide(target_ssid="LIDA-UNIVERSITY", need_auth=True):
     brand, gw = get_router_brand()
     guide = _brand_relay_guide(brand, target_ssid, need_auth)
     return brand, gw, guide
+
+
+# ---------- 固件下载 / 校验 / 路由器方案索引 ----------
+
+# 品牌 -> 固件搜索/下载入口(只列官方页面链接, 不内置镜像以免携带第三方文件)
+_FIRMWARE_SOURCES = {
+    "华为": {
+        "vendor_search": "https://consumer.huawei.com/en/support/routers/",
+        "openwrt_toh": "https://openwrt.org/toh/hw.start",
+        "note": "华为家用路由器仅部分机型在 OpenWrt 官方适配列表中。\n"
+                "EMUI/鸿蒙智联路由器不支持 OpenWrt, 建议保留厂商固件。"
+    },
+    "小米": {
+        "vendor_search": "https://www.mi.com/service/miwifi/settings",
+        "openwrt_toh": "https://openwrt.org/toh/xiaomi/xiaomi",
+        "note": "小米 / 红米路由器大多有 Padavan / OpenWrt 第三方固件。\n"
+                "刷前务必核对型号完全一致(包括末尾小版本号)。"
+    },
+    "TP-LINK": {
+        "vendor_search": "https://www.tp-link.com/en/support/download/",
+        "openwrt_toh": "https://openwrt.org/toh/tp-link/start",
+        "note": "TP-LINK 是 OpenWrt 官方适配最多的品牌之一, 支持型号广。"
+    },
+    "水星": {
+        "vendor_search": "https://service.mercurycom.com.cn/",
+        "openwrt_toh": "https://openwrt.org/toh/tp-link/start",
+        "note": "水星与 TP-LINK 同源, 可共用 OpenWrt 适配（核对硬件版本号 Rev 前缀）。"
+    },
+    "迅捷(FAST)": {
+        "vendor_search": "https://www.fastcom.com.cn/",
+        "openwrt_toh": "https://openwrt.org/toh/tp-link/start",
+        "note": "迅捷 FAST 与 TP-LINK 同源, FAC1200R / FW316R 等型号在 OpenWrt 有移植。"
+    },
+    "腾达": {
+        "vendor_search": "https://www.tenda.com.cn/support/download.html",
+        "openwrt_toh": "https://openwrt.org/toh/tenda/start",
+        "note": "腾达家用型号大多支持 OpenWrt (核对型号完全一致)。"
+    },
+    "华硕": {
+        "vendor_search": "https://www.asus.com/networking-iot-servers/wifi-routers/",
+        "merlin": "https://www.asuswrt-merlin.net/",
+        "note": "华硕官方固件已开放; 想要更强功能可刷 Merlin (asuswrt-merlin)。\n"
+                "Merlin 与 OpenWrt 不同, 是 ASUS 官方分支的第三方增强版本。"
+    },
+    "网件": {
+        "vendor_search": "https://www.netgear.com/support/product/",
+        "openwrt_toh": "https://openwrt.org/toh/netgear/start",
+        "note": "网件多型号在 OpenWrt 官方列表, 社区资源丰富。"
+    },
+    "中兴": {
+        "vendor_search": "https://www.zte.com.cn/global/support",
+        "openwrt_toh": "https://openwrt.org/toh/zte/start",
+        "note": "中兴运营商定制版机型通常锁定固件; 自购型号大多可刷。"
+    },
+    "360": {
+        "vendor_search": "https://luyou.360.cn/",
+        "openwrt_toh": "https://openwrt.org/toh/360.start",
+        "note": "360 路由器可刷 OpenWrt/PandoraBox, 注意核对芯片类型。"
+    },
+    "D-Link": {
+        "vendor_search": "https://www.dlink.com/en/support",
+        "openwrt_toh": "https://openwrt.org/toh/d-link/start",
+        "note": "D-Link 部分型号官方开放, 详情查 OpenWrt 适配表。"
+    },
+    "斐讯": {
+        "vendor_search": "https://www.luyouwang.com.cn/",
+        "openwrt_toh": "https://openwrt.org/toh/phicomm/start",
+        "note": "斐讯(Phicomm)K2/K2P/K3 等型号社区活跃, 多适配。"
+    },
+}
+
+
+def lookup_firmware_urls(brand, model="", revision=""):
+    """路由器统一刷固件准备: 返回适配入口 + 提示, 不直接 OTA 刷写。
+
+    返回 dict:
+        brand, model, revision, vendor_name, vendor_url, openwrt_toh,
+        merlin_url (如有), note
+    """
+    if not brand:
+        return {
+            "brand": "", "model": model, "revision": revision,
+            "vendor_name": "", "vendor_url": "",
+            "openwrt_toh": "",
+            "merlin_url": "",
+            "note": "尚未识别路由器品牌; 请确认电脑已连接路由器 WiFi 后重试, 或在「保存识别结果」里手动填入品牌/型号。"
+        }
+    src = _FIRMWARE_SOURCES.get(brand)
+    if not src:
+        return {
+            "brand": brand, "model": model, "revision": revision,
+            "vendor_name": brand, "vendor_url": "",
+            "openwrt_toh": "https://openwrt.org/toh/start",
+            "note": "暂未内置该品牌的固件入口; 直接查 OpenWrt 官方适配列表, 或浏览器搜索「%s + OpenWrt 适配」。" % brand
+        }
+    return {
+        "brand": brand, "model": model, "revision": revision,
+        "vendor_name": brand, "vendor_url": src["vendor_search"],
+        "openwrt_toh": src.get("openwrt_toh", "https://openwrt.org/toh/start"),
+        "merlin_url": src.get("merlin", ""),
+        "note": src["note"]
+    }
+
+
+def sha256_of_file(path, chunk=65536):
+    """计算文件 SHA256 (用于刷机前校验固件包完整)."""
+    import hashlib
+    h = hashlib.sha256()
+    try:
+        with open(path, "rb") as handle:
+            while True:
+                block = handle.read(chunk)
+                if not block:
+                    break
+                h.update(block)
+        return h.hexdigest()
+    except Exception:
+        return ""
+
+
+def download_firmware(url, save_path, expected_sha256="", progress_cb=None,
+                      timeout=120, headers=None):
+    """下载固件到本地(只下载不刷入); 给定 SHA256 时自动校验。
+
+    progress_cb(done_bytes, total_bytes) 用于进度条 (主线程需 after 切回).
+    超时或失败抛 RuntimeError 或返回 (ok, msg, sha256).
+    """
+    import urllib.request
+    if not url or not url.startswith(("http://", "https://")):
+        return (False, "URL 非法(只支持 http/https)", "")
+    req_headers = {"User-Agent": "CampusNetManager/4"}
+    if headers:
+        req_headers.update(headers)
+    try:
+        req = urllib.request.Request(url, headers=req_headers)
+        with urllib.request.urlopen(req, timeout=30) as response:
+            total = int(response.headers.get("Content-Length", "0") or 0)
+            os.makedirs(os.path.dirname(os.path.abspath(save_path)) or ".", exist_ok=True)
+            done = 0
+            with open(save_path, "wb") as out:
+                while True:
+                    block = response.read(8192)
+                    if not block:
+                        break
+                    out.write(block)
+                    done += len(block)
+                    if progress_cb:
+                        try:
+                            progress_cb(done, total)
+                        except Exception:
+                            pass
+            sha = sha256_of_file(save_path)
+            if expected_sha256 and sha.lower() != expected_sha256.lower():
+                try:
+                    os.remove(save_path)
+                except Exception:
+                    pass
+                return (False, "SHA256 校验失败, 已删除不完整文件", sha)
+            return (True, "下载完成 (%.1f MB)" % (done / 1048576), sha)
+    except Exception as exc:
+        return (False, "下载失败: %s" % exc, "")
+

@@ -118,16 +118,17 @@ class FeatureWindowsMixin:
         win = tk.Toplevel(self)
         win.title("连接档案管理")
         win.configure(bg=BG)
-        win.geometry("720x560")
-        win.minsize(640, 520)
+        win.geometry("780x620")
+        win.minsize(700, 560)
         win.transient(self)
-        card = ttk.Frame(win, style="Card.TFrame", padding=(18, 14))
-        card.pack(fill="both", expand=True, padx=14, pady=14)
+        card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
+        card.pack(fill="both", expand=True, padx=18, pady=18)
 
         ttk.Label(card, text="连接档案", style="DialogTitle.TLabel").grid(
             row=0, column=0, columnspan=2, sticky="w")
         ttk.Label(card, text="按类型匹配网络：校园网=登录保活；普通WiFi/热点=只检测断网不登录",
-                  style="Muted.TLabel").grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 8))
+                  style="Muted.TLabel", wraplength=700).grid(
+            row=1, column=0, columnspan=2, sticky="w", pady=(4, 10))
 
         prof_row = ttk.Frame(card, style="Inner.TFrame")
         prof_row.grid(row=2, column=0, columnspan=2, sticky="ew")
@@ -136,47 +137,47 @@ class FeatureWindowsMixin:
         self.cmb_profile.grid(row=0, column=0, sticky="ew")
         self.cmb_profile.bind("<<ComboboxSelected>>", self._on_profile_selected)
         ttk.Button(prof_row, text="新建", style="Gray.TButton",
-                   command=self.new_profile).grid(row=0, column=1, padx=(8, 0))
+                   command=self.new_profile).grid(row=0, column=1, padx=(12, 0))
         ttk.Button(prof_row, text="删除", style="Quiet.TButton",
-                   command=self.del_profile).grid(row=0, column=2, padx=(4, 0))
+                   command=self.del_profile).grid(row=0, column=2, padx=(8, 0))
 
-        # 类型选择器(始终可见)
+        # 类型选择器
         type_row = ttk.Frame(card, style="Inner.TFrame")
-        type_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(12, 4))
+        type_row.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(16, 6))
         ttk.Label(type_row, text="档案类型", style="Field.TLabel").pack(side="left")
         self.cmb_ptype = ttk.Combobox(
             type_row, state="readonly", width=32,
             values=["校园网认证（登录保活）", "普通WiFi/热点（只检测断网）"])
-        self.cmb_ptype.pack(side="left", padx=(10, 0))
+        self.cmb_ptype.pack(side="left", padx=(16, 0))
         self.cmb_ptype.bind("<<ComboboxSelected>>",
                             lambda e: self._profile_rebuild_form())
 
-        # 类型说明(随类型切换)
-        self.lbl_ptype_hint = ttk.Label(card, text="", style="Muted.TLabel", wraplength=620)
-        self.lbl_ptype_hint.grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        # 类型说明
+        self.lbl_ptype_hint = ttk.Label(card, text="", style="Muted.TLabel", wraplength=700)
+        self.lbl_ptype_hint.grid(row=4, column=0, columnspan=2, sticky="w", pady=(0, 8))
 
-        # 动态字段容器 — 切换类型时重建
+        # 动态字段容器
         self._profile_form_host = ttk.Frame(card, style="Inner.TFrame")
-        self._profile_form_host.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(4, 0))
+        self._profile_form_host.grid(row=5, column=0, columnspan=2, sticky="nsew", pady=(6, 0))
         card.rowconfigure(5, weight=1)
 
-        # 底部按钮行(常驻)
+        # 底部按钮行
         btns = ttk.Frame(card, style="Inner.TFrame")
-        btns.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        btns.grid(row=6, column=0, columnspan=2, sticky="ew", pady=(16, 0))
         btns.columnconfigure(0, weight=1)
         btns.columnconfigure(1, weight=1)
         btns.columnconfigure(2, weight=1)
         btns.columnconfigure(3, weight=1)
         self.btn_save = ttk.Button(btns, text="保存档案", style="Accent.TButton",
                                    command=self.save_profile)
-        self.btn_save.grid(row=0, column=0, sticky="ew", padx=(0, 4))
+        self.btn_save.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         self.btn_check = ttk.Button(btns, text="立即检测", style="Gray.TButton",
                                     command=self.check_now)
-        self.btn_check.grid(row=0, column=1, sticky="ew", padx=(4, 4))
+        self.btn_check.grid(row=0, column=1, sticky="ew", padx=6)
         ttk.Button(btns, text="导入配置", style="Gray.TButton",
-                   command=self.import_config).grid(row=0, column=2, sticky="ew", padx=(4, 4))
+                   command=self.import_config).grid(row=0, column=2, sticky="ew", padx=6)
         ttk.Button(btns, text="导出配置", style="Gray.TButton",
-                   command=self.export_config).grid(row=0, column=3, sticky="ew", padx=(4, 0))
+                   command=self.export_config).grid(row=0, column=3, sticky="ew", padx=(6, 0))
 
         # 关窗时清理所有表单控件引用
         def _closed():
@@ -229,11 +230,11 @@ class FeatureWindowsMixin:
 
         def _fl(row, col, text):
             ttk.Label(f, text=text, style="Field.TLabel").grid(
-                row=row, column=col, sticky="w", padx=(0 if col == 0 else 12, 0), pady=(4, 2))
+                row=row, column=col, sticky="w", padx=(0 if col == 0 else 16, 0), pady=(10, 4))
 
         def _fw(widget, row, col):
-            widget.grid(row=row, column=col, sticky="ew", pady=(0, 5),
-                        padx=(0 if col == 0 else 12, 12 if col == 0 else 0))
+            widget.grid(row=row, column=col, sticky="ew", pady=(0, 8),
+                        padx=(0 if col == 0 else 16, 16 if col == 0 else 0))
 
         # 档案名(两种类型都需要)
         _fl(0, 0, "档案名称")
@@ -241,7 +242,7 @@ class FeatureWindowsMixin:
         self.ent_name = ttk.Entry(f)
         _fw(self.ent_name, 1, 0)
         ttk.Label(f, text="(易记的名字，例如「寝室华为中继」「家」)",
-                  style="Muted.TLabel").grid(row=1, column=1, sticky="w", padx=(12, 0), pady=(0, 5))
+                  style="Muted.TLabel").grid(row=1, column=1, sticky="w", padx=(16, 0), pady=(0, 8))
 
         if wifi:
             # ----- 普通WiFi档案: 只显示绑定 + 间隔 -----
@@ -253,11 +254,11 @@ class FeatureWindowsMixin:
             _fw(self.ent_gw, 3, 1)
 
             probe_row = ttk.Frame(f, style="Inner.TFrame")
-            probe_row.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(4, 6))
+            probe_row.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(2, 8))
             ttk.Button(probe_row, text="自动探查当前网络", style="Gray.TButton",
                        command=self._profile_auto_probe).pack(side="left")
             ttk.Label(probe_row, text="点击后填入电脑当前连接的 WiFi 名 与 网关",
-                      style="Muted.TLabel").pack(side="left", padx=(10, 0))
+                      style="Muted.TLabel").pack(side="left", padx=(12, 0))
 
             _fl(5, 0, "检测间隔（秒）")
             ttk.Label(f, text="", style="Muted.TLabel").grid(row=5, column=1, sticky="w")
@@ -265,7 +266,7 @@ class FeatureWindowsMixin:
                                              state="normal", width=24)
             _fw(self.cmb_interval, 6, 0)
             ttk.Label(f, text="断网后多久开始通知(默认 60 秒)",
-                      style="Muted.TLabel").grid(row=6, column=1, sticky="w", padx=(12, 0))
+                      style="Muted.TLabel").grid(row=6, column=1, sticky="w", padx=(16, 0))
         else:
             # ----- 校园网档案: 完整字段 -----
             _fl(2, 0, "运营商")
@@ -274,14 +275,14 @@ class FeatureWindowsMixin:
                 "移动互联网访问 (cmcc)", "联通互联网访问 (unicom)", "教师登录 (teacher)"])
             _fw(self.cmb_type, 3, 0)
             ttk.Label(f, text="校园网按运营商分流，移动=cmcc/联通=unicom",
-                      style="Muted.TLabel").grid(row=3, column=1, sticky="w", padx=(12, 0))
+                      style="Muted.TLabel").grid(row=3, column=1, sticky="w", padx=(16, 0))
 
             _fl(4, 0, "校园网账号")
             _fl(4, 1, "密码" + ("（macOS 钥匙串）" if core.IS_MACOS else ""))
             self.ent_user = ttk.Entry(f)
             _fw(self.ent_user, 5, 0)
             pwf = ttk.Frame(f, style="Inner.TFrame")
-            pwf.grid(row=5, column=1, sticky="ew", padx=(12, 12), pady=(0, 5))
+            pwf.grid(row=5, column=1, sticky="ew", padx=(16, 16), pady=(0, 8))
             pwf.columnconfigure(0, weight=1)
             self.ent_pass = ttk.Entry(pwf, show="●")
             self.ent_pass.grid(row=0, column=0, sticky="ew")
@@ -295,11 +296,11 @@ class FeatureWindowsMixin:
             self.ent_gw = ttk.Entry(f)
             _fw(self.ent_gw, 7, 1)
             probe_row = ttk.Frame(f, style="Inner.TFrame")
-            probe_row.grid(row=8, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+            probe_row.grid(row=8, column=0, columnspan=2, sticky="ew", pady=(2, 10))
             ttk.Button(probe_row, text="自动探查当前网络", style="Gray.TButton",
                        command=self._profile_auto_probe).pack(side="left")
             ttk.Label(probe_row, text="SSID 留空=任意网络(默认); 网关用于有线/中继匹配",
-                      style="Muted.TLabel").pack(side="left", padx=(10, 0))
+                      style="Muted.TLabel").pack(side="left", padx=(12, 0))
 
             _fl(9, 0, "检测间隔（秒）")
             _fl(9, 1, "认证服务器")
@@ -307,7 +308,7 @@ class FeatureWindowsMixin:
                                              state="normal", width=24)
             _fw(self.cmb_interval, 10, 0)
             authf = ttk.Frame(f, style="Inner.TFrame")
-            authf.grid(row=10, column=1, sticky="ew", padx=(12, 12), pady=(0, 5))
+            authf.grid(row=10, column=1, sticky="ew", padx=(16, 16), pady=(0, 8))
             authf.columnconfigure(0, weight=1)
             self.cmb_auth = ttk.Combobox(authf)
             self.cmb_auth.grid(row=0, column=0, sticky="ew")
@@ -342,83 +343,123 @@ class FeatureWindowsMixin:
                 pass
         self._log("自动探查: SSID=%s 网关=%s" % (ssid or "(无)", gw or "(无)"))
 
-    # ---------- 独立窗口: 运行日志 ----------
-
-    def open_log_window(self):
-        if self._fwin("log"):
-            return
-        self._init_fwin_map()
-        win = tk.Toplevel(self)
-        win.title("运行日志")
-        win.configure(bg=BG)
-        win.geometry("860x520")
-        win.minsize(600, 360)
-        win.transient(self)
-        card = ttk.Frame(win, style="Card.TFrame", padding=(14, 10))
-        card.pack(fill="both", expand=True, padx=14, pady=14)
-        ttk.Label(card, text="运行日志", style="DialogTitle.TLabel").pack(anchor="w")
-        ttk.Label(card, text="守护与网络事件实时记录（也会写入日志文件，重启不丢失）",
-                  style="Muted.TLabel").pack(anchor="w", pady=(2, 8))
-        body = ttk.Frame(card, style="Inner.TFrame")
-        body.pack(fill="both", expand=True)
-        self.txt_log = tk.Text(body, bg="#09101c", fg="#b7c4d8", font=("Menlo", 10),
-                               relief="flat", wrap="none", state="disabled",
-                               insertbackground=FG, selectbackground=ACCENT)
-        self.txt_log.pack(side="left", fill="both", expand=True)
-        scroll = ttk.Scrollbar(body, orient="vertical", command=self.txt_log.yview)
-        scroll.pack(side="right", fill="y")
-        self.txt_log.configure(yscrollcommand=scroll.set)
-        self.txt_log.bind("<MouseWheel>", self._scroll_log)
-        self._load_existing_log()
-
-        def _closed():
-            self.txt_log = None
-        self._fwin_open("log", lambda: win, on_close=_closed)
-
     # ---------- 独立窗口: 热点分享 ----------
 
     def open_hotspot_window(self):
-        """热点分享(独立窗口): 检测当前状态并引导打开系统热点。"""
+        """热点分享(独立窗口): 检测状态 + 引导开热点 + 列出连入设备/流量。"""
         if self._fwin("hotspot"):
             return
         self._init_fwin_map()
         win = tk.Toplevel(self)
         win.title("热点分享")
         win.configure(bg=BG)
-        win.geometry("560x430")
+        win.geometry("720x620")
+        win.minsize(660, 560)
         win.transient(self)
-        card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))
-        card.pack(fill="both", expand=True, padx=16, pady=16)
+        card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
+        card.pack(fill="both", expand=True, padx=18, pady=18)
         ttk.Label(card, text="热点分享", style="DialogTitle.TLabel").pack(anchor="w")
-        state_label = ttk.Label(card, text="", style="Muted.TLabel", wraplength=480,
+        state_label = ttk.Label(card, text="", style="Muted.TLabel", wraplength=640,
                                 justify="left")
-        state_label.pack(anchor="w", pady=(6, 12))
+        state_label.pack(anchor="w", pady=(8, 12), fill="x")
+
+        # 设备列表 + 流量表
+        list_label = ttk.Label(card, text="连入设备 (0)", style="CardSubTitle.TLabel")
+        list_label.pack(anchor="w", pady=(12, 6))
+        table_frame = ttk.Frame(card, style="Inner.TFrame")
+        table_frame.pack(fill="both", expand=True)
+        cols = ("ip", "mac", "vendor", "rx", "tx")
+        tree = ttk.Treeview(table_frame, columns=cols, show="headings", height=6)
+        tree.heading("ip", text="IP")
+        tree.heading("mac", text="MAC")
+        tree.heading("vendor", text="厂家")
+        tree.heading("rx", text="接收")
+        tree.heading("tx", text="发送")
+        tree.column("ip", width=110, anchor="w")
+        tree.column("mac", width=140, anchor="w")
+        tree.column("vendor", width=100, anchor="w")
+        tree.column("rx", width=90, anchor="e")
+        tree.column("tx", width=90, anchor="e")
+        tree.pack(side="left", fill="both", expand=True)
+        sb = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        note_label = ttk.Label(card, text="", style="Muted.TLabel", wraplength=580,
+                               justify="left")
+        note_label.pack(anchor="w", pady=(6, 0), fill="x")
 
         def refresh():
             on = core.hotspot_on()
-            if on:
+            clients = core.list_hotspot_clients()
+            # 已开启判定: Windows 走 192.168.137 网段; macOS 走 list_hotspot_clients 命中
+            on_effective = bool(on) or bool(clients)
+            if on_effective:
                 state_label.configure(
                     text="✅ 热点已开启\n\n手机/平板连接电脑热点即可上网，只占电脑 1 个校园网名额。\n"
                          "WiFi 名称与密码在「系统设置 → 移动热点/互联网共享」中查看/修改。",
                     foreground="#3fae7f")
             else:
-                state_label.configure(
-                    text="电脑热点尚未开启。点击下方按钮打开系统热点设置：\n\n"
-                         "Windows: 打开开关「与其他设备共享我的 Internet 连接」\n"
-                         "macOS: 打开「互联网共享」开关 → Wi-Fi 选项设名称密码\n\n"
-                         "开启后回到此窗口点「刷新状态」确认。", foreground=FG)
+                if core.IS_MACOS:
+                    state_label.configure(
+                        text="⚠️ macOS 互联网共享限制\n\n"
+                             "macOS 不支持 Wi-Fi→Wi-Fi 共享（系统级硬限制，App 无法绕过）。\n"
+                             "可选方案：\n"
+                             "① USB 线连手机（系统设置 → 共享 → 互联网共享 → Wi-Fi 共享给 iPhone USB）\n"
+                             "② 改用「隧道共享」：iPhone 配 HTTP 代理指电脑 IP:8080，效果一样\n\n"
+                             "点击下方按钮打开 macOS 共享设置页（macOS 不支持脚本化开启）。",
+                        foreground="#f1b84b")
+                else:
+                    state_label.configure(
+                        text="电脑热点尚未开启。点击下方「一键开启热点」即可自动启动（需 Wi-Fi 网卡支持移动热点）。\n\n"
+                             "失败 fallback 到系统「设置 → 移动热点」手动开启。", foreground=FG)
+            # 设备列表
+            tree.delete(*tree.get_children())
+            for c in clients:
+                tree.insert("", "end", values=(
+                    c.get("ip", "—"),
+                    c.get("mac", "—") or "—",
+                    c.get("vendor", "") or "—",
+                    (core.fmt_bytes(c.get("rx_bytes")) if c.get("rx_bytes") is not None
+                     else (c.get("note", "") or "—")),
+                    (core.fmt_bytes(c.get("tx_bytes")) if c.get("tx_bytes") is not None
+                     else "—"),
+                ))
+            list_label.configure(text="连入设备 (%d)" % len(clients))
+            if not clients:
+                note_label.configure(
+                    text="当前未检测到连入设备。开启热点后让手机/平板连入此电脑，再点「刷新状态」。")
+            else:
+                note_label.configure(
+                    text="提示：macOS 不能按 IP 拆分流量（需 sudo），列出的「接收/发送」是 NAT 接口的总流量；Windows 可按 IP 精确拆分。")
 
         refresh()
         btns = ttk.Frame(card, style="Inner.TFrame")
-        btns.pack(fill="x", pady=(14, 0))
-        ttk.Button(btns, text="打开热点设置", style="Accent.TButton",
-                   command=lambda: self._open_hotspot_setting()).pack(side="left")
+        btns.pack(fill="x", pady=(16, 0))
+        if core.IS_MACOS:
+            ttk.Button(btns, text="打开 macOS 共享设置", style="Accent.TButton",
+                       command=lambda: self._open_hotspot_setting()).pack(side="left")
+        else:
+            ttk.Button(btns, text="一键开启热点", style="Accent.TButton",
+                       command=lambda: self._start_hotspot()).pack(side="left")
+            ttk.Button(btns, text="打开热点设置", style="Gray.TButton",
+                       command=lambda: self._open_hotspot_setting()).pack(side="left", padx=(10, 0))
         ttk.Button(btns, text="刷新状态", style="Gray.TButton",
-                   command=refresh).pack(side="left", padx=(8, 0))
-        ttk.Label(card, text="原理：所有设备走电脑的网络出口，只占用电脑 1 个名额，"
+                   command=refresh).pack(side="left", padx=(10, 0))
+        ttk.Label(card, text="原理：所有设备走电脑的网络出口，只占用电脑 1 个校园网名额，"
                              "不受校园网多设备限制。", style="Muted.TLabel",
-                  wraplength=480).pack(anchor="w", pady=(14, 0))
+                  wraplength=640).pack(anchor="w", pady=(20, 0))
         self._fwin_open("hotspot", lambda: win)
+
+    def _start_hotspot(self):
+        """一键开启 Windows 移动热点 (PowerShell 优先, netsh 兜底)."""
+        ok, msg = core.start_mobile_hotspot()
+        if ok:
+            self._log("移动热点: %s" % msg)
+            messagebox.showinfo("✅ 已开启", msg + "\n\n请到「设置 → 移动热点」查看 WiFi 名称/密码。")
+        else:
+            self._log("一键开热点失败: %s" % msg)
+            messagebox.showwarning("开启失败", msg)
+            self._open_hotspot_setting()
 
     def _open_hotspot_setting(self):
         ok = False
@@ -481,37 +522,3 @@ class FeatureWindowsMixin:
         ttk.Button(btns, text="导出诊断", style="Gray.TButton",
                    command=self.export_diag).pack(side="left", padx=(8, 0))
         self._fwin_open("report", lambda: win)
-
-    # ---------- 独立窗口: 软件更新 ----------
-
-    def open_update_window(self):
-        if self._fwin("update"):
-            return
-        self._init_fwin_map()
-        win = tk.Toplevel(self)
-        win.title("软件更新")
-        win.configure(bg=BG)
-        win.geometry("560x300")
-        win.transient(self)
-        card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))
-        card.pack(fill="both", expand=True, padx=16, pady=16)
-        ttk.Label(card, text="软件更新", style="DialogTitle.TLabel").pack(anchor="w")
-        ttk.Label(card, text="当前版本 v%s（%s）" % (core.APP_VERSION,
-                                                     "macOS" if core.IS_MACOS else "Windows"),
-                  style="Muted.TLabel").pack(anchor="w", pady=(8, 4))
-        upd_line = ttk.Frame(card, style="Inner.TFrame")
-        upd_line.pack(fill="x", pady=(6, 0))
-        self._upd_line_frame = upd_line
-        self._lbl_update = ttk.Label(upd_line, text="", style="Card.TLabel")
-        self._lbl_update.pack(side="left")
-        ttk.Button(upd_line, text="检查更新", style="Accent.TButton",
-                   command=self._check_update_now).pack(side="right")
-        ttk.Label(card, text="点击「检查更新」联网检测 GitHub 最新版本；发现新版本后点「立即更新」自动下载替换重启。",
-                  style="Muted.TLabel", wraplength=520).pack(anchor="w", pady=(10, 0))
-
-        def _closed():
-            self._lbl_update = None
-            self._upd_line_frame = None
-            self._btn_update_now = None
-            self._update_info = None
-        self._fwin_open("update", lambda: win, on_close=_closed)

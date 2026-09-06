@@ -24,10 +24,19 @@ class OutageTimelineTests(unittest.TestCase):
     def _patch_history(self, path):
         self._orig = common.HISTORY_PATH
         common.HISTORY_PATH = path
+        # v4.0.3 起 reader 用 get_log_path(), 需要同时切换模块变量才能立刻生效
+        from core import history
+        history.set_log_path(path)
 
     def tearDown(self):
         if hasattr(self, "_orig"):
             common.HISTORY_PATH = self._orig
+        # 还原模块变量, 避免污染后续测试
+        try:
+            from core import history
+            history.set_log_path(None)
+        except Exception:
+            pass
         for f in getattr(self, "_files", []):
             try:
                 os.unlink(f)
