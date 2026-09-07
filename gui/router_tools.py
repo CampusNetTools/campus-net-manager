@@ -95,6 +95,11 @@ class RouterToolsMixin:
         current = {"report": None}
 
         def set_entry_value(ent, value, readonly):
+            try:
+                if not ent.winfo_exists():
+                    return  # 窗口已销毁, 后台探测结果直接丢弃 (v5.0.8)
+            except Exception:
+                return
             ent.configure(state="normal")
             ent.delete(0, "end")
             ent.insert(0, value or "")
@@ -102,6 +107,11 @@ class RouterToolsMixin:
                 ent.configure(state="readonly")
 
         def set_status(text):
+            try:
+                if not status_box.winfo_exists():
+                    return  # 窗口已销毁 (v5.0.8)
+            except Exception:
+                return
             status_box.configure(state="normal")
             status_box.delete("1.0", "end")
             status_box.insert("1.0", text)

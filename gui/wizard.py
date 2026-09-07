@@ -47,7 +47,8 @@ class WizardMixin:
         btns = ttk.Frame(card, style="Card.TFrame")
         btns.pack(fill="x")
         btn_prev = ttk.Button(btns, text="← 上一步", style="Gray.TButton")
-        btn_prev.pack(side="left")
+        # v5.0.8: 初始无 command, 不预 pack(点了解决「按了没反应」); 进入子步骤时再 pack
+        btn_prev.pack_forget()
         btn_act = ttk.Button(btns, text="下一步 →", style="Accent.TButton")
         btn_act.pack(side="right")
         btn_act2 = ttk.Button(btns, text="", style="Green.TButton")

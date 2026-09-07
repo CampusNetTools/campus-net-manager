@@ -245,7 +245,10 @@ class RouterProxyMixin:
                 self.after(0, lambda: set_fw(fw_msg))
                 self.after(0, lambda: ip_var.set(state["router_ip"]))
             except Exception as e:
-                self.after(0, lambda: set_info("探测失败: %s" % e))
+                # v5.0.8: 先在 except 作用域内格式化 —— lambda 延迟执行时
+                # Python 已删除异常变量 e, 原写法会 NameError 导致报错提示自身崩溃
+                err = "探测失败: %s" % e
+                self.after(0, lambda: set_info(err))
 
         ttk.Button(a_actions, text="🔍 识别我的路由器", style="Accent.TButton",
                    command=do_detect).pack(side="left")

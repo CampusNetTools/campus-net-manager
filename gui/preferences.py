@@ -350,7 +350,8 @@ class PreferencesMixin:
         actions = ttk.Frame(card, style="Inner.TFrame")
         actions.pack(fill="x", side="bottom", pady=(20, 0))
         ttk.Button(actions, text="测试通知", style="Gray.TButton",
-                   command=lambda: core.send_system_notification("通知设置工作正常")).pack(side="left")
+                   command=lambda: (self._log("测试通知已发送, 请看屏幕右上角通知中心"),
+                                    core.send_system_notification("通知设置工作正常"))).pack(side="left")
         ttk.Button(actions, text="保存设置", style="Accent.TButton", command=save_preferences).pack(side="right")
 
         # 首次进入: 按当前 history_enabled 渲染网络报告段
