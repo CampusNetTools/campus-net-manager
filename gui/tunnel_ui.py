@@ -12,6 +12,7 @@ import shared_proxy  # noqa: F401
 from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry, make_scrollable
 
 try:
     import pystray  # noqa: F401
@@ -109,8 +110,8 @@ class TunnelUiMixin:
         win = tk.Toplevel(self)
         win.title("隧道共享")
         win.configure(bg=BG)
-        win.geometry("760x780")
-        win.minsize(700, 660)
+        win.geometry(fit_geometry(win, 760, 780))
+        win.minsize(700, 520)
         win.resizable(True, True)
         win.transient(self)
         win.grab_set()
@@ -534,7 +535,7 @@ class TunnelUiMixin:
         win = tk.Toplevel(self)
         win.title("VPN 上游代理")
         win.configure(bg=BG)
-        win.geometry("460x300")
+        win.geometry(fit_geometry(win, 460, 300))
         win.transient(self)
         win.grab_set()
         card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))

@@ -12,6 +12,7 @@ import shared_proxy  # noqa: F401
 from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry
 
 try:
     import pystray  # noqa: F401
@@ -33,7 +34,7 @@ class WizardMixin:
         win = tk.Toplevel(self)
         win.title("新手向导")
         win.configure(bg=BG)
-        win.geometry("640x600")
+        win.geometry(fit_geometry(win, 640, 600, min_h=500))
         win.transient(self)
 
         card = ttk.Frame(win, style="Card.TFrame", padding=(20, 18))
@@ -191,7 +192,7 @@ class WizardMixin:
         help_win = tk.Toplevel(self)
         help_win.title("使用帮助")
         help_win.configure(bg=BG)
-        help_win.geometry("560x560")
+        help_win.geometry(fit_geometry(help_win, 560, 560, min_h=460))
         help_win.transient(self)
 
         txt = tk.Text(help_win, bg="#16161f", fg="#d5d5e5", font=("Microsoft YaHei UI", 10),

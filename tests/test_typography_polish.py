@@ -40,19 +40,21 @@ class TestWindowGeometry(unittest.TestCase):
     def test_main_window_size(self):
         from app_gui import App
         src = inspect.getsource(App.__init__)
-        # v5 主窗 1140x880 / minsize 1020x780 (双栏布局需要更宽)
+        # v5.0.1: 宽 1140 不变; 高度适配小屏 min(880, screen-120), minsize 980x540
         self.assertIn("1140", src)
         self.assertIn("880", src)
-        self.assertIn("1020", src)
-        self.assertIn("780", src)
+        self.assertIn("screen_h - 120", src)
+        self.assertIn("540", src)
 
     def test_preferences_window_size(self):
         from gui.preferences import PreferencesMixin
         src = inspect.getsource(PreferencesMixin.show_preferences)
-        # 偏好 680x800 / minsize 640x660 / 卡片 padding 26/24
+        # v5.0.1: 设计尺寸 680x800, fit_geometry 钳到屏幕可视区 + 整页滚动容器
         self.assertIn("680", src)
         self.assertIn("800", src)
-        self.assertIn("padding=(26, 24)", src)
+        self.assertIn("fit_geometry", src)
+        self.assertIn("make_scrollable", src)
+        self.assertIn("pad=(26, 24)", src)
 
     def test_profile_window_size(self):
         """v5: 连接档案内嵌主窗, open_profile_window 只置前主窗(不再开 780x620 独立窗)。"""

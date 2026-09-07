@@ -25,6 +25,7 @@ import shared_proxy
 from PIL import Image, ImageTk
 
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry  # noqa: F401
 
 try:
     import qrcode
@@ -142,8 +143,8 @@ class RouterProxyMixin:
         win = tk.Toplevel(self)
         win.title("路由器代理: 路由器自身开 HTTP 代理 · 手机不认证走代理")
         win.configure(bg=BG)
-        win.geometry("880x820")
-        win.minsize(820, 720)
+        win.geometry(fit_geometry(win, 880, 820))
+        win.minsize(820, 520)
         win.transient(self)
 
         # 外层滚动容器

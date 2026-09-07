@@ -13,6 +13,7 @@ import shared_proxy  # noqa: F401
 from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry, make_scrollable
 
 try:
     import pystray  # noqa: F401
@@ -96,13 +97,15 @@ class PreferencesMixin:
         win = tk.Toplevel(self)
         win.title("偏好设置")
         win.configure(bg=BG)
-        win.geometry("680x800")
-        win.resizable(False, True)
-        win.minsize(640, 660)
+        win.geometry(fit_geometry(win, 680, 800, min_h=520))
+        win.minsize(620, 520)
         win.transient(self)
 
-        card = ttk.Frame(win, style="Card.TFrame", padding=(26, 24))
-        card.pack(fill="both", expand=True, padx=18, pady=18)
+        # v5.0.1: 内容 ~800px 高, 小屏装不下 → 整页滚动容器
+        # (make_scrollable 返回的 inner 已在 canvas 内, 不能再 pack, 用 outer 承载边距)
+        outer = ttk.Frame(win, style="TFrame")
+        outer.pack(fill="both", expand=True, padx=18, pady=18)
+        card = make_scrollable(outer, pad=(26, 24))
         # 保存 card 引用供内联「立即更新」按钮挂靠
         self._pref_card = card
         ttk.Label(card, text="偏好设置", style="DialogTitle.TLabel").pack(anchor="w")
@@ -217,7 +220,7 @@ class PreferencesMixin:
                                           command=self._pref_check_update)
         self._btn_pref_check.pack(side="right")
         self._lbl_pref_upd = ttk.Label(card, text="点击「立即检查」联网访问 GitHub Release。",
-                                       style="Muted.TLabel", wraplength=600, justify="left")
+                                       style="Muted.TLabel", wraplength=540, justify="left")
         self._lbl_pref_upd.pack(anchor="w", pady=(8, 0))
         # 立即更新按钮: 有新版本时显示, 没有时隐藏
         self._btn_pref_update_now = None
@@ -266,7 +269,7 @@ class PreferencesMixin:
         report_body = ttk.Frame(report_card, style="Inner.TFrame")
         report_body.pack(fill="both", expand=True, pady=(10, 0))
         self._lbl_report = ttk.Label(report_body, text="", style="Card.TLabel",
-                                     wraplength=600, justify="left")
+                                     wraplength=540, justify="left")
         self._lbl_report.pack(fill="both", expand=True, anchor="nw")
         report_btns = ttk.Frame(report_card, style="Inner.TFrame")
         report_btns.pack(fill="x", pady=(12, 0))
@@ -285,7 +288,7 @@ class PreferencesMixin:
         ttk.Label(help_card, text="诊断与帮助", style="Section.TLabel").pack(anchor="w")
         ttk.Label(help_card, text="导出诊断 = 脱敏的网络状态/档案/日志, 给技术人员时使用；"
                                   "使用帮助 = 三种上网方式 + 常见问题速查。",
-                  style="Muted.TLabel", wraplength=600, justify="left").pack(
+                  style="Muted.TLabel", wraplength=540, justify="left").pack(
             anchor="w", pady=(4, 10))
         help_btns = ttk.Frame(help_card, style="Inner.TFrame")
         help_btns.pack(fill="x")

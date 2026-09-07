@@ -12,6 +12,7 @@ import shared_proxy  # noqa: F401
 from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry
 
 try:
     import pystray  # noqa: F401
@@ -32,7 +33,7 @@ class SpeedWindowMixin:
         win = tk.Toplevel(self)
         win.title("网络测速")
         win.configure(bg=BG)
-        win.geometry("680x570")
+        win.geometry(fit_geometry(win, 680, 570, min_h=500))
         win.resizable(False, False)
         win.transient(self)
 
