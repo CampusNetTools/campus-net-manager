@@ -629,10 +629,24 @@ class TunnelUiMixin:
 
 
     def _poll_allow(self):
-        """主线程轮询: 处理新设备的授权弹窗"""
+        """主线程轮询: 处理新设备的授权弹窗。
+        v5.0.8: 主窗隐藏(已缩到菜单栏)时不再弹模态框——看不见的 askyesno
+        会以系统级模态挡死整个应用(所有按钮失灵)。改为自动拒绝 + 系统通知,
+        用户打开主界面后设备重新连入即可正常授权。"""
         try:
             while True:
                 ip, ev, holder = self._allow_q.get_nowait()
+                try:
+                    hidden = (self.state() == "withdrawn")
+                except Exception:
+                    hidden = False
+                if hidden:
+                    holder["ok"] = False
+                    ev.set()
+                    self._on_alert(
+                        "设备 %s 请求使用隧道共享（主窗口隐藏中，已自动拒绝）。"
+                        "打开主界面后让对方重连一次即可授权。" % ip, "device")
+                    continue
                 self._on_alert("有新设备请求使用隧道共享：%s" % ip, "device")
                 ok = messagebox.askyesno(
                     "设备连接请求",
