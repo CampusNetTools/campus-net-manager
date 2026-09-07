@@ -201,15 +201,43 @@ def gen_tunnel_key(length=16):
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def detect_gateway_mode():
+def detect_gateway_mode(campus_ssids=None, wired_is_campus=None):
     """检测当前网关模式: 电脑直连网络(computer) 还是 经路由器(router)。
-    判断依据: 网关是否是一台路由器(有管理页/UPnP/对应品牌 MAC), 且本机非网关本身。
-    返回 dict: {mode: 'router'|'computer'|'unknown', gateway, gateway_mac, brand,
-    description}"""
+
+    v5.0.5 修正: 旧启发式「网关是私网地址 → 路由器」会把直连校园网也误判成
+    路由器——因为校园网自身就是大内网(网关必然是私网, 如立达 10.52.191.254 /
+    有线 10.14.0.1)。现在按更有区分度的信号判定:
+      1) SSID 命中校园网档案的绑定 SSID      → 电脑直连校园网 WiFi (computer)
+      2) 有线接入 + 校园认证可达             → 电脑有线直连校园网     (computer)
+      3) 其余维持旧启发式(私网网关+有MAC)    → 经路由器接入           (router)
+    参数:
+      campus_ssids:   set, 校园网类型档案的绑定 SSID 集合(GUI 传入)
+      wired_is_campus: bool, 有线场景下校园认证服务器是否可达(GUI 传入)
+    返回 dict: {mode, gateway, gateway_mac, brand, description}"""
     gw = netinfo.get_gateway()
     if not gw:
         return {"mode": "unknown", "gateway": "", "gateway_mac": "", "brand": "",
                 "description": "未检测到默认网关"}
+    ssid = None
+    try:
+        ssid = netinfo.get_ssid()
+    except Exception:
+        ssid = None
+    # ① SSID 命中校园网档案 → 一定是直连校园网 WiFi
+    if ssid and campus_ssids and ssid in campus_ssids:
+        return {"mode": "computer", "gateway": gw,
+                "gateway_mac": get_gateway_mac() or "",
+                "brand": "",
+                "description": "电脑直连校园网 WiFi（%s）—— 网关 %s 是校园网自身的内网网关"
+                               % (ssid, gw)}
+    # ② 有线接入 + 校园认证可达 → 有线直连校园网(校园网自身是内网)
+    if not ssid and wired_is_campus:
+        return {"mode": "computer", "gateway": gw,
+                "gateway_mac": get_gateway_mac() or "",
+                "brand": "",
+                "description": "电脑有线直连校园网（校园网自身是内网，网关 %s）"
+                               % gw}
+    # ③ 旧启发式: 有品牌MAC + 网关是私有地址(通常是路由器/AP)
     gmac = get_gateway_mac()
     brand_val = get_router_brand()
     if isinstance(brand_val, tuple):
@@ -218,7 +246,6 @@ def detect_gateway_mode():
         brand = str(brand_val or "")
     else:
         brand = brand_val
-    # 判断是否为路由器: 有品牌MAC + 网关是私有地址(通常是路由器/AP)
     is_router = bool(brand) or (gmac and gmac not in ("", "00:00:00:00:00:00"))
     # 常见路由器网关段: 192.168.x.1 / 10.x.x.1 / 172.16-31.x.1
     gw_is_lan = bool(re.match(r"^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)", gw or ""))
