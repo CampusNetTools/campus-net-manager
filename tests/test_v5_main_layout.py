@@ -24,7 +24,8 @@ class TestV5MainLayout(unittest.TestCase):
         self.assertIn("立即检测", src)
         self.assertIn("导入配置", src)
         self.assertIn("导出配置", src)
-        self.assertIn("自动探查当前网络", src)
+        # v5.0.2: 探查按钮只在表单字段区一份(_profile_rebuild_form), 主窗不重复放
+        self.assertNotIn('"自动探查当前网络"', src)
 
     def test_right_column_nav_groups(self):
         """右栏: 功能导航按场景分组, v4 全功能保留。"""
