@@ -309,8 +309,8 @@ class PreferencesMixin:
                 self._lbl_report.configure(
                     text="开启『保存网络稳定性历史』后，软件会在这里用普通人能读懂的方式说明"
                          "最近 7 天的网络稳定性，并列出每次断网的开始 / 恢复 / 持续时长。\n\n"
-                         "（提示）即便暂时不开, 你仍可在「主界面宫格 → 网络控制台」"
-                         "实时看当前连接状态。")
+                         "（提示）即便暂时不开, 你仍可在「主界面 功能导航 → 网络控制台」"
+                 "实时看当前连接状态。")
                 return
             self._lbl_report_status.configure(text="最近 7 天 · 仅本地记录")
             for w in (self._lbl_report, self._btn_report_refresh, self._btn_report_export):

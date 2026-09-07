@@ -288,8 +288,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         self.cmb_ptype.pack(side="left", padx=(12, 0))
         self.cmb_ptype.bind("<<ComboboxSelected>>",
                             lambda e: self._profile_rebuild_form())
-        ttk.Button(type_row, text="自动探查当前网络", style="Gray.TButton",
-                   command=self._profile_auto_probe).pack(side="right")
+        # (探查按钮在表单字段区里, 这里不再重复放一个)
 
         self.lbl_ptype_hint = ttk.Label(pcard, text="", style="Muted.TLabel",
                                         wraplength=520, justify="left")
