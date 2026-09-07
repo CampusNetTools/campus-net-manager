@@ -196,7 +196,7 @@ class TunnelUiMixin:
         if mode == "router":
             router_body = (
                 "✓ 当前已是路由器模式。手机直接连那台路由器的 WiFi 就能借校园网出口, "
-                "**不用配任何代理**。\n\n"
+                "不用配任何代理。\n\n"
                 "如果你仍希望走本软件代理(有跨网段、防蹭网、鉴权通行等需要), "
                 "向下滚到 ② 段, 那里是手动代理 + 扫码配置。\n\n"
                 "路由器自身也能开 PAC(在本应用「路由器中继」窗口里有教)。"
@@ -218,7 +218,7 @@ class TunnelUiMixin:
         ttk.Label(computer_card,
                   text="② 电脑直连校园网(手机配代理)",
                   style="Section.TLabel").pack(anchor="w")
-        computer_header = ("**手机需要配电脑的 HTTP 代理** 才能借校园网出口上网。"
+        computer_header = ("手机需要配电脑的 HTTP 代理 才能借校园网出口上网。"
                            if mode == "computer" else
                            "如果手机不在这台路由器下, 可走电脑代理借校园网出口上网。")
         ttk.Label(computer_card, text=computer_header,
@@ -461,10 +461,10 @@ class TunnelUiMixin:
             "  ① 路由器先刷 OpenWrt/Padavan/Merlin/iKuaiOS (具体品牌步骤 → 「路由器代理」窗口);\n"
             "  ② 在路由器里安装 HTTP 代理插件 (OpenWrt: luci-app-squid / Padavan: 内置 HTTP 代理 "
             "/ Merlin: 自定义脚本 + nginx) 并监听 8080;\n"
-            "  ③ 手机连路由器 WiFi 但**不登录校园网** → WiFi 高级 → 代理 → 手动 → 服务器填上方 IP, "
+            "  ③ 手机连路由器 WiFi 但不登录校园网 → WiFi 高级 → 代理 → 手动 → 服务器填上方 IP, "
             "端口 8080 → 保存;\n"
             "  ④ 手机打开任意网页就能上网, 流量全走路由器, 路由器替手机完成校园网认证。\n"
-            "  ※ 该方案**不需要本软件隧道在电脑运行**, 电脑关了也能用。"
+            "  ※ 该方案不需要本软件隧道在电脑运行, 电脑关了也能用。"
         )
         ttk.Label(router_proxy_card, text=rp_guide, style="Card.TLabel",
                   justify="left", wraplength=680).pack(anchor="w", pady=(10, 0))
