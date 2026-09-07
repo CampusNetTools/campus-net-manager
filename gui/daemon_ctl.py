@@ -68,7 +68,12 @@ class DaemonCtlMixin:
     def set_env(self, mode, ssid, gw, profile_name, in_campus):
         if in_campus is None:
             return
-        conn = (" (" + ssid + ")" if ssid else ("" if not in_campus else (" (有线/网关 %s)" % gw if gw else "")))
+        # v5.0.6: Wi-Fi 已关联但 SSID 被 macOS 隐私打码时, 明示而不是谎称有线
+        if mode == "wifi" and not ssid:
+            conn = " (WiFi 名被系统隐藏)"
+        else:
+            conn = (" (" + ssid + ")" if ssid else
+                    ("" if not in_campus else (" (有线/网关 %s)" % gw if gw else "")))
         if in_campus:
             self.dot_env.configure(fg=GREEN)
             extra = " → 档案「%s」" % profile_name if profile_name else " (未匹配档案)"
@@ -303,6 +308,11 @@ class DaemonCtlMixin:
             auth_url = profile.get("auth_url", core.DEFAULT_AUTH_URL) if profile else core.DEFAULT_AUTH_URL
             in_campus = core.auth_reachable(auth_url)
             self._on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
+            # v5.0.6: Wi-Fi 已关联但 SSID 被系统隐私打码 → 一次性引导开定位
+            if mode == "wifi" and not ssid and not getattr(self, "_ssid_hint_logged", False):
+                self._ssid_hint_logged = True
+                self._log("提示: WiFi 名被 macOS 隐私机制隐藏, 无法按 WiFi 自动匹配档案。"
+                          "开启定位后可恢复: 系统设置 → 隐私与安全性 → 定位服务 → 勾选校园网连接管家")
         threading.Thread(target=work, daemon=True).start()
 
 

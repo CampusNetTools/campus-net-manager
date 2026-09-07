@@ -219,19 +219,21 @@ def detect_gateway_mode(campus_ssids=None, wired_is_campus=None):
         return {"mode": "unknown", "gateway": "", "gateway_mac": "", "brand": "",
                 "description": "未检测到默认网关"}
     ssid = None
+    conn_mode = None
     try:
-        ssid = netinfo.get_ssid()
+        conn_mode, ssid = netinfo.get_connection_mode()
     except Exception:
-        ssid = None
+        conn_mode, ssid = None, None
     # ① SSID 命中校园网档案 → 一定是直连校园网 WiFi
-    if ssid and campus_ssids and ssid in campus_ssids:
+    if conn_mode == "wifi" and ssid and campus_ssids and ssid in campus_ssids:
         return {"mode": "computer", "gateway": gw,
                 "gateway_mac": get_gateway_mac() or "",
                 "brand": "",
                 "description": "电脑直连校园网 WiFi（%s）—— 网关 %s 是校园网自身的内网网关"
                                % (ssid, gw)}
-    # ② 有线接入 + 校园认证可达 → 有线直连校园网(校园网自身是内网)
-    if not ssid and wired_is_campus:
+    # ② 有线接入(以太网网卡) + 校园认证可达 → 有线直连校园网(校园网自身是内网)
+    #    v5.0.6: 有线/无线按网卡硬件类型判定, Wi-Fi 打码不再被误判成有线
+    if conn_mode == "ethernet" and wired_is_campus:
         return {"mode": "computer", "gateway": gw,
                 "gateway_mac": get_gateway_mac() or "",
                 "brand": "",

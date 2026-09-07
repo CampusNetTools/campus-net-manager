@@ -171,7 +171,15 @@ class TunnelUiMixin:
         ttk.Label(scroll_frame, text=top_status, style="Muted.TLabel",
                   justify="left").pack(anchor="w", pady=(6, 0))
         ttk.Label(scroll_frame, text=top_desc, style="Muted.TLabel",
-                  justify="left", wraplength=680).pack(anchor="w", pady=(4, 18))
+                  justify="left", wraplength=680).pack(anchor="w", pady=(4, 4))
+        # v5.0.6: 免认证网络提示 —— 有密码即可上网/不限设备的 WiFi, 手机直连即可
+        ttk.Label(scroll_frame,
+                  text="💡 先判断你的 WiFi 类型: 若当前 WiFi 本身免认证"
+                       "（有密码就能上网、不限设备数），手机直连同一 WiFi 即可上网，"
+                       "无需隧道共享；若需要校园网网页认证（如 LIDA-UNIVERSITY），"
+                       "手机过不了认证时再走下方 ② 借电脑网络。",
+                  style="Muted.TLabel", justify="left",
+                  wraplength=680).pack(anchor="w", pady=(0, 10))
 
         st = {"ip": myip, "pac": pac_url, "setup": setup_url}
         cands = shared_proxy.get_lan_ips() or [myip]

@@ -3,7 +3,7 @@
 from core.common import *  # noqa: F401,F403
 from core import common  # noqa: F401
 
-__all__ = ['_run_decode', 'get_ssid', 'get_gateway', 'get_physical_route', 'get_physical_interface', 'vpn_active', 'automatic_speed_test_plan', 'get_connection_mode']
+__all__ = ['_run_decode', 'get_ssid', 'get_gateway', 'get_physical_route', 'get_physical_interface', 'vpn_active', 'automatic_speed_test_plan', 'get_connection_mode', 'iface_is_wireless', 'hardware_port_name']
 
 def _run_decode(cmd, timeout=10):
     """运行命令并智能解码输出。
@@ -103,12 +103,64 @@ def automatic_speed_test_plan():
     }
 
 
+def hardware_port_name(device):
+    """返回网卡的硬件端口名, 如 "Wi-Fi" / "Ethernet" / "Thunderbolt Ethernet"。
+    macOS 26 隐私机制会打码/谎报 SSID, 但硬件端口类型始终可读——
+    判定有线/无线应以网卡类型为准, 而不是能否读到 SSID。"""
+    if not device:
+        return ""
+    out = _run_decode(["networksetup", "-listallhardwareports"])
+    for block in out.split("\n\n"):
+        if re.search(r"Device:\s*" + re.escape(device) + r"\b", block):
+            m = re.search(r"Hardware Port:\s*(.+)", block)
+            if m:
+                return m.group(1).strip()
+    return ""
+
+
+def iface_is_wireless(device):
+    """判断网卡是否为 Wi-Fi 物理网卡(与是否已关联无关)。"""
+    if not device:
+        return False
+    port = hardware_port_name(device).lower()
+    return ("wi-fi" in port or "wifi" in port or "airport" in port)
+
+
+def _iface_has_ssid_line(device):
+    """ipconfig getsummary 输出中是否存在 "SSID :" 行。
+    macOS 26 隐私打码时行内容是 <redacted>, 但**行存在即已关联无线**;
+    真正的有线网卡(以太网口)永远不会输出该行。"""
+    if not device:
+        return False
+    out = _run_decode(["ipconfig", "getsummary", device])
+    for line in out.splitlines():
+        s = line.strip()
+        if s.startswith("SSID") and not s.startswith("BSSID"):
+            return True
+    return False
+
+
 def get_connection_mode():
-    """返回 (模式, ssid): wifi=无线连接, ethernet=有线连接, none=无网络"""
-    ssid = get_ssid()
-    if ssid:
-        return "wifi", ssid
+    """返回 (模式, ssid): wifi=无线连接, ethernet=有线连接, none=无网络
+
+    v5.0.6 修正: 有线/无线改按**默认路由网卡的硬件类型**判定
+    (Wi-Fi 网卡已关联 = 无线, 哪怕 SSID 被系统隐私打码读不出名字);
+    旧逻辑「读不到 SSID = 有线」在 macOS 26 隐私打码下会把无线误判为有线。"""
+    if not common.IS_MACOS:
+        ssid = get_ssid()
+        if ssid:
+            return "wifi", ssid
+        gw = get_gateway()
+        if gw and not gw.startswith("127."):
+            return "ethernet", None
+        return "none", None
+    iface = get_physical_interface()
     gw = get_gateway()
-    if gw and not gw.startswith("127."):
-        return "ethernet", None
-    return "none", None
+    if not iface or not gw or gw.startswith("127."):
+        return "none", None
+    if iface_is_wireless(iface):
+        if _iface_has_ssid_line(iface):
+            # Wi-Fi 已关联; SSID 真名可能被隐私打码(get_ssid 读不到时返回 None)
+            return "wifi", get_ssid()
+        return "none", None
+    return "ethernet", None
