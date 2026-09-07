@@ -114,7 +114,8 @@ class TunnelUiMixin:
         win.minsize(700, 520)
         win.resizable(True, True)
         win.transient(self)
-        win.grab_set()
+        # v5.0.7: 不设全局事件抓取 —— 此窗口是常驻工具窗, 抢全局事件会让
+        # 之后打开的其他功能窗口(路由器代理等)看得见却点不动
 
         # 外层滚动容器(便于内容超出屏幕时)
         canvas = tk.Canvas(win, bg=BG, highlightthickness=0)
@@ -560,7 +561,7 @@ class TunnelUiMixin:
         win.configure(bg=BG)
         win.geometry(fit_geometry(win, 460, 300))
         win.transient(self)
-        win.grab_set()
+        # v5.0.7: 不设全局事件抓取, 避免遗留弹窗劫持全局事件
         card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))
         card.pack(fill="both", expand=True, padx=16, pady=16)
         ttk.Label(card, text="VPN 上游代理", style="DialogTitle.TLabel").pack(anchor="w")
