@@ -1,5 +1,14 @@
 # 更新记录
 
+## v5.0.4
+
+- **修复「关闭窗口即崩溃弹窗」(意外退出对话框)**:
+  - 现象: 点 X 关闭窗口时弹出「校园网连接管家意外退出」, 崩溃报告自 v4 时代累计多份。
+  - 根因(崩溃栈实锤): 关闭走「最小化到托盘」时, pystray 在**后台线程**运行 NSApplication, 新版 macOS 在 `NSUpdateCycleInitialize` 处 SIGTRAP(EXC_BREAKPOINT, Trace/BPT trap 5)。
+  - 修复: 新增 `gui/tray_mac.py` — macOS 改用 **NSStatusItem 原生菜单栏托盘**(pyobjc, 在 Tk 主线程创建, 菜单动作经主线程事件循环派发, 线程安全); pystray 仅保留给 Windows。
+  - 退出兜底: Tk destroy 后若 AppKit/线程残留偶发 SIGTRAP 假崩溃, 在守护/代理/控制台/配置全部清理完成后 `os._exit(0)` 干净退出, 不再弹「意外退出」。
+  - 托盘交互不变: 关 X = 隐藏窗口守护继续, 菜单栏 🌐 图标 → 打开主界面 / 退出; 托盘创建失败时窗口保持显示不隐身。
+
 ## v5.0.3
 
 - **真实点击测试打通 + 文案清理**:
