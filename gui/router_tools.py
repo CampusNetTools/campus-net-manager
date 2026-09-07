@@ -12,6 +12,7 @@ import shared_proxy  # noqa: F401
 from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry  # noqa: F401
 
 try:
     import pystray  # noqa: F401
@@ -57,8 +58,8 @@ class RouterToolsMixin:
         win = tk.Toplevel(self)
         win.title("路由器检测")
         win.configure(bg=BG)
-        win.geometry("720x640")
-        win.minsize(680, 580)
+        win.geometry(fit_geometry(win, 720, 640))
+        win.minsize(680, 480)
         win.transient(self)
 
         card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
@@ -229,8 +230,8 @@ class RouterToolsMixin:
         win = tk.Toplevel(self)
         win.title("路由器中继: 不刷固件也能用 + 一键刷固件准备")
         win.configure(bg=BG)
-        win.geometry("820x780")
-        win.minsize(760, 680)
+        win.geometry(fit_geometry(win, 820, 780))
+        win.minsize(760, 520)
         win.transient(self)
 
         # 外层滚动容器

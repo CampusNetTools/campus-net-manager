@@ -11,6 +11,7 @@ from tkinter import ttk, messagebox  # noqa: F401
 
 import keepalive_core as core  # noqa: F401
 from gui.theme import *  # noqa: F401,F403
+from gui.scrollkit import fit_geometry, make_scrollable  # noqa: F401
 
 try:
     import pystray  # noqa: F401
@@ -154,10 +155,10 @@ class FeatureWindowsMixin:
 
         def _fl(row, col, text):
             ttk.Label(f, text=text, style="Field.TLabel").grid(
-                row=row, column=col, sticky="w", padx=(0 if col == 0 else 16, 0), pady=(10, 4))
+                row=row, column=col, sticky="w", padx=(0 if col == 0 else 16, 0), pady=(7, 3))
 
         def _fw(widget, row, col):
-            widget.grid(row=row, column=col, sticky="ew", pady=(0, 8),
+            widget.grid(row=row, column=col, sticky="ew", pady=(0, 6),
                         padx=(0 if col == 0 else 16, 16 if col == 0 else 0))
 
         # 档案名(两种类型都需要)
@@ -277,8 +278,8 @@ class FeatureWindowsMixin:
         win = tk.Toplevel(self)
         win.title("热点分享")
         win.configure(bg=BG)
-        win.geometry("720x620")
-        win.minsize(660, 560)
+        win.geometry(fit_geometry(win, 720, 620))
+        win.minsize(660, 460)
         win.transient(self)
         card = ttk.Frame(win, style="Card.TFrame", padding=(24, 22))
         card.pack(fill="both", expand=True, padx=18, pady=18)
@@ -405,8 +406,8 @@ class FeatureWindowsMixin:
         win = tk.Toplevel(self)
         win.title("网络报告")
         win.configure(bg=BG)
-        win.geometry("660x560")
-        win.minsize(600, 460)
+        win.geometry(fit_geometry(win, 660, 560))
+        win.minsize(600, 440)
         win.transient(self)
         card = ttk.Frame(win, style="Card.TFrame", padding=(22, 18))
         card.pack(fill="both", expand=True, padx=16, pady=16)
