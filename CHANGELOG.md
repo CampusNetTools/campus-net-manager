@@ -1,5 +1,14 @@
 # 更新记录
 
+## v5.0.6
+
+- **有线/无线按网卡硬件类型判定 (修「Wi-Fi 被误判为有线以太网」)**:
+  - 用户指出: 免认证校园 WiFi(有密码即可上网、不限设备)下被显示成「有线」。
+  - 根因: macOS 26 隐私机制对无定位授权进程打码 SSID——`networksetup -getairportnetwork` 甚至谎报 "not associated", 旧逻辑「读不到 SSID = 有线」随之失真。
+  - 修复: `get_connection_mode` 改按**默认路由网卡的硬件端口类型**判定 (networksetup 硬件端口 = Wi-Fi 且 `ipconfig getsummary` 存在 SSID 行[内容可是 <redacted>] → 无线; 以太网类 → 有线)。SSID 打码时环境行显示「WiFi 名被系统隐藏」并一次性日志引导开定位服务。
+- **隧道共享窗口新增「免认证网络」提示**: 顶部固定提示先判断 WiFi 类型——免认证 WiFi(有密码即可上网/不限设备)手机直连同一 WiFi 即可, 无需隧道共享; 需网页认证的(如 LIDA-UNIVERSITY)手机过不了认证再走 ② 配代理。
+- 新增 `tests/test_iface_connection_mode.py` (6 项) + 扩充网关模式判定测试, 全套 243 项通过。
+
 ## v5.0.5
 
 - **修复「直连校园网被误判为经由路由器接入」**:
