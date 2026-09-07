@@ -132,7 +132,22 @@ class TunnelUiMixin:
         # 顶部: 标题 + 概要状态
         ttk.Label(scroll_frame, text="隧道已经准备好",
                   style="DialogTitle.TLabel").pack(anchor="w")
-        gm = core.detect_gateway_mode()
+        # v5.0.5: 传入校园网信号, 修复「直连校园网被误判为路由器」
+        campus_ssids = {p.get("ssid") for p in self.cfg.get("profiles", [])
+                        if p.get("profile_type") == "campus" and p.get("ssid")}
+        try:
+            _mode, _ssid = core.get_connection_mode()
+            _gw = core.get_gateway()
+            _prof = core.match_profile(self.cfg, _ssid, _gw)
+        except Exception:
+            _prof = None
+        _auth_url = (_prof or {}).get("auth_url") or core.DEFAULT_AUTH_URL
+        try:
+            _wired_campus = core.auth_reachable(_auth_url)
+        except Exception:
+            _wired_campus = False
+        gm = core.detect_gateway_mode(campus_ssids=campus_ssids,
+                                      wired_is_campus=_wired_campus)
         mode = gm["mode"]
         if mode == "router":
             top_status = ("✓ 服务自检通过。" if verified else
