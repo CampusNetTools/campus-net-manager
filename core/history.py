@@ -18,8 +18,10 @@ def effective_log_path(cfg):
     if custom and os.path.isabs(custom):
         return custom
     if custom:
-        # 相对路径按 BASE_DIR 解析, 避免当前工作目录漂移导致打不开
-        return os.path.join(common.BASE_DIR, custom)
+        # 相对路径按 BASE_DIR 解析, 避免当前工作目录漂移导致打不开;
+        # 统一分隔符(os.path.join 只补边界, 不改 custom 内部的 / → Windows 下会混用)
+        norm = custom.replace("/", os.sep).replace("\\", os.sep)
+        return os.path.join(common.BASE_DIR, norm)
     return common.HISTORY_PATH
 
 
