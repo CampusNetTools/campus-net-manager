@@ -10,6 +10,24 @@ import socket
 import subprocess
 import threading
 import urllib.request
+import urllib.parse
+import proxy_transport
+
+def validate_upstream(upstream, timeout=2):
+    """检查所填 HTTP 代理是否在监听；不修改系统 VPN 或静默绕过用户上游。"""
+    if not upstream:
+        return
+    if upstream.get("type", "http") != "http":
+        raise ValueError("请使用 VPN 客户端的 HTTP/混合代理端口，不能填写 SOCKS 专用端口")
+    host = upstream.get("host", "")
+    port = int(upstream.get("port", 0))
+    if not host or not 1 <= port <= 65535:
+        raise ValueError("上游代理地址或端口无效")
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            pass
+    except OSError as exc:
+        raise ValueError("上游 %s:%d 无法连接。请启动对应代理客户端或清空上游，使用电脑当前网络（含系统 VPN）。" % (host, port)) from exc
 
 
 class SharedProxy:
@@ -32,6 +50,16 @@ class SharedProxy:
         self._listener = None
         self._running = False
         self._threads = []
+        self._allow_lock = threading.Lock()
+        self._pending_allow = {}
+        self.last_error = ""
+        self.upload_bytes = 0
+        self.download_bytes = 0
+        self.relay_idle_timeout = 300
+        self._active_clients = {}
+
+        self._connections = set()
+        self._connections_lock = threading.Lock()
         # 电脑自己所有 IPv4 接口(127.0.0.1 + en0/bridge0/bridge100/awdl0/...).
         # 收到 host 是自己的绝对 URL 时, 视同内嵌路径处理(返回引导页/mobileconfig/PAC),
         # 避免代理到 192.168.3.1:80 / 10.52.188.32:80 失败返 502, 触发 iOS Safari
@@ -41,6 +69,30 @@ class SharedProxy:
     @property
     def running(self):
         return self._running
+
+    def check_exit(self):
+        """独立检查代理出口的 TLS/HTTP；配置页可达不代表此检查通过。"""
+        import ssl
+        sock = self._connect("www.apple.com", 443, timeout=8)
+        if sock is None:
+            return self.last_error or "外网出口连接失败"
+        try:
+            with ssl.create_default_context().wrap_socket(sock, server_hostname="www.apple.com") as tls:
+                tls.settimeout(8)
+                tls.sendall(b"GET /library/test/success.html HTTP/1.1\r\nHost: www.apple.com\r\nConnection: close\r\n\r\n")
+                response = bytearray()
+                while len(response) < 32768:
+                    data = tls.recv(4096)
+                    if not data:
+                        break
+                    response.extend(data)
+                if b" 200 " in response.split(b"\r\n", 1)[0] and b"Success" in response:
+                    return "电脑外网测试通过；此检查不代表手机所有 App 均可用。"
+                return "已连接外网，但测试页面返回异常；请检查认证或上游规则。"
+        except Exception as exc:
+            return "外网出口验证失败 (%s)；请检查上游、VPN 或校园认证。" % type(exc).__name__
+        finally:
+            sock.close()
 
     def start(self):
         if self._running:
@@ -70,6 +122,14 @@ class SharedProxy:
             self._listener.close()
         except Exception:
             pass
+        with self._connections_lock:
+            connections = list(self._connections)
+        for connection in connections:
+            try:
+                connection.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            connection.close()
         for t in self._threads[:]:
             try:
                 t.join(0.3)
@@ -79,16 +139,29 @@ class SharedProxy:
 
     def _check_allow(self, ip):
         """访问控制: 白名单直接放行, 新设备走询问回调"""
-        if ip in self.allowed:
-            return True
-        if self.on_ask is not None:
-            try:
-                if self.on_ask(ip):
-                    self.allowed.add(ip)
-                    return True
-            except Exception:
-                pass
-        return False
+        with self._allow_lock:
+            if ip in self.allowed:
+                return True
+            pending = self._pending_allow.get(ip)
+            owner = pending is None
+            if owner:
+                pending = threading.Event()
+                self._pending_allow[ip] = pending
+        if not owner:
+            pending.wait(46)
+            return ip in self.allowed
+        try:
+            if self.on_ask is not None and self.on_ask(ip):
+                self.allowed.add(ip)
+                return True
+            self.last_error = "设备尚未授权；请在电脑主窗口允许设备连接"
+            return False
+        except Exception:
+            return False
+        finally:
+            with self._allow_lock:
+                self._pending_allow.pop(ip, None)
+                pending.set()
 
     @staticmethod
     def _collect_my_ips():
@@ -227,6 +300,7 @@ class SharedProxy:
                 client, addr = self._listener.accept()
                 t = threading.Thread(target=self._handle, args=(client, addr[0]), daemon=True)
                 t.start()
+                self._threads = [worker for worker in self._threads if worker.is_alive()]
                 self._threads.append(t)
             except socket.timeout:
                 continue
@@ -234,6 +308,10 @@ class SharedProxy:
                 break
 
     def _handle(self, client, client_ip):
+        with self._connections_lock:
+            self._connections.add(client)
+            self._active_clients[client_ip] = self._active_clients.get(client_ip, 0) + 1
+        stage = "读取手机代理请求"
         try:
             client.settimeout(20)
             data = b""
@@ -256,7 +334,7 @@ class SharedProxy:
             #   1) host 是代理自己 + port 是本地服务端口(如 8081 控制台) -> 代理到 127.0.0.1:port
             #   2) host 是代理自己 + port 缺省或 == 代理端口(8080) -> 视同相对路径, 走引导页/mobileconfig
             #   3) host 是代理自己 + 其他 port -> 代理到 127.0.0.1:port (本地服务透传)
-            if method == b"GET" and target.startswith(b"http://"):
+            if target.startswith(b"http://"):
                 t = target.decode(errors="ignore")
                 rest = t[7:]
                 hp, _, path_only = rest.partition("/")
@@ -269,30 +347,25 @@ class SharedProxy:
                 is_self = (host_only.lower() == socket.gethostname().lower()
                            or host_only in self._my_ips)
                 if is_self:
-                    qs = ("?" + rest.split("?", 1)[1]) if "?" in rest else ""
+                    # path_only 已经包含 query，不能再次追加口令参数。
+                    parsed = urllib.parse.urlsplit(t)
+                    local_target = parsed.path or "/"
+                    if parsed.query:
+                        local_target += "?" + parsed.query
                     if port_only and port_only != self.port:
                         # 代理到本地服务(例如控制台 8081)
-                        upstream = self._connect("127.0.0.1", port_only)
+                        stage = "连接电脑本地服务"
+                        upstream = socket.create_connection(("127.0.0.1", port_only), timeout=10)
                         if not upstream:
                             client.sendall(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
                             return
-                        new_path = ("/" + path_only) if path_only else "/"
-                        new_target = (new_path + qs).encode()
-                        out_lines = []
-                        for ln in lines:
-                            if ln.startswith(b"Proxy-Connection"):
-                                continue
-                            if ln.startswith(method + b" "):
-                                out_lines.append(method + b" " + new_target + b" HTTP/1.1")
-                            else:
-                                out_lines.append(ln)
-                        new_head = b"\r\n".join(out_lines) + b"\r\n\r\n"
+                        new_target = local_target.encode()
+                        new_head = proxy_transport.forward_head(lines, method, new_target)
                         rest2 = data.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in data else b""
                         self._relay(client, upstream, new_head + rest2)
                         return
                     # port 缺省 / 等于代理端口 -> 视同相对路径, 走下面 / /setup.mobileconfig / proxy.pac
-                    target = (("/" + path_only) if path_only else "/") + qs
-                    target = target.encode()
+                    target = local_target.encode()
             if method == b"GET" and target.split(b"?", 1)[0] in (b"/proxy.pac", b"/wpad.dat"):
                 host = self.pac_host or client.getsockname()[0]
                 pac = ('function FindProxyForURL(url, host) { return "PROXY %s:%d; DIRECT"; }'
@@ -336,13 +409,17 @@ class SharedProxy:
                             key_ok = True
                         break
                 if not key_ok:
+                    self.last_error = "设备代理口令校验失败（不是控制台口令）"
                     client.sendall(b"HTTP/1.1 407 Proxy Authentication Required\r\n\r\n")
                     return
             if method == b"CONNECT":
                 # HTTPS 隧道: 连上游后转发
-                host, _, port = target.partition(b":")
-                port = int(port) if port else 443
-                upstream = self._connect(host.decode(errors="ignore"), port)
+                stage = "解析 CONNECT 地址"
+                parsed = urllib.parse.urlsplit("//" + target.decode("ascii"))
+                host, port = parsed.hostname, parsed.port or 443
+                if not host or parsed.username is not None:
+                    raise ValueError("invalid authority")
+                upstream = self._connect(host, port)
                 if not upstream:
                     client.sendall(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
                     return
@@ -354,32 +431,30 @@ class SharedProxy:
                 # HTTP 代理: 绝对 URL 转相对路径转发
                 url = target.decode(errors="ignore")
                 if url.startswith("http://"):
-                    rest_url = url[7:]
-                    host, _, path = rest_url.partition("/")
-                    port = 80
-                    if ":" in host:
-                        host, _, ps = host.partition(":")
-                        port = int(ps) if ps.isdigit() else 80
-                    path = "/" + path if path else "/"
+                    stage = "解析 HTTP 地址"
+                    parsed = urllib.parse.urlsplit(url)
+                    host, port = parsed.hostname, parsed.port or 80
+                    path = parsed.path or "/"
+                    if parsed.query:
+                        path += "?" + parsed.query
                     upstream = self._connect(host, port)
                     if not upstream:
                         client.sendall(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
                         return
                     # 重写请求行: 绝对URL -> 路径, 去掉 Proxy-Connection
-                    out_lines = []
-                    for ln in lines:
-                        if ln.startswith(b"Proxy-Connection"):
-                            continue
-                        if ln.startswith(method + b" "):
-                            out_lines.append(method + b" " + path.encode() + b" HTTP/1.1")
-                        else:
-                            out_lines.append(ln)
-                    new_head = b"\r\n".join(out_lines) + b"\r\n\r\n"
+                    new_head = proxy_transport.forward_head(lines, method, path.encode())
                     rest2 = data.split(b"\r\n\r\n", 1)[1] if b"\r\n\r\n" in data else b""
                     self._relay(client, upstream, new_head + rest2)
-        except Exception:
-            pass
+        except Exception as exc:
+            self.last_error = "%s失败 (%s)" % (stage, type(exc).__name__)
         finally:
+            with self._connections_lock:
+                self._connections.discard(client)
+                count = self._active_clients.get(client_ip, 1) - 1
+                if count:
+                    self._active_clients[client_ip] = count
+                else:
+                    self._active_clients.pop(client_ip, None)
             try:
                 client.close()
             except Exception:
@@ -394,7 +469,8 @@ class SharedProxy:
             u = socket.create_connection((host, port), timeout=timeout)
             u.settimeout(20)
             return u
-        except Exception:
+        except Exception as exc:
+            self.last_error = "外网连接失败 (%s)" % type(exc).__name__
             return None
 
     def _connect_via_upstream(self, host, port, timeout=10):
@@ -405,26 +481,31 @@ class SharedProxy:
         u = None
         try:
             u = socket.create_connection((up["host"], up["port"]), timeout=timeout)
-            u.settimeout(20)
+            u.settimeout(timeout)
             # 发送 HTTP CONNECT 请求给上游, 请求建立到目标的隧道
+            authority_host = "[" + host + "]" if ":" in host else host
             req = ("CONNECT %s:%d HTTP/1.1\r\nHost: %s:%d\r\n"
                    "Proxy-Connection: keep-alive\r\n\r\n" % (
-                       host, port, host, port)).encode("utf-8")
+                       authority_host, port, authority_host, port)).encode("utf-8")
             u.sendall(req)
             # 读上游响应头
             resp = b""
             while b"\r\n\r\n" not in resp and len(resp) < 65536:
-                chunk = u.recv(4096)
+                # 精确读完响应头，保留与响应头同时到达的隧道数据。
+                chunk = u.recv(1)
                 if not chunk:
                     break
                 resp += chunk
             # 上游代理可能需要认证 (407) 或直接拒绝 (403/502)
             head = resp.split(b"\r\n", 1)[0].decode("utf-8", errors="ignore")
             if " 200 " not in head and "200 connection" not in head.lower():
+                self.last_error = "上游代理拒绝 CONNECT，请检查代理端口和认证设置"
                 u.close()
                 return None
+            u.settimeout(120)
             return u
-        except Exception:
+        except Exception as exc:
+            self.last_error = "无法连接配置的上游 %s:%s (%s)" % (up.get("host"), up.get("port"), type(exc).__name__)
             if u is not None:
                 try:
                     u.close()
@@ -433,37 +514,24 @@ class SharedProxy:
             return None
 
     def _relay(self, a, b, first=b""):
-        if first:
-            try:
-                b.sendall(first)
-            except Exception:
-                try:
-                    a.close()
-                    b.close()
-                except Exception:
-                    pass
-                return
-        # 双向转发 (每方向一个线程, 避免 select 平台差异)
-        def pipe(src, dst):
-            try:
-                while True:
-                    d = src.recv(65536)
-                    if not d:
-                        break
-                    dst.sendall(d)
-            except Exception:
-                pass
-            finally:
-                try:
-                    dst.shutdown(socket.SHUT_WR)
-                except Exception:
-                    pass
-        t1 = threading.Thread(target=pipe, args=(a, b), daemon=True)
-        t2 = threading.Thread(target=pipe, args=(b, a), daemon=True)
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+        with self._connections_lock:
+            self._connections.add(b)
+        def count(direction, size):
+            with self._connections_lock:
+                if direction == "upload":
+                    self.upload_bytes += size
+                else:
+                    self.download_bytes += size
+        def error(message):
+            self.last_error = message
+        try:
+            proxy_transport.relay(a, b, first, idle_timeout=self.relay_idle_timeout,
+                                  on_bytes=count, on_error=error,
+                                  should_stop=lambda: not self._running)
+        finally:
+            b.close()
+            with self._connections_lock:
+                self._connections.discard(b)
 
 
 def _ip_int(ip):

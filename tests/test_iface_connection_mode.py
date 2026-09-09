@@ -90,7 +90,9 @@ class TestDetectGatewayModeIfaceAware(unittest.TestCase):
         with patch.object(router.netinfo, "get_gateway",
                           return_value="10.14.0.1"), \
                 patch.object(router.netinfo, "get_connection_mode",
-                             return_value=(conn_mode, None)):
+                             return_value=(conn_mode, None)), \
+                patch.object(router, "get_gateway_mac", return_value="02:00:00:00:00:01"), \
+                patch.object(router, "get_router_brand", return_value=""):
             return router.detect_gateway_mode(wired_is_campus=wired_is_campus)
 
     def test_wifi_redacted_not_misjudged_wired_campus(self):

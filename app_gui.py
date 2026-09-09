@@ -433,7 +433,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         port = vpn.get("port")
         if host and port:
             self.lbl_vpn.configure(
-                text="✓ 已启用: 隧道共享的设备流量经 %s:%s 转发 (VPN 全透明)" % (host, port),
+                text="已配置上游 %s:%s（可用性在开启隧道时检查）" % (host, port),
                 foreground="#3fae7f")
             try:
                 self.btn_vpn_disable.configure(state="normal")
@@ -441,7 +441,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
                 pass
         else:
             self.lbl_vpn.configure(
-                text="未启用: 设备流量直连校园网出口。填入本机 VPN 客户端 (Clash 等) 的 HTTP 端口即可透明加速。",
+                text="设备使用电脑当前网络（包括系统 VPN）。仅使用 HTTP 代理的 VPN 客户端需要填写上游端口。",
                 foreground=MUTED)
             try:
                 self.btn_vpn_disable.configure(state="disabled")
@@ -452,16 +452,25 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         self._show_vpn_upstream_dialog(on_done=self._refresh_vpn_status)
 
     def _vpn_preset_local(self):
+        try:
+            shared_proxy.validate_upstream({"host": "127.0.0.1", "port": 7890})
+        except ValueError as error:
+            messagebox.showwarning("上游代理不可用", str(error), parent=self)
+            return
         self.cfg["vpn_upstream"] = {"host": "127.0.0.1", "port": 7890, "type": "http"}
         core.save_config(self.cfg)
         self._refresh_vpn_status()
-        self._log("VPN 加速: 已预设本机 Clash 端口 127.0.0.1:7890 (隧道共享自动生效)")
+        if self.proxy and self.proxy.running:
+            self.proxy.upstream_proxy = self._get_vpn_upstream()
+        self._log("已应用上游 127.0.0.1:7890；新连接使用此上游")
 
     def _vpn_disable(self):
         self.cfg.pop("vpn_upstream", None)
         core.save_config(self.cfg)
         self._refresh_vpn_status()
-        self._log("VPN 加速: 已停用, 设备流量恢复直连校园网出口")
+        if self.proxy and self.proxy.running:
+            self.proxy.upstream_proxy = None
+        self._log("已停用额外上游，新连接使用电脑当前网络（含系统 VPN）")
 
     # ---------- 日志收起/展开 ----------
 
