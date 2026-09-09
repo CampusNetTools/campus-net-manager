@@ -19,3 +19,12 @@ __pycache__/
 
 # 本地源码快照 (磁盘+OneDrive 已备份, 不入库)
 archives/
+
+# IKEv2 私钥/凭据/一次性描述文件 (不入库)
+ikev2/*.pem
+ikev2/*.key
+ikev2/*.csr
+ikev2/*.srl
+ikev2/credentials-private.txt
+ikev2/pending/
+ikev2/.signed-for-*
