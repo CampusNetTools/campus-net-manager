@@ -69,11 +69,22 @@ class TunnelUiMixin:
                 self.tunnel_shared_key = None
                 # 但保留磁盘上的旧 key (用户随时可以再勾回来用)。
             core.save_config(self.cfg)
+            upstream = self._get_vpn_upstream()
+            if upstream:
+                try:
+                    shared_proxy.validate_upstream(upstream)
+                except ValueError as error:
+                    if not messagebox.askyesno("上游代理不可用", str(error) +
+                            "\n\n是否清空此上游配置并使用电脑当前网络？", parent=self):
+                        return
+                    self.cfg.pop("vpn_upstream", None)
+                    core.save_config(self.cfg)
+                    upstream = None
             self.proxy = shared_proxy.SharedProxy(port=8080, allowed=allowed,
                                                   on_ask=self._ask_tunnel_allow,
                                                   pac_host=myip,
                                                   shared_key=self.tunnel_shared_key,
-                                                  upstream_proxy=self._get_vpn_upstream())
+                                                  upstream_proxy=upstream)
             self.proxy.start()
         except Exception as e:
             self.proxy = None
@@ -91,8 +102,8 @@ class TunnelUiMixin:
             self.update_idletasks()
         except Exception:
             pass
-        self._log("隧道共享已开启并完成%s: %s:8080 (已有授权设备 %d 台)"
-                  % ("自检" if verified else "启动", myip, len(self.proxy.allowed)))
+        self._log("隧道共享已开启，%s: %s:8080 (已有授权设备 %d 台)"
+                  % ("配置页可访问；外网需经设备授权后验证" if verified else "配置页检查失败", myip, len(self.proxy.allowed)))
         self._show_tunnel_ready(myip, pac_url, setup_url, verified)
 
 
@@ -151,7 +162,7 @@ class TunnelUiMixin:
                                       wired_is_campus=_wired_campus)
         mode = gm["mode"]
         if mode == "router":
-            top_status = ("✓ 服务自检通过。" if verified else
+            top_status = ("✓ 配置页可访问（尚未验证代理外网出口）。" if verified else
                           "⚠ 服务已启动，但局域网自检未通过；请检查防火墙。")
             top_desc = ("检测到: %s\n\n"
                         "这种模式下, 手机直接连那台路由器的 WiFi 就能借校园网出口上网, "
@@ -159,7 +170,7 @@ class TunnelUiMixin:
                         "转成「已能直接上网」说明。"
                         % gm["description"])
         elif mode == "computer":
-            top_status = ("✓ 服务自检通过。" if verified else
+            top_status = ("✓ 配置页可访问（尚未验证代理外网出口）。" if verified else
                           "⚠ 服务已启动，但局域网自检未通过；请检查防火墙。")
             top_desc = ("检测到: %s\n\n"
                         "这种模式下, 手机与电脑如果在不同 WiFi, 手机必须配电脑的 "
@@ -171,6 +182,31 @@ class TunnelUiMixin:
             top_desc = "未识别上游模式。下面两条独立方案按你实际情况选用。"
         ttk.Label(scroll_frame, text=top_status, style="Muted.TLabel",
                   justify="left").pack(anchor="w", pady=(6, 0))
+        exit_label = ttk.Label(scroll_frame, text="", style="Muted.TLabel", wraplength=640)
+        exit_label.pack(anchor="w")
+        def check_exit():
+            proxy = self.proxy
+            if not proxy or not proxy.running:
+                exit_label.configure(text="请先开启隧道共享")
+                return
+            exit_label.configure(text="正在验证代理外网出口…")
+            def worker():
+                result = proxy.check_exit()
+                with proxy._connections_lock:
+                    active = sum(ip != "127.0.0.1" for ip in proxy._active_clients)
+                    uploaded, downloaded = proxy.upload_bytes, proxy.download_bytes
+                result += "\n当前有连接的远端地址 %d 个；已保存授权 %d 条（不等于在线台数）。" % (active, len(proxy.allowed))
+                result += "\n累计转发上传 %.1f KB / 下载 %.1f KB。" % (uploaded / 1024, downloaded / 1024)
+                if proxy.last_error:
+                    result += "\n最近异常（可能已恢复）: " + proxy.last_error
+                self._log("隧道出口检查: " + result)
+                def done():
+                    if win.winfo_exists():
+                        exit_label.configure(text=result)
+                self.after(0, done)
+            threading.Thread(target=worker, daemon=True).start()
+        ttk.Button(scroll_frame, text="检查代理外网出口", command=check_exit,
+                   style="Gray.TButton").pack(anchor="w", pady=4)
         ttk.Label(scroll_frame, text=top_desc, style="Muted.TLabel",
                   justify="left", wraplength=680).pack(anchor="w", pady=(4, 4))
         # v5.0.6: 免认证网络提示 —— 有密码即可上网/不限设备的 WiFi, 手机直连即可
@@ -585,15 +621,18 @@ class TunnelUiMixin:
             port = e_port.get().strip()
             if host and port:
                 try:
-                    int(port)
+                    parsed_port = int(port)
+                    shared_proxy.validate_upstream({"host": host, "port": parsed_port, "type": "http"})
                 except Exception:
-                    messagebox.showwarning("端口无效", "端口必须是数字", parent=win)
+                    messagebox.showwarning("上游不可用", "请确认 HTTP 代理地址、端口有效且对应客户端已启动。", parent=win)
                     return
-                self.cfg["vpn_upstream"] = {"host": host, "port": port, "type": "http"}
+                self.cfg["vpn_upstream"] = {"host": host, "port": parsed_port, "type": "http"}
             else:
                 self.cfg.pop("vpn_upstream", None)
             core.save_config(self.cfg)
             self._log("VPN 上游代理: %s" % (host and ("%s:%s" % (host, port)) or "已关闭"))
+            if self.proxy and self.proxy.running:
+                self.proxy.upstream_proxy = self._get_vpn_upstream()
             win.destroy()
             if on_done:
                 try:
@@ -655,9 +694,13 @@ class TunnelUiMixin:
                     "选择拒绝会断开本次连接。" % ip,
                     parent=self)
                 holder["ok"] = bool(ok)
+                # 用户可能在请求等待超时后才点允许；仍需记住决定，后续重试才能成功。
+                if ok and self.proxy and self.proxy.running:
+                    self.proxy.allowed.add(ip)
+                    self.cfg["tunnel_allow"] = sorted(self.proxy.allowed)
+                    core.save_config(self.cfg)
+                self._log("隧道设备授权: " + ("已允许，请手机刷新网页" if ok else "已拒绝"))
                 ev.set()
         except queue.Empty:
             pass
         self.after(400, self._poll_allow)
-
-

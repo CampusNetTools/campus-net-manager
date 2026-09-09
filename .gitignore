@@ -16,3 +16,6 @@ __pycache__/
 
 # 诊断导出
 校园网连接管家诊断_*.txt
+
+# 本地源码快照 (磁盘+OneDrive 已备份, 不入库)
+archives/

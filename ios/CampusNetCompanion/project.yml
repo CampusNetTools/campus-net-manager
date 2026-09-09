@@ -1,0 +1,28 @@
+name: CampusNetCompanion
+options:
+  minimumXcodeGenVersion: 2.38.0
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    SWIFT_VERSION: 5.0
+targets:
+  CampusNetCompanion:
+    type: application
+    platform: iOS
+    sources: [App, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.campusnettools.companion
+        INFOPLIST_FILE: Resources/App-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/App.entitlements
+    dependencies:
+      - target: CampusPacketTunnel
+  CampusPacketTunnel:
+    type: app-extension
+    platform: iOS
+    sources: [PacketTunnel, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.campusnettools.companion.packet-tunnel
+        INFOPLIST_FILE: Resources/PacketTunnel-Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/PacketTunnel.entitlements
