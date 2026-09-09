@@ -43,7 +43,8 @@ if getattr(sys, "frozen", False) and IS_MACOS:
 elif getattr(sys, "frozen", False):
     BASE_DIR = os.path.dirname(sys.executable)
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    # 源码开发运行: 项目根目录 (common.py 位于 core/ 子包, 需上溯一级)
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.makedirs(BASE_DIR, exist_ok=True)
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "keepalive.log")

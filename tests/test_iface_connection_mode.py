@@ -9,6 +9,7 @@ not associated), 旧逻辑「读不到 SSID = 有线」把 Wi-Fi 误判成有线
 import os
 import sys
 import unittest
+from contextlib import ExitStack
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,14 +29,20 @@ WIRED_SUMMARY = """ipconfig getsummary en5
 
 
 def _patch_run(mapping):
-    """patch netinfo._run_decode: 完整命令串按 mapping key 前缀匹配。"""
+    """patch netinfo._run_decode: 完整命令串按 mapping key 前缀匹配。
+    本组用例模拟 macOS 网卡场景, 需同时把平台切到 macOS 才能走对应代码路径
+    (Windows 分支用 netsh, 不会消费 networksetup/ipconfig 的输出)。"""
     def fake(cmd, timeout=10):
         full = " ".join(cmd)
         for k, v in mapping.items():
             if full.startswith(k):
                 return v
         return ""
-    return patch.object(netinfo, "_run_decode", side_effect=fake)
+    stack = ExitStack()
+    stack.enter_context(patch.object(netinfo.common, "IS_MACOS", True))
+    stack.enter_context(patch.object(netinfo.common, "IS_WINDOWS", False))
+    stack.enter_context(patch.object(netinfo, "_run_decode", side_effect=fake))
+    return stack
 
 
 class TestConnectionModeByIfaceType(unittest.TestCase):

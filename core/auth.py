@@ -18,12 +18,13 @@ def auth_reachable(auth_url):
 # ---------- 网络检测 ----------
 def http_get(url, timeout=6, physical=False):
     """获取 URL；macOS 的校园认证请求可强制走物理网卡，避免被 VPN 路由接管。"""
-    if common.IS_MACOS and physical:
+    if physical and (common.IS_MACOS or common.IS_WINDOWS):
         interface = netinfo.get_physical_interface()
         if interface:
+            curl = "/usr/bin/curl" if common.IS_MACOS else "curl"
             try:
                 result = subprocess.run(
-                    ["/usr/bin/curl", "--silent", "--show-error", "--max-time", str(timeout),
+                    [curl, "--silent", "--show-error", "--max-time", str(timeout),
                      "--noproxy", "*",
                      "--interface", interface, "--output", "-", "--write-out", "\n%{http_code}",
                      "--user-agent", "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",

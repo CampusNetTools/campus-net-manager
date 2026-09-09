@@ -50,29 +50,44 @@ def get_ssid():
 
 
 def get_gateway():
-    """返回当前默认网关 IP (路由器管理地址通常就是它)"""
+    """返回当前默认网关 IP (路由器管理地址通常就是它)。
+    Windows 下忽略 VPN(On-link) 默认路由, 取真实物理网关。"""
     if common.IS_MACOS:
         gateway, _ = get_physical_route()
         return gateway
-    out = _run_decode(["route", "print", "-4"])
-    for line in out.splitlines():
-        parts = line.split()
-        if len(parts) >= 3 and parts[0] == "0.0.0.0" and parts[1] == "0.0.0.0":
-            return parts[2]
-    return None
+    gateway, _ = get_physical_route()
+    return gateway
 
 
 def get_physical_route():
-    """返回 macOS 实际局域网的 (网关, 网卡)，忽略 utun 等 VPN 默认路由。"""
-    if not common.IS_MACOS:
-        return get_gateway(), None
-    out = _run_decode(["netstat", "-rn", "-f", "inet"])
+    """返回实际承载校园网流量的 (网关, 接口标识)，忽略 VPN 默认路由。
+    macOS 的接口标识是设备名(如 en0); Windows 是接口 IPv4 地址,
+    curl 的 --interface 两种形式都支持。"""
+    if common.IS_MACOS:
+        out = _run_decode(["netstat", "-rn", "-f", "inet"])
+        for line in out.splitlines():
+            parts = line.split()
+            if (len(parts) >= 4 and parts[0] == "default"
+                    and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[1])
+                    and not parts[3].startswith("utun")):
+                return parts[1], parts[3]
+        return None, None
+    # Windows: route print 可能有多条 0.0.0.0 默认路由,
+    # VPN 行网关为 On-link(非真实 IP) — 必须跳过, 取物理网关+接口IP。
+    out = _run_decode(["route", "print", "-4"])
     for line in out.splitlines():
         parts = line.split()
-        if (len(parts) >= 4 and parts[0] == "default"
-                and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[1])
-                and not parts[3].startswith("utun")):
-            return parts[1], parts[3]
+        if (len(parts) >= 4 and parts[0] == "0.0.0.0" and parts[1] == "0.0.0.0"
+                and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[2])
+                and parts[2] != "0.0.0.0"
+                and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[3])):
+            return parts[2], parts[3]
+    # 兜底: 返回首个普通默认路由的网关
+    for line in out.splitlines():
+        parts = line.split()
+        if (len(parts) >= 3 and parts[0] == "0.0.0.0" and parts[1] == "0.0.0.0"
+                and parts[2] != "On-link" and parts[2] != "0.0.0.0"):
+            return parts[2], (parts[3] if len(parts) >= 4 and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[3]) else None)
     return None, None
 
 

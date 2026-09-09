@@ -98,7 +98,9 @@ class TestListHotspotClients(unittest.TestCase):
             "\tinet 192.168.3.1 netmask 0xffffff00 broadcast 192.168.3.255\n"
             "\tether aa:bb:cc:dd:ee:ff\n"
         )
-        with patch.object(router, "_hotspot_iface_candidates", return_value=["bridge0"]), \
+        with patch.object(router.common, "IS_MACOS", True), \
+             patch.object(router.common, "IS_WINDOWS", False), \
+             patch.object(router, "_hotspot_iface_candidates", return_value=["bridge0"]), \
              patch.object(router.netinfo, "_run_decode", return_value=fake_ifconfig), \
              patch.object(router, "_arp_entries",
                           return_value=[("192.168.3.10", "AA:BB:CC:11:22:33"),
