@@ -1,0 +1,4 @@
+subjectAltName=IP:192.168.31.30,DNS:campusnet-gateway
+extendedKeyUsage=serverAuth
+basicConstraints=CA:FALSE
+keyUsage=digitalSignature,keyAgreement
