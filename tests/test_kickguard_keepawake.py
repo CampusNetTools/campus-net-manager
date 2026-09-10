@@ -51,7 +51,7 @@ class KickGuardTests(unittest.TestCase):
     def test_match_profile_relay_prefers_account_profile(self):
         """中继场景: 连路由器WiFi时, 应优先选用有账号的立达档案而非空账号默认档案"""
         cfg = {"profiles": [
-            {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "24012752",
+            {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "example_user",
              "password": "x", "auth_url": "http://192.168.16.3/"},
             {"name": "新档案1", "ssid": "", "username": "", "password": "",
              "auth_url": "http://192.168.16.3/"},
@@ -89,7 +89,7 @@ class KeepAwakeTests(unittest.TestCase):
         self.assertFalse(core.keep_awake_enabled())
 
 
-CAMPUS_PROFILE = {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "24012752",
+CAMPUS_PROFILE = {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "example_user",
                   "password": "x", "auth_url": "http://192.168.16.3/", "gateway": ""}
 
 
@@ -124,7 +124,7 @@ class RespectUserChoiceTests(unittest.TestCase):
 
     def _cfg(self):
         return {"profiles": [
-            {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "24012752",
+            {"name": "立达校园网", "ssid": "LIDA-UNIVERSITY", "username": "example_user",
              "password": "pw", "auth_url": "http://192.168.16.3/", "gateway": ""},
             {"name": "新档案1", "ssid": "", "username": "", "password": "",
              "auth_url": "http://192.168.16.3/"},

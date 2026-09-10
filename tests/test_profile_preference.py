@@ -16,7 +16,7 @@ from core import auth, config, matching, netinfo, sysutils  # noqa: E402
 
 def _mk(name, **kw):
     p = config.default_profile(name)
-    p.update({"username": "24012752", "password": "secret",
+    p.update({"username": "example_user", "password": "secret",
               "auth_url": "http://192.168.16.3/"})
     p.update(kw)
     return p
