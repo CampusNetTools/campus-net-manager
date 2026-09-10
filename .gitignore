@@ -30,3 +30,7 @@ ikev2/pending/
 ikev2/.signed-for-*
 .git.broken-tcc-*/
 ikev2/test.err
+
+# 运行时网络历史数据 (不入库)
+core/network_history.jsonl
+network_history.jsonl
