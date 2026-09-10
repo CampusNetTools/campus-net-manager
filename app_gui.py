@@ -209,6 +209,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         # v5.0.1: 整页纵向滚动容器 —— 小屏(可视高度 ~700px)上窗口变矮时,
         # 全部功能仍可通过滚轮/滚动条触达, 不会被截在屏幕外。
         page = make_scrollable(self, pad=(0, 0), inner_bg_style="TFrame")
+        self.page = page  # 供窗口高度自适应使用(底边紧贴内容)
 
         # ===== 顶栏: 品牌在左 + 版本/检查更新在右 =====
         top = ttk.Frame(page, padding=(24, 12, 24, 6))
@@ -402,7 +403,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
 
         # ===== 底部: 可收起运行日志 (默认收起, 展开时自动加高窗口) =====
         log_card = ttk.Frame(page, style="Card.TFrame", padding=(18, 8))
-        log_card.pack(fill="x", padx=24, pady=(8, 12))
+        log_card.pack(fill="x", padx=24, pady=(8, 8))
         self.log_card = log_card
         log_head = ttk.Frame(log_card, style="Inner.TFrame")
         log_head.pack(fill="x")
@@ -424,6 +425,8 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         self.txt_log.configure(yscrollcommand=self._scroll_log_bar.set)
         self.txt_log.bind("<MouseWheel>", self._scroll_log)
         self._load_existing_log()
+        # 打开时把窗口高度收到内容高度, 底部紧贴日志卡片
+        self.after(300, self._fit_window_height)
 
     # ---------- VPN 加速 (主窗直达) ----------
 
@@ -474,6 +477,26 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
 
     # ---------- 日志收起/展开 ----------
 
+    def _fit_window_height(self):
+        """窗口高度收缩到内容实际高度(上限屏幕可用高度), 使窗口底边紧贴内容底边。
+
+        - 日志折叠时: 底边紧贴日志折叠栏底边
+        - 日志展开时: 底边紧贴日志展开区底边
+        内容超出屏幕时钳制到屏幕可用高度, 由滚动容器兜底。
+        """
+        try:
+            page = getattr(self, "page", None)
+            if page is None or not page.winfo_exists():
+                return
+            self.update_idletasks()
+            need = page.winfo_reqheight()
+            max_h = self.winfo_screenheight() - 110
+            want = max(540, min(need + 4, max_h))
+            if abs(want - self.winfo_height()) > 2:
+                self.geometry("%dx%d" % (self.winfo_width(), want))
+        except Exception:
+            pass
+
     def _toggle_log(self):
         if self.log_expanded:
             self.log_body.pack_forget()
@@ -485,15 +508,8 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
             self.txt_log.pack(side="left", fill="both", expand=True)
             self.btn_log_toggle.configure(text="收起")
             self.log_expanded = True
-            # 展开时若屏幕还有余量, 自动加高窗口, 避免挤压左栏表单
-            try:
-                screen_h = self.winfo_screenheight()
-                h = self.winfo_height()
-                want = min(h + 170, screen_h - 100)
-                if want > h + 20:
-                    self.geometry("%dx%d" % (self.winfo_width(), want))
-            except Exception:
-                pass
+        # 窗口高度跟着内容走: 展开加高、折叠收回, 底边始终紧贴日志区底边
+        self.after(60, self._fit_window_height)
 
     def _scroll_log(self, event):
         """鼠标位于日志窗口时只滚动日志，不移动主界面。"""

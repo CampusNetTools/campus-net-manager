@@ -86,7 +86,9 @@ def set_autostart(enabled):
         if enabled:
             # exe 版: 指向 exe 自己; 源码版: 指向 pythonw + app_gui.py
             if getattr(sys, "frozen", False):
-                cmd = '"%s"' % os.path.join(BASE_DIR, "校园网连接管家.exe")
+                # 用 sys.executable 拿 exe 的真实完整路径(含实际文件名),
+                # 避免硬编码文件名与用户改名后不匹配导致自启失效
+                cmd = '"%s"' % sys.executable
             else:
                 pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
                 cmd = '"%s" "%s"' % (pyw, os.path.join(BASE_DIR, "app_gui.py"))

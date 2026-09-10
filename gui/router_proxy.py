@@ -35,7 +35,8 @@ except Exception:
 
 
 # 路由器常见的 HTTP 代理端口列表 (探测时逐个尝试)
-_ROUTER_PROXY_PORTS = [8080, 8888, 1080, 3128, 9090]
+# 7890 在最前: 本机在路由器上部署的 mihomo/clash 混合代理端口
+_ROUTER_PROXY_PORTS = [7890, 8080, 8888, 1080, 3128, 9090]
 # 探测超时 (秒)
 _PROBE_TIMEOUT = 1.6
 
