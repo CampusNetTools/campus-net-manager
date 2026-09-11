@@ -18,13 +18,11 @@ import shared_proxy  # noqa: E402
 def _start(port=19092):
     """启动代理 + 假上游服务(模拟电脑自己的 8081 控制台)"""
     # 假控制台服务: 优先 8081, 占用时退到 18081
-    fake_port = 8081
     for try_port in (8081, 18081, 19081):
         try:
             fake_console = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             fake_console.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             fake_console.bind(("127.0.0.1", try_port))
-            fake_port = try_port
             break
         except OSError:
             try:

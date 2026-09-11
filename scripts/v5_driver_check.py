@@ -21,8 +21,6 @@ import shared_proxy  # noqa: E402
 
 RESULTS = {"steps": [], "clipped_windows": {}, "proxy_test": None, "errors": []}
 
-TEXT_WIDGETS = (tk.Label, ttk.Label if False else object())  # placeholder, real check below
-
 
 def _is_text_widget(w):
     cn = type(w).__name__

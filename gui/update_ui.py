@@ -160,10 +160,23 @@ class UpdateUiMixin:
                 pct = (done * 100.0 / total) if total else 0
                 self.after(0, lambda: bar.configure(value=pct, maximum=100))
             try:
+                # 先解析期望哈希(GitHub digest 或 SHA256SUMS), 下载后立即校验:
+                # 网络中间人/半截下载/被替换的包一律挡在"替换运行"之前。
+                expected = updater.resolve_expected_sha256(info.get("assets"), asset)
                 updater.download(asset["url"], dest, progress=progress)
+                ok, msg = updater.verify_download(dest, expected)
+                self.after(0, lambda m=msg: self._log("更新包校验: %s" % m))
+                if not ok:
+                    try:
+                        os.remove(dest)
+                    except OSError:
+                        pass
+                    raise RuntimeError("%s\n\n已删除下载的文件, 未做替换。" % msg)
                 self.after(0, lambda: self._apply_downloaded(win, dest, asset["name"]))
             except Exception as e:
-                self.after(0, lambda: self._on_update_failed(win, info, e))
+                # err=e 绑定默认参数: except 块结束后 e 会被删除, lambda 稍后
+                # 由事件循环调用时会抛 NameError, 更新失败提示就永远弹不出来。
+                self.after(0, lambda err=e: self._on_update_failed(win, info, err))
         threading.Thread(target=work, daemon=True).start()
 
     def _on_update_failed(self, win, info, err):

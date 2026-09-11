@@ -30,7 +30,6 @@ except Exception:
 class WizardMixin:
     def show_wizard(self):
         """新手向导: 分步引导, 无计算机基础也能用"""
-        import webbrowser
         win = tk.Toplevel(self)
         win.title("新手向导")
         win.configure(bg=BG)

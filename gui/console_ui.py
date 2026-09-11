@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """网络控制台 UI Mixin: 启停 WebConsole, 展示局域网地址/口令/二维码。"""
+import threading
+import time
 import tkinter as tk
 from tkinter import ttk
 
@@ -18,6 +20,10 @@ except Exception:
 
 CONSOLE_PORT = 8081
 
+# 状态快照缓存时长(秒): /api/status 会被手机端每 8 秒轮询, 多标签页/多设备并发时
+# 每次都真跑一遍 PowerShell 会拖垮机器; 状态本身变化很慢, 缓存 1.5s 足够。
+CONSOLE_STATE_TTL = 1.5
+
 
 class ConsoleUiMixin:
     def _console_key(self):
@@ -30,7 +36,30 @@ class ConsoleUiMixin:
         return self.cfg["console_key"]
 
     def _console_state(self):
-        """给 WebConsole 的状态快照。"""
+        """给 WebConsole 的状态快照(带短 TTL 缓存)。
+
+        /api/status 由 HTTP 工作线程直接调用, 而 _console_state_uncached 内部会跑
+        get_connection_mode / get_gateway(PowerShell 子进程) 和局域网 IP 枚举 ——
+        多个请求并发时会并发拉起一堆 PowerShell。这里做单飞 + 1.5s 缓存。
+        """
+        now = time.time()
+        cached = getattr(self, "_console_state_cache", None)
+        if cached and now - cached[0] < CONSOLE_STATE_TTL:
+            return cached[1]
+        lock = getattr(self, "_console_state_lock", None)
+        if lock is None:
+            lock = self._console_state_lock = threading.Lock()
+        with lock:
+            # 双检: 等锁期间别的线程可能已经填好缓存
+            cached = getattr(self, "_console_state_cache", None)
+            if cached and time.time() - cached[0] < CONSOLE_STATE_TTL:
+                return cached[1]
+            data = self._console_state_uncached()
+            self._console_state_cache = (time.time(), data)
+            return data
+
+    def _console_state_uncached(self):
+        """真实的（较慢的）状态采集。"""
         daemon = getattr(self, "daemon", None)
         running = bool(daemon and daemon.is_alive())
         mode, ssid, gw = "", "", ""

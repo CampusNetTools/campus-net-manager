@@ -4,7 +4,7 @@ from core.common import *  # noqa: F401,F403
 from core import common  # noqa: F401
 from core import auth  # noqa: F401
 
-__all__ = ['profile_has_credentials', 'profile_is_wifi', 'is_campus_locked', 'best_match_profile', 'match_profile']
+__all__ = ['profiles_snapshot', 'profile_has_credentials', 'profile_is_wifi', 'is_campus_locked', 'best_match_profile', 'match_profile']
 
 def profile_has_credentials(profile):
     """档案是否已填写账号密码 (具备登录能力)。"""
@@ -40,13 +40,24 @@ def is_campus_locked(profile, ssid, gw, respect_user_choice=False):
     return bool(ssid_bound or gw_bound or not ssid)
 
 
+def profiles_snapshot(cfg):
+    """取 profiles 的浅拷贝再遍历。
+
+    守护线程(每轮匹配)与 GUI 线程(增删档案)会并发读同一个 cfg:
+    直接遍历 cfg["profiles"] 时 GUI 恰好 append/remove, 会抛
+    "list changed size during iteration" 或读到半更新的档案。
+    浅拷贝足够 —— 我们只读, 不修改元素。
+    """
+    return list(cfg.get("profiles") or [])
+
+
 def best_match_profile(cfg, ssid, gateway=None, auth_url=None):
     """返回当前环境下的"最优匹配"档案 (用于智能自动切换)。
     匹配优先级: SSID 精确匹配 > 网关精确匹配 > 认证可达的有账号校园网档案。
     返回 (profile, reason); reason 描述匹配原因; 无匹配返回 (None, None)。
     注意: 仅当匹配是"明确"的(精确SSID/网关, 或认证服务器可达的校园网)才建议切换,
     避免在家 WiFi 场景被误切到校园网档案。"""
-    profiles = cfg.get("profiles", [])
+    profiles = profiles_snapshot(cfg)
     # 1. SSID 精确匹配
     if ssid:
         for p in profiles:
@@ -59,7 +70,8 @@ def best_match_profile(cfg, ssid, gateway=None, auth_url=None):
                 return p, "网关精确匹配 %s" % gateway
     # 3. 认证服务器可达且在校园网: 用"认证可达"判定, 匹配任何指向该认证服务器的有账号校园网档案。
     #    覆盖无SSID的有线接路由器(中继)场景 —— 此时SSID为None无法精确匹配, 但认证可达即校园网。
-    if auth_url and auth.auth_reachable(auth_url):
+    # 自动切档案必须依据实时探测: 防抖滞后值可能让 App 切到已经不可达的校园网档案
+    if auth_url and auth.auth_reachable(auth_url, debounce=False):
         for p in profiles:
             if (profile_has_credentials(p) and p.get("auth_url") == auth_url
                     and p.get("ssid") and p["ssid"] != ssid):
@@ -81,7 +93,7 @@ def match_profile(cfg, ssid, gateway=None, respect_user_choice=False):
     没有账号, 也返回它本身, 绝不回退到其他有账号的校园网档案 —— 尊重用户"不绑定"的选择,
     避免选了任意网络却被硬用立达账号登录并显示校园网环境。
     """
-    profiles = cfg.get("profiles", [])
+    profiles = profiles_snapshot(cfg)
     if ssid:
         for p in profiles:
             if p.get("ssid") and p["ssid"] == ssid:

@@ -155,7 +155,7 @@ class TunnelUiMixin:
             _prof = None
         _auth_url = (_prof or {}).get("auth_url") or core.DEFAULT_AUTH_URL
         try:
-            _wired_campus = core.auth_reachable(_auth_url)
+            _wired_campus = core.auth_reachable(_auth_url, debounce=False)
         except Exception:
             _wired_campus = False
         gm = core.detect_gateway_mode(campus_ssids=campus_ssids,

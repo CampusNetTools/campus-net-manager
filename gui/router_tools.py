@@ -180,8 +180,10 @@ class RouterToolsMixin:
                     report = core.detect_router_hardware()
                     self.after(0, lambda: refresh_with(report))
                 except Exception as exc:
-                    self.after(0, lambda: (
-                        set_status("检测失败：%s" % exc),
+                    # err=exc 绑定默认参数: 否则 except 块结束后 exc 被删除,
+                    # 延迟执行的 lambda 抛 NameError, 失败状态永远显示不出来。
+                    self.after(0, lambda err=exc: (
+                        set_status("检测失败：%s" % err),
                         btn_detect.configure(text="重新检测", state="normal")))
             threading.Thread(target=work, daemon=True).start()
 

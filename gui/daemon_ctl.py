@@ -157,7 +157,9 @@ class DaemonCtlMixin:
                                         "诊断报告已保存到：\n%s\n\n内容也已复制到剪贴板，可直接粘贴发给技术人员。" % fname)
                 self.after(0, done)
             except Exception as e:
-                self.after(0, lambda: messagebox.showerror("诊断失败", str(e)))
+                # 必须把异常绑定成默认参数: except ... as e 会在块结束时 del e,
+                # lambda 稍后由事件循环调用时 e 已不存在 → 错误提示本身抛 NameError。
+                self.after(0, lambda err=e: messagebox.showerror("诊断失败", str(err)))
         threading.Thread(target=_do, daemon=True).start()
 
 
@@ -275,7 +277,7 @@ class DaemonCtlMixin:
         gw = core.get_gateway()
         profile = core.match_profile(self.cfg, ssid, gw)
         auth_url = profile.get("auth_url", core.DEFAULT_AUTH_URL) if profile else core.DEFAULT_AUTH_URL
-        in_campus = core.auth_reachable(auth_url)
+        in_campus = core.auth_reachable(auth_url, debounce=False)
         self._on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
         if not in_campus:
             self._log("结果: 非校园网环境, 不进行登录")
@@ -306,7 +308,7 @@ class DaemonCtlMixin:
             gw = core.get_gateway()
             profile = core.match_profile(self.cfg, ssid, gw)
             auth_url = profile.get("auth_url", core.DEFAULT_AUTH_URL) if profile else core.DEFAULT_AUTH_URL
-            in_campus = core.auth_reachable(auth_url)
+            in_campus = core.auth_reachable(auth_url, debounce=False)
             self._on_env(mode, ssid, gw, profile["name"] if profile else None, in_campus)
             # v5.0.6: Wi-Fi 已关联但 SSID 被系统隐私打码 → 一次性引导开定位
             if mode == "wifi" and not ssid and not getattr(self, "_ssid_hint_logged", False):

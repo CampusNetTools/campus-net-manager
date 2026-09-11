@@ -67,7 +67,6 @@ owner.setdefault("_keep_awake_proc", "sysutils")
 owner.setdefault("_keep_awake_lock", "sysutils")
 owner["_AUTOSTART_NAME"] = "sysutils"
 owner["_MAC_LAUNCH_LABEL"] = "sysutils"
-owner["AUTOSTART_CMD"] = "sysutils"
 
 COMMON_CONSTS = {n for n, m in owner.items() if m == "common"}
 

@@ -298,9 +298,11 @@ class RouterConsoleMixin:
                 data = json.loads(raw)
                 self.after(0, lambda: self._rc_render(data))
             except URLError as exc:
-                self.after(0, lambda: self._rc_fail("无法连接路由器工作台: %s" % exc))
+                # 异常绑定为默认参数: except ... as exc 结束后 exc 会被删除,
+                # 延迟执行的 lambda 直接引用它会抛 NameError(错误提示弹不出来)。
+                self.after(0, lambda err=exc: self._rc_fail("无法连接路由器工作台: %s" % err))
             except Exception as exc:
-                self.after(0, lambda: self._rc_fail("读取失败: %s" % exc))
+                self.after(0, lambda err=exc: self._rc_fail("读取失败: %s" % err))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -405,7 +407,7 @@ class RouterConsoleMixin:
                 self.after(0, lambda: self._rc_set_head("「%s」: %s" % (title, msg), bool(data.get("ok"))))
                 self.after(2000, self._rc_refresh)
             except Exception as exc:
-                self.after(0, lambda: self._rc_set_head("「%s」执行失败: %s" % (title, exc), False))
+                self.after(0, lambda err=exc: self._rc_set_head("「%s」执行失败: %s" % (title, err), False))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -433,6 +435,6 @@ class RouterConsoleMixin:
                 self.after(0, lambda: self._rc_set_head(msg, bool(data.get("ok"))))
                 self.after(60000, self._rc_refresh)
             except Exception as exc:
-                self.after(0, lambda: self._rc_set_head("切换失败: %s" % exc, False))
+                self.after(0, lambda err=exc: self._rc_set_head("切换失败: %s" % err, False))
 
         threading.Thread(target=worker, daemon=True).start()
