@@ -46,33 +46,52 @@ def login_probe(profile, timeout=15):
     """执行一次登录探测, 返回解码后的 Dr.COM JSON (不改变会话语义; 同源IP=刷新续期)。
     返回 dict: result/msg/ss1/ss4/ss5/msga/raw
     失败返回 None (网络不可达或账号异常)。"""
-    url = build_login_url(profile)
-    req = urllib.request.Request(url, headers={
-        "User-Agent": "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",
-        "Referer": url.split("/drcom/")[0] + "/"})
+    # 与 core.try_login 对齐: 走物理网卡 + 绕过系统代理。
+    # 会话刷新/归属分析依赖"请求确实从本机物理网卡发出"; 走代理会让
+    # 来源 IP 变成代理出口, 刷新失效甚至把会话顶到别的设备名下。
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode("gbk", errors="replace")
-        m = re.search(r"dr1003\((\{.*\})\)", body)
-        if not m:
-            return {"raw": body[:200]}
-        data = json.loads(m.group(1))
-        data["raw"] = body[:200]
-        return data
+        from core import auth as _auth
+        status, body = _auth.http_get(build_login_url(profile), timeout=timeout,
+                                      physical=True)
+        body = body or b""
     except Exception as exc:
         return {"error": str(exc)}
+    text = body.decode("gbk", errors="replace")
+    m = re.search(r"dr1003\((\{.*\})\)", text)
+    if not m:
+        return {"raw": text[:200]}
+    try:
+        data = json.loads(m.group(1))
+    except Exception as exc:
+        return {"raw": text[:200], "error": str(exc)}
+    data["raw"] = text[:200]
+    return data
 
 
 def local_macs():
-    """本机所有网卡 MAC (小写)。"""
-    if core and core.IS_MACOS:
-        out = core._run_decode(["ifconfig", "-a"])
-    else:
-        import subprocess
-        out = subprocess.run(["ifconfig", "-a"], capture_output=True, text=True).stdout
+    """本机所有网卡 MAC (小写)。Windows 没有 ifconfig, 走 ipconfig /all。
+    输出可能是 GBK(中文标签会乱码), 因此不做标签匹配, 直接匹配 MAC 格式 ——
+    ipconfig /all 里 6 段十六进制串只有物理地址。"""
     macs = set()
-    for m in re.finditer(r"ether\s+([0-9a-f:]{17})", out):
-        macs.add(m.group(1).lower())
+    try:
+        if core and core.IS_MACOS:
+            out = core._run_decode(["ifconfig", "-a"])
+            for m in re.finditer(r"ether\s+([0-9a-f:]{17})", out):
+                macs.add(m.group(1).lower())
+            return macs
+        import subprocess
+        kwargs = {"capture_output": True, "timeout": 8}
+        if hasattr(subprocess, "CREATE_NO_WINDOW"):
+            kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+        proc = subprocess.run(["ipconfig", "/all"], **kwargs)
+        out = proc.stdout.decode("utf-8", errors="replace")
+        for m in re.finditer(r"(?:[0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2}", out):
+            mac = m.group(0).lower().replace("-", ":")
+            # 过滤全 0 与组播位为奇(本地管理位)的虚拟标识
+            if mac != "00:00:00:00:00:00":
+                macs.add(mac)
+    except Exception:
+        pass
     return macs
 
 

@@ -8,6 +8,7 @@
 """
 import datetime
 import json
+import locale
 import os
 import re
 import ssl
@@ -146,26 +147,49 @@ rm -f "$0"
 
 
 def windows_apply_script(exe_path, new_exe_path, pid=None):
-    """生成 bat 脚本: 等待进程退出 → 替换 exe → 重启。仅 ASCII 路径注释, 中文路径由变量传。"""
+    """生成 bat 脚本: 等待进程退出 → 替换 exe → 重启。
+    编码: cmd 按系统 ANSI 代码页(中文 Windows=GBK)解码 bat —— write_apply_script
+    对 .bat 用本地 ANSI 编码落盘, 中文路径(如 桌面\\校园网连接管家.exe)才能正确解析。
+    find/timeout 必须用 System32 绝对路径: PATH 上若有 Git/MSYS 的 GNU find、
+    GNU timeout, 裸命令名会被劫持, 导致等待循环与计时全部失效。"""
     pid = pid or os.getpid()
+    sys32 = os.environ.get("SystemRoot", r"C:\Windows") + r"\System32"
     return """@echo off
 rem CampusNetManager self-update script
 :wait
-tasklist /FI "PID eq %d" | find "%d" >nul
+tasklist /FI "PID eq %d" | "%s\\find.exe" "%d" >nul
 if not errorlevel 1 (
-    timeout /t 1 /nobreak >nul
+    "%s\\timeout.exe" /t 1 /nobreak >nul
     goto wait
 )
-timeout /t 1 /nobreak >nul
+"%s\\timeout.exe" /t 1 /nobreak >nul
 move /y "%s" "%s" >nul
 start "" "%s"
 del "%%~f0"
-""" % (pid, pid, new_exe_path, exe_path, exe_path)
+""" % (pid, sys32, pid, sys32, sys32, new_exe_path, exe_path, exe_path)
+
+
+def _bat_encoding():
+    """cmd 解析 bat 用的是系统 ANSI 代码页(中文 Windows=cp936)。
+    不能用 locale.getpreferredencoding: Python 开 UTF-8 模式时它返回 utf-8,
+    与 cmd 的实际解码代码页脱节。用 Win32 GetACP 拿真实值。"""
+    try:
+        import ctypes
+        acp = ctypes.windll.kernel32.GetACP()
+        return "cp%d" % acp
+    except Exception:
+        return "gbk"
 
 
 def write_apply_script(content, suffix):
     fd, path = tempfile.mkstemp(suffix=suffix, prefix="cnm_update_")
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
+    if suffix.lower() == ".bat" and os.name == "nt":
+        # cmd 按系统 ANSI 代码页解码 bat; 用 UTF-8 写会把中文路径
+        # (桌面\校园网连接管家.exe)变成乱码, 替换必然失败。
+        encoding = _bat_encoding()
+    else:
+        encoding = "utf-8"
+    with os.fdopen(fd, "w", encoding=encoding, errors="replace") as f:
         f.write(content)
     os.chmod(path, os.stat(path).st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     return path

@@ -51,36 +51,30 @@ class TestMacOSStartHotspot(unittest.TestCase):
 
 
 class TestWindowsStartHotspot(unittest.TestCase):
-    """Windows 上优先 PowerShell Start-MobileHotspot; netsh 兜底. """
+    """Windows 用 WinRT NetworkOperatorTetheringManager 开热点;
+    失败时如实提示并打开系统设置页 (旧版调用的 Start-MobileHotspot cmdlet 不存在). """
 
-    def test_powershell_success(self):
+    def test_winrt_success(self):
         with patch.object(core.common, "IS_MACOS", False), \
              patch.object(core.common, "IS_WINDOWS", True), \
              patch.object(router.netinfo, "_run_decode",
                           return_value="OK\n"):
             ok, msg = router.start_mobile_hotspot()
         self.assertTrue(ok)
-        self.assertIn("PowerShell", msg)
+        self.assertIn("热点", msg)
 
-    def test_powershell_fail_then_netsh_fail(self):
+    def test_winrt_fail_opens_settings_and_reports(self):
+        opened = []
         with patch.object(core.common, "IS_MACOS", False), \
              patch.object(core.common, "IS_WINDOWS", True), \
              patch.object(router.netinfo, "_run_decode",
-                          side_effect=["FAIL\n",
-                                       "The wireless local area network interface is disabled.\n"]):
+                          return_value="FAIL: timeout-or-denied\n"), \
+             patch.object(router, "open_hotspot_settings",
+                          side_effect=lambda: opened.append(1)):
             ok, msg = router.start_mobile_hotspot()
         self.assertFalse(ok)
-        self.assertIn("网卡", msg)
-
-    def test_powershell_fail_then_netsh_success(self):
-        with patch.object(core.common, "IS_MACOS", False), \
-             patch.object(core.common, "IS_WINDOWS", True), \
-             patch.object(router.netinfo, "_run_decode",
-                          side_effect=["FAIL\n",
-                                       "The hosted network started.\n"]):
-            ok, msg = router.start_mobile_hotspot()
-        self.assertTrue(ok)
-        self.assertIn("netsh", msg)
+        self.assertIn("手动", msg)
+        self.assertEqual(opened, [1])  # 失败时自动打开设置页
 
 
 class TestListHotspotClients(unittest.TestCase):

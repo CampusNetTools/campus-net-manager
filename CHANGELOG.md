@@ -1,5 +1,18 @@
 # 更新记录
 
+## v5.1.1
+
+- **修复 Windows 下 `get_lan_ips()` 恒返回空的问题**：IP 枚举原本只支持 `ifconfig`（macOS），导致隧道共享引导页显示"本机IP"、网络控制台二维码指向 `127.0.0.1`（手机扫不开）。现在 Windows 走 PowerShell `Get-NetIPAddress` + `ipconfig` + `getaddrinfo` 兜底，并过滤 VPN 虚拟接口（接口名含 VPN / TUN / 198.18.x Clash 假 IP）。
+- **修复 Windows 自更新中文路径必失败**：bat 脚本原以 UTF-8 写盘而 cmd 按 ANSI（GBK）解码，`桌面\校园网连接管家.exe` 会变乱码导致替换失败。现在按 Win32 `GetACP()` 的真实代码页写盘；`find`/`timeout` 改用 System32 绝对路径，避免被 PATH 上的 GNU 工具（Git Bash 等）劫持。已用中文路径端到端实测替换成功。
+- **配置文件读写加固**：`save_config` 改为临时文件 + `os.replace` 原子写入，强杀进程/断电不再产生半截 JSON；`load_config` 遇损坏文件自动备份为 `config.json.corrupt-<时间戳>` 并重建默认配置（此前会直接崩溃且无提示）；新增可重入读写锁，消除守护线程自动切档案与 GUI 保存的并发竞态。
+- **修复「一键开启移动热点」永远失败**：旧实现调用了不存在的 `Start-MobileHotspot` cmdlet。改用 WinRT `NetworkOperatorTetheringManager`（轮询 15 秒确认状态）；失败时如实提示并自动打开「设置 → 移动热点」。
+- **认证探测绕过系统代理**：`http_get` 兜底路径、captive portal 探针、诊断登录探测此前走系统代理（Clash 等），开着代理软件会把探测/登录（含账号密码）发往代理出口。现在统一绕过代理并绑定物理网卡，与 `try_login` 行为对齐。
+- **修复 Windows 会话归属分析崩溃**：`local_macs()` 调用不存在的 `ifconfig`；改为 `ipconfig /all` 直接按 MAC 格式匹配（兼容中文/英文系统与 GBK 编码）。
+- **修复 Windows VPN 误报**：`vpn_active()` 原以宽泛的 `"vpn"` 子串匹配 `route print` 输出（装过 VPN 软件即常驻误报）；收窄为 WireGuard/wintun/TAP/OpenVPN 等精确驱动名。
+- **修复中文 Windows 网关兜底解析**：`route print` 的 On-link 在中文系统显示「在链路上」，兜底分支未校验 IP 会把它当网关返回；已加 IPv4 校验。
+- **修复断网时间线解析崩溃**：历史行时间格式异常时 `analyze_outage_timeline` 会直接抛异常，现逐行保护跳过。
+- 同步更新热点相关测试至新 WinRT 实现。
+
 ## v5.1.0
 
 - 新增「路由器后台工作台」窗口：把部署在路由器上的监控工作台融合进管家界面，直接读取路由器控制台状态接口（无需 SSH），实时展示无线中继 / 本机 AP / 校园网认证 / 外网连通 / 透明代理 / VPN / SSH / 防复发开关 / 系统负载 / 守护日志。

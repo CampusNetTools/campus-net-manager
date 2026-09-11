@@ -120,7 +120,11 @@ def analyze_outage_timeline(days=7):
     last_disconnect_msg = ""
     for item in events:
         ev = item.get("event")
-        when = datetime.datetime.strptime(item["time"], "%Y-%m-%d %H:%M:%S")
+        # 时间格式异常的行直接跳过(读取阶段同款保护只覆盖文件读取, 这里是二次解析)
+        try:
+            when = datetime.datetime.strptime(item["time"], "%Y-%m-%d %H:%M:%S")
+        except Exception:
+            continue
         if ev == "disconnect":
             last_disconnect_time = when
             last_disconnect_msg = item.get("message", "")

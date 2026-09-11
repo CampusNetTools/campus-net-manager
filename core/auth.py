@@ -6,6 +6,11 @@ from core import netinfo, portal  # noqa: F401
 
 __all__ = ['auth_reachable', 'http_get', 'decode_gbk', 'check_auth', '_probe_matches_expected', 'check_internet', 'check_network_paths', 'try_login', 'ensure_login']
 
+# 禁用系统/环境变量代理的 opener: 认证探测、登录请求必须走本机真实网络路径。
+# 走系统代理(Clash/v2rayN 等)时, 探测结果反映的是代理出口, 会误判认证状态,
+# 登录请求甚至可能因代理无法访问校园网内网认证服务器而失败。
+_DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
 def auth_reachable(auth_url):
     """认证服务器是否可达 (判定是否校园网环境)"""
     try:
@@ -44,7 +49,7 @@ def http_get(url, timeout=6, physical=False):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         "Referer": url,
     })
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    with _DIRECT_OPENER.open(req, timeout=timeout) as resp:
         return resp.status, resp.read()
 
 
