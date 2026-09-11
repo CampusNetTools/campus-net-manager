@@ -33,6 +33,7 @@ from gui.scrollkit import make_scrollable  # noqa: F401
 from gui.profile_form import ProfileFormMixin  # noqa: F401
 from gui.router_tools import RouterToolsMixin  # noqa: F401
 from gui.router_proxy import RouterProxyMixin  # noqa: F401
+from gui.router_console_ui import RouterConsoleMixin  # noqa: F401
 from gui.speed_window import SpeedWindowMixin  # noqa: F401
 from gui.tunnel_ui import TunnelUiMixin  # noqa: F401
 from gui.preferences import PreferencesMixin  # noqa: F401
@@ -44,7 +45,7 @@ from gui.console_ui import ConsoleUiMixin  # noqa: F401
 from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -384,7 +385,11 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, SpeedWindowMixin
         ttk.Button(nav, text="路由器检测（品牌/固件查询）", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router", self.show_router_assessment)).grid(
-                           row=12, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+                           row=12, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
+        ttk.Button(nav, text="路由器后台工作台", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "router_console", self.show_router_console_window)).grid(
+                           row=12, column=1, sticky="ew", pady=(4, 0))
 
         # 工具
         _sep(13, "工具")

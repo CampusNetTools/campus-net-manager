@@ -5,10 +5,17 @@ import sys
 import json
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import keepalive_core as core
 from core import common  # noqa: F401
 import shared_proxy as sp
+
+
+def _ts(days_ago=1, hour=10, minute=0, second=0):
+    """生成"相对现在"的时间戳字符串, 避免测试数据写死日期后过期 (时间炸弹)。"""
+    d = datetime.now() - timedelta(days=days_ago)
+    return d.strftime("%Y-%m-%d ") + "%02d:%02d:%02d" % (hour, minute, second)
 
 
 class OutageTimelineTests(unittest.TestCase):
@@ -45,10 +52,10 @@ class OutageTimelineTests(unittest.TestCase):
 
     def test_pairing_and_duration(self):
         ev = [
-            {"time": "2026-09-04 10:00:00", "event": "disconnect", "message": "掉线"},
-            {"time": "2026-09-04 10:05:00", "event": "recovery", "message": "恢复"},
-            {"time": "2026-09-04 11:00:00", "event": "disconnect", "message": "掉线2"},
-            {"time": "2026-09-04 11:30:00", "event": "recovery", "message": "恢复2"},
+            {"time": _ts(1, 10, 0), "event": "disconnect", "message": "掉线"},
+            {"time": _ts(1, 10, 5), "event": "recovery", "message": "恢复"},
+            {"time": _ts(1, 11, 0), "event": "disconnect", "message": "掉线2"},
+            {"time": _ts(1, 11, 30), "event": "recovery", "message": "恢复2"},
         ]
         p = self._write(ev)
         self._patch_history(p)
@@ -59,7 +66,7 @@ class OutageTimelineTests(unittest.TestCase):
         self.assertEqual(outages[1]["duration_s"], 1800)
 
     def test_unrecovered_outage(self):
-        ev = [{"time": "2026-09-04 10:00:00", "event": "disconnect", "message": "未恢复"}]
+        ev = [{"time": _ts(1, 10, 0), "event": "disconnect", "message": "未恢复"}]
         p = self._write(ev)
         self._patch_history(p)
         self._files = [p]
