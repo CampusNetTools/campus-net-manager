@@ -80,8 +80,8 @@ class RouterConsoleMixin:
         self._rc_window = win
         win.title("路由器后台工作台")
         win.configure(bg=BG)
-        win.geometry(fit_geometry(win, 860, 720))
-        win.minsize(760, 560)
+        win.geometry("880x700")          # 占位尺寸, 构建完成后按内容自适应
+        win.minsize(720, 520)            # 允许缩放到的最小可用尺寸
         win.transient(self)
 
         card = ttk.Frame(win, style="Card.TFrame", padding=(24, 20))
@@ -90,11 +90,11 @@ class RouterConsoleMixin:
 
         ttk.Label(card, text="路由器后台工作台", style="DialogTitle.TLabel").grid(
             row=0, column=0, sticky="w")
-        ttk.Label(
+        lbl_sub = ttk.Label(
             card,
             text="读取路由器上部署的监控工作台: 中继 / 认证 / 透明代理 / VPN / 防护 / 日志, 并可一键操作。",
-            style="Muted.TLabel", wraplength=780).grid(
-            row=1, column=0, sticky="w", pady=(6, 12))
+            style="Muted.TLabel", wraplength=780)
+        lbl_sub.grid(row=1, column=0, sticky="w", pady=(6, 12))
 
         # ---------- 连接参数行 ----------
         bar = ttk.Frame(card, style="Card.TFrame")
@@ -126,11 +126,10 @@ class RouterConsoleMixin:
         self._rc_head = ttk.Label(card, text="正在读取…", style="Muted.TLabel", wraplength=780)
         self._rc_head.grid(row=3, column=0, sticky="w", pady=(12, 6))
 
-        box = tk.Text(card, height=15, bg="#09101c", fg="#b7c4d8",
+        box = tk.Text(card, height=15, width=1, bg="#09101c", fg="#b7c4d8",
                       font=("PingFang SC", 10), relief="flat", wrap="word",
                       padx=12, pady=10, state="disabled")
         box.grid(row=4, column=0, sticky="nsew", pady=(0, 10))
-        card.rowconfigure(4, weight=1)
         self._rc_box = box
 
         # ---------- 一键操作 ----------
@@ -139,7 +138,7 @@ class RouterConsoleMixin:
         acts = ttk.Frame(card, style="Card.TFrame")
         acts.grid(row=6, column=0, sticky="ew")
         for i in range(3):
-            acts.columnconfigure(i, weight=1)
+            acts.columnconfigure(i, weight=1, uniform="rcact")
         buttons = [
             ("重启透明代理", "restart_proxy", False),
             ("重启 VPN", "restart_vpn", False),
@@ -151,8 +150,7 @@ class RouterConsoleMixin:
         for idx, (text, op, danger) in enumerate(buttons):
             ttk.Button(acts, text=text, style="Gray.TButton",
                        command=lambda o=op, d=danger: self._rc_action(o, confirm=d)).grid(
-                row=idx // 3, column=idx % 3, sticky="ew", padx=(0 if idx % 3 == 0 else 6, 0),
-                pady=(0, 6))
+                row=idx // 3, column=idx % 3, sticky="ew", padx=(0, 6), pady=(0, 6))
 
         # ---------- 切换中继目标 ----------
         ttk.Label(card, text="切换中继目标 (换成其它校园网 / WiFi)", style="Field.TLabel").grid(
@@ -170,15 +168,16 @@ class RouterConsoleMixin:
         ttk.Button(sw, text="切换", style="Gray.TButton",
                    command=lambda: self._rc_switch_relay(ent_ssid, ent_pass)).grid(
             row=0, column=4)
-        ttk.Label(card,
-                  text="提示: 切换后约 1 分钟生效; 校园网通常还需要重新登录认证 (可用上面的「重新登录校园网」)。",
-                  style="Muted.TLabel", wraplength=780).grid(
-            row=9, column=0, sticky="w", pady=(6, 6))
+        lbl_hint = ttk.Label(
+            card,
+            text="提示: 切换后约 1 分钟生效; 校园网通常还需要重新登录认证 (可用上面的「重新登录校园网」)。",
+            style="Muted.TLabel", wraplength=780)
+        lbl_hint.grid(row=9, column=0, sticky="w", pady=(6, 6))
 
         # ---------- 守护日志 ----------
         ttk.Label(card, text="守护日志 (最近 30 行)", style="Field.TLabel").grid(
             row=10, column=0, sticky="w", pady=(4, 4))
-        logbox = tk.Text(card, height=7, bg="#09101c", fg="#9fb0c8",
+        logbox = tk.Text(card, height=7, width=1, bg="#09101c", fg="#9fb0c8",
                          font=("PingFang SC", 9), relief="flat", wrap="none",
                          padx=10, pady=8, state="disabled")
         logbox.grid(row=11, column=0, sticky="nsew")
@@ -186,7 +185,42 @@ class RouterConsoleMixin:
         self._rc_logbox = logbox
 
         win.protocol("WM_DELETE_WINDOW", lambda: (setattr(self, "_rc_window", None), win.destroy()))
+
+        # 说明文字随窗口宽度自动换行 (不再写死 780)
+        wrap_labels = [lbl_sub, self._rc_head, lbl_hint]
+
+        def _rc_on_resize(_event=None):
+            try:
+                wpx = win.winfo_width() - 96
+                if wpx > 260:
+                    for lb in wrap_labels:
+                        lb.configure(wraplength=wpx)
+            except Exception:
+                pass
+
+        win.bind("<Configure>", _rc_on_resize)
+        # 按内容自适应窗口尺寸 (避免留白 / 裁切)
+        win.after(80, lambda: self._rc_autosize(win))
         self._rc_refresh()
+
+    def _rc_autosize(self, win):
+        """按内容贴合窗口尺寸: 宽高都跟随内容需求(不留白、不裁切), 夹在屏幕内并居中。
+
+        宽高都取"内容请求值"而不是写死像素, 这样在高分屏缩放(字体更大)下也不会裁切。
+        """
+        try:
+            win.update_idletasks()
+            screen_w = win.winfo_screenwidth()
+            screen_h = win.winfo_screenheight()
+            need_w = win.winfo_reqwidth() + 6
+            need_h = win.winfo_reqheight() + 6
+            w = max(760, min(need_w, screen_w - 120))
+            h = max(520, min(need_h, screen_h - 110))
+            x = max(0, (screen_w - w) // 2)
+            y = max(0, (screen_h - h) // 3)
+            win.geometry("%dx%d+%d+%d" % (w, h, x, y))
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ 内部
     def _rc_base(self, host, port):
