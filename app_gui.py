@@ -302,10 +302,10 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
 
         btns = ttk.Frame(pcard, style="Inner.TFrame")
         btns.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(8, 0))
-        btns.columnconfigure(0, weight=1)
-        btns.columnconfigure(1, weight=1)
-        btns.columnconfigure(2, weight=1)
-        btns.columnconfigure(3, weight=1)
+        btns.columnconfigure(0, weight=1, uniform="pbtn")
+        btns.columnconfigure(1, weight=1, uniform="pbtn")
+        btns.columnconfigure(2, weight=1, uniform="pbtn")
+        btns.columnconfigure(3, weight=1, uniform="pbtn")
         self.btn_save = ttk.Button(btns, text="保存档案", style="Accent.TButton",
                                    command=self.save_profile)
         self.btn_save.grid(row=0, column=0, sticky="ew", padx=(0, 6))
@@ -320,8 +320,9 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
         # ---- 右栏: 功能导航 ----
         nav = ttk.Frame(body, style="Card.TFrame", padding=(16, 14))
         nav.grid(row=0, column=1, sticky="nsew")
-        nav.columnconfigure(0, weight=1)
-        nav.columnconfigure(1, weight=1)
+        # 两列强制等宽 (uniform): 否则长标签(如"路由器检测(品牌/固件查询)")会把左列撑宽, 视觉不齐
+        nav.columnconfigure(0, weight=1, uniform="navcol")
+        nav.columnconfigure(1, weight=1, uniform="navcol")
 
         ttk.Label(nav, text="功能导航", style="Section.TLabel").grid(
             row=0, column=0, columnspan=2, sticky="w")
@@ -382,7 +383,7 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
                    command=lambda: self._fwin_open_legacy(
                        "router_proxy", self.show_router_proxy_window)).grid(
                            row=11, column=1, sticky="ew", pady=(3, 0))
-        ttk.Button(nav, text="路由器检测（品牌/固件查询）", style="Gray.TButton",
+        ttk.Button(nav, text="路由器检测", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router", self.show_router_assessment)).grid(
                            row=12, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
