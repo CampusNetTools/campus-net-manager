@@ -4,7 +4,7 @@ from core.common import *  # noqa: F401,F403
 from core import common  # noqa: F401
 from core import netinfo  # noqa: F401
 
-__all__ = ['now_str', 'log', 'send_system_notification', '_trim_log', 'AUTOSTART_CMD', 'autostart_enabled', 'set_autostart', 'keep_awake_start', 'keep_awake_stop', 'keep_awake_enabled']
+__all__ = ['now_str', 'log', 'send_system_notification', '_trim_log', 'autostart_enabled', 'set_autostart', 'process_start_token', 'keep_awake_start', 'keep_awake_stop', 'keep_awake_enabled']
 
 def now_str():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -51,10 +51,8 @@ def _trim_log(max_bytes=2 * 1024 * 1024, keep_bytes=300 * 1024):
 # 开机自启: Windows 使用注册表 Run 键；macOS 使用当前用户的 LaunchAgent。
 _AUTOSTART_NAME = "CampusNetManager"
 _MAC_LAUNCH_LABEL = "com.campusnettools.campusnetmanager"
-AUTOSTART_CMD = '"%s" "%s"' % (
-    sys.executable if not getattr(sys, "frozen", False) else sys.executable,
-    os.path.abspath(__file__) if not getattr(sys, "frozen", False) else os.path.join(BASE_DIR, "校园网连接管家.exe"),
-)
+# 注: 这里曾经有个 AUTOSTART_CMD 常量, 非 frozen 时指向 core/sysutils.py(不是入口脚本),
+# 从来没人用也永远指向错误的目标 —— 已删除。真正的注册表命令在 set_autostart() 里现算。
 
 
 def autostart_enabled():
@@ -105,6 +103,64 @@ def set_autostart(enabled):
             return r.returncode == 0
     except Exception:
         return False
+
+
+# ---------- 进程指纹 (单实例锁用) ----------
+def process_start_token(pid):
+    """返回某进程的"启动时刻"指纹字符串, 拿不到时返回 ""。
+
+    用途: 识别 PID 复用。OS 会回收并重新分配 PID —— 上次守护异常退出留下的 lock 文件
+    里写的 PID, 过一阵可能被分给完全无关的进程(记事本/浏览器)。只检查"这个 PID 还活着"
+    就会永久误判"已有实例在运行", 用户从此打不开 App 且不知道要删哪个文件。
+    比较"同一 PID 的启动时刻"就能可靠区分: 时间不同 => 是另一个进程。
+
+    Windows 用 GetProcessTimes(进程创建时间, 走 ctypes 不拉子进程);
+    macOS/Linux 用 ps -o lstart=。
+    """
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return ""
+    if pid <= 0:
+        return ""
+    if common.IS_WINDOWS:
+        return _windows_start_token(pid)
+    try:
+        out = netinfo._run_decode(["ps", "-o", "lstart=", "-p", str(pid)], timeout=5)
+        return out.strip()
+    except Exception:
+        return ""
+
+
+def _windows_start_token(pid):
+    import ctypes
+    from ctypes import wintypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, ctypes.c_void_p, ctypes.c_void_p,
+                                       ctypes.c_void_p, ctypes.c_void_p]
+    kernel.GetProcessTimes.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return ""
+    try:
+        creation = (ctypes.c_uint32 * 2)()
+        exited = (ctypes.c_uint32 * 2)()
+        kern = (ctypes.c_uint32 * 2)()
+        user = (ctypes.c_uint32 * 2)()
+        ok = kernel.GetProcessTimes(handle, ctypes.byref(creation), ctypes.byref(exited),
+                                   ctypes.byref(kern), ctypes.byref(user))
+    except Exception:
+        return ""
+    finally:
+        kernel.CloseHandle(handle)
+    if not ok:
+        return ""
+    return "%d" % ((creation[1] << 32) | creation[0])
 
 
 # ---------- 合盖/休眠保持运行 ----------

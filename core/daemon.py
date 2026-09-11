@@ -98,7 +98,8 @@ class KeepAliveDaemon(threading.Thread):
                 # 尊重用户"任意网络"选择: 若当前激活档案是空账号的默认档案(SSID/网关留空),
                 # 说明用户明确不想绑定特定网络 —— 不自动回退到其他校园网档案, 也不强制锁定为校园网。
                 active_name = self.cfg.get("active_profile")
-                active_prof = next((p for p in self.cfg.get("profiles", []) if p.get("name") == active_name), None)
+                active_prof = next((p for p in matching.profiles_snapshot(self.cfg)
+                                    if p.get("name") == active_name), None)
                 user_any_network = bool(
                     active_prof and not active_prof.get("ssid") and not active_prof.get("gateway")
                     and not matching.profile_has_credentials(active_prof))
@@ -128,7 +129,7 @@ class KeepAliveDaemon(threading.Thread):
                 # 若用户当前选的档案不匹配当前环境(可能误选「任意网络」/选错), 但存在
                 # 明确匹配的档案(SSID/网关精确匹配, 或认证可达的校园网档案), 自动切换过去。
                 best, reason = matching.best_match_profile(self.cfg, ssid, gw, auth_url)
-                current_prof = next((p for p in self.cfg.get("profiles", [])
+                current_prof = next((p for p in matching.profiles_snapshot(self.cfg)
                                      if p.get("name") == self.cfg.get("active_profile")), None)
                 # 守卫(根治热点事故): 用户显式选中的档案本身可登录且当前校园网可达时,
                 # 不因"认证可用"而切去别的空绑定默认档案。仅当 best 是 SSID/网关精确匹配,
@@ -230,7 +231,8 @@ class KeepAliveDaemon(threading.Thread):
                         history.record_network_history(self.cfg, "recovery", "网络已自动恢复", profile=profile["name"])
                         self._alert("网络已自动恢复", "recovery")
                     else:
-                        reachable = auth.auth_reachable(auth_url)
+                        # 这里要看"此刻链路到底断没断", 必须用实时值, 不能用防抖滞后值
+                        reachable = auth.auth_reachable(auth_url, debounce=False)
                         if not reachable:
                             self._log("重登失败：认证服务器不可达。中继/路由器模式下校园网链路可能已断开，"
                                       "请重启路由器重新拨号恢复")
@@ -251,7 +253,8 @@ class KeepAliveDaemon(threading.Thread):
                         self._alert("已自动恢复连接", "recovery")
                     else:
                         # 区分"链路断开"(认证服务器不可达) 与 "账号问题"(可达但登录失败)
-                        reachable = auth.auth_reachable(auth_url)
+                        # 这里要看"此刻链路到底断没断", 必须用实时值, 不能用防抖滞后值
+                        reachable = auth.auth_reachable(auth_url, debounce=False)
                         if not reachable:
                             self._log("自动登录失败：认证服务器不可达。当前处于中继/路由器模式时，"
                                       "校园网链路可能已断开，需要重启路由器重新拨号才能恢复")

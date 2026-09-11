@@ -11,13 +11,45 @@ __all__ = ['auth_reachable', 'http_get', 'decode_gbk', 'check_auth', '_probe_mat
 # 登录请求甚至可能因代理无法访问校园网内网认证服务器而失败。
 _DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-def auth_reachable(auth_url):
-    """认证服务器是否可达 (判定是否校园网环境)"""
+# 认证服务器可达性防抖: 单次探测失败(链路抖动 / 认证服务器瞬时繁忙 / DNS 抖动)
+# 不代表已经离开校园网。连续 _UNREACHABLE_STRIKES 次不可达才翻转为"不在校园网",
+# 中间沿用上一次的判定 —— 否则守护会在"校园网/非校园网"之间来回横跳: 每跳一次
+# 就多一轮 subprocess 探测 + 一次 30s 休眠 + 一次误判策略变更。
+_UNREACHABLE_STRIKES = 3
+_reach_state = {}          # auth_url -> (连续失败次数, 上次判定)
+_reach_lock = threading.Lock()
+
+
+def _probe_auth_url(auth_url):
+    """单次探测认证服务器是否可达(不带防抖)。"""
     try:
         status, _ = http_get(auth_url, timeout=5, physical=True)
         return status == 200
     except Exception:
         return False
+
+
+def auth_reachable(auth_url, debounce=True):
+    """认证服务器是否可达 (判定是否校园网环境)。
+
+    debounce=True(默认) 给守护循环的"环境判定"用: 抗抖动, 连续 3 次失败才翻转。
+    debounce=False 用于"此刻就要真相"的场景(重登失败后判断链路是否真断、界面展示、
+    自动切档案的依据) —— 这些地方用滞后值会造成误导或误切档案。
+    """
+    ok = _probe_auth_url(auth_url)
+    if not debounce:
+        with _reach_lock:
+            _reach_state[auth_url] = (0 if ok else _UNREACHABLE_STRIKES, ok)
+        return ok
+    with _reach_lock:
+        fails, last = _reach_state.get(auth_url, (0, False))
+        if ok:
+            result, fails = True, 0
+        else:
+            fails += 1
+            result = False if fails >= _UNREACHABLE_STRIKES else last
+        _reach_state[auth_url] = (fails, result)
+        return result
 
 
 # ---------- 网络检测 ----------
@@ -60,15 +92,36 @@ def decode_gbk(body):
         return body.decode("utf-8", errors="replace")
 
 
+_LOGOUT_TITLES = ("注销页", "注销", "logout", "log out", "log off", "signed out", "已注销")
+
+
+def _authed_from_page(text):
+    """从认证页正文判定是否"已登录"。
+
+    多判据的原因: 旧实现只认死 `<title>注销页</title>` —— 学校一换 Dr.COM 固件版本
+    或改语言(标题变成 Logout / 注销 / 已注销), 判定立刻失效, 界面永远显示"掉线",
+    守护则每个周期都重登一次, 把别的设备挤下线。
+
+    判据(命中任一即认为已登录):
+      1) <title> 是注销页的常见写法
+      2) 页面同时含 Dr.COM 特征(drcom)与注销语义(logout/注销) —— 未登录的认证页
+         只有"登录"字样, 不会同时出现注销语义, 所以这个组合是可靠的。
+    """
+    match = re.search(r"<title>\s*([^<]{0,40}?)\s*</title>", text or "", re.I)
+    title = match.group(1).strip() if match else ""
+    if title and title.lower() in _LOGOUT_TITLES:
+        return True
+    lowered = (text or "").lower()
+    return "drcom" in lowered and re.search(r"(logout|注销)", lowered) is not None
+
+
 def check_auth(auth_url=common.DEFAULT_AUTH_URL):
     """True=已登录(注销页), False=未登录/不可达"""
     try:
         status, body = http_get(auth_url, timeout=6, physical=True)
         if status != 200:
             return False
-        text = decode_gbk(body)
-        m = re.search(r"<title>([^<]+)</title>", text, re.I)
-        return bool(m and m.group(1).strip() == "注销页")
+        return _authed_from_page(decode_gbk(body))
     except Exception:
         return False
 
@@ -126,13 +179,36 @@ def try_login(profile):
         return False
 
 
-def ensure_login(profile, on_log=None):
-    for i in range(10):
+def ensure_login(profile, on_log=None, attempts=6, base_delay=2, max_delay=10,
+                 fast_attempts=2):
+    """尝试登录(含重试)。返回 True=成功。
+
+    相对旧实现(固定 10 次 × 2s)的三点改进:
+    1) **先探一次认证服务器**: 明确不可达时只做 fast_attempts 次快速重试就收工 ——
+       校园网链路断开时, 旧实现会干等 10 次 try_login(每次最长 15s)才回到主循环,
+       期间界面像卡死、用户点退出也没反应。宁可早点回主循环重新判定环境。
+    2) 重试间隔指数退避(2/4/8/10…), 给认证服务器恢复留缓冲, 又不至于空转太久。
+    3) 总尝试次数收敛到 6 次, 最坏阻塞从 150s+ 降到 90s 量级。
+
+    探测结论只用来"减少重试次数", 不用来直接跳过登录 —— 探测本身可能抖动,
+    不能让一次抖动导致这轮完全不登录。
+    """
+    auth_url = profile.get("auth_url", common.DEFAULT_AUTH_URL)
+    reachable = auth_reachable(auth_url, debounce=False)
+    if not reachable:
+        attempts = min(attempts, max(1, fast_attempts))
+        if on_log:
+            on_log("认证服务器不可达, 只快速重试 %d 次(校园网链路可能已断开)" % attempts)
+    delay = base_delay
+    for i in range(attempts):
         if try_login(profile):
             return True
         if on_log:
-            on_log("登录重试 %d/10 失败" % (i + 1))
-        time.sleep(2)
+            on_log("登录重试 %d/%d 失败" % (i + 1, attempts))
+        if i + 1 >= attempts:
+            break
+        time.sleep(delay)
+        delay = min(max_delay, delay * 2)
     return False
 
 

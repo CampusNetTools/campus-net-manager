@@ -464,7 +464,8 @@ def _iface_list():
 def list_hotspot_clients():
     """返回连接到本机热点/共享 NAT 的设备列表 + 流量估算。
     每项 dict: {ip, mac, vendor, tx_bytes, rx_bytes, iface, since, note}
-    跨平台: macOS 走 arp + ifconfig bridge0; Windows 走 Get-NetNeighbor + Get-NetIPStatistics。
+    跨平台: macOS 走 arp + ifconfig bridge0; Windows 走 Get-NetNeighbor
+    (流量按网卡整机口径放 note, 系统不提供按对端设备拆分)。
     无热点/共享时返 [].
     """
     # 1) 找当前作为热点/共享 NAT 网关的接口
@@ -527,20 +528,15 @@ def _iface_clients(iface):
     """拿指定接口下的客户端 IP+MAC+流量(平台分支)."""
     out = []
     if common.IS_MACOS:
-        # macOS: arp -an 看整个表, 过滤落在 iface 子网内的 IP. 流量的"按 IP 估算"靠
-        # netstat -f inet 抽样(普通用户能跑); 标注 (粗略) + 加上 bridge0 接口总流量给上下文.
+        # macOS: arp -an 看整个表, 过滤落在 iface 子网内的 IP.
         # 1) 找 iface 子网
         ifc = netinfo._run_decode(["ifconfig", iface], timeout=3)
         sub = re.search(r"inet (\d+\.\d+\.\d+)\.\d+ netmask 0x(..)(..)(..)", ifc)
         if not sub:
             return []
         base = sub.group(1)
-        # netmask bytes -> mask length
-        nm = int(sub.group(2), 16) * 65536 + int(sub.group(3), 16) * 256 + int(sub.group(4), 16)
-        bits = bin(nm).count("1")
-        # 2) 抽样 netstat -an 看每个 src IP 的字节(粗略但 sudo-free)
-        sample = netinfo._run_decode(["netstat", "-an", "-f", "inet", "-p", "tcp"], timeout=4)
-        # netstat -I iface -b 在 macOS 需要 sudo; 退化用 ifconfig 总字节 + 客户端数均分
+        # 2) netstat -I iface -b 在 macOS 需要 sudo(普通用户跑不了), 所以按 IP 拆分流量
+        #    这条路走不通 —— 退化为给"接口总流量"作为上下文(见 _iface_total_bytes)。
         total = _iface_total_bytes(iface)
         total_note = ""
         if total:
@@ -557,38 +553,51 @@ def _iface_clients(iface):
                     "note": total_note or None,
                 })
     else:
-        # Windows: Get-NetNeighbor 拿热点客户端, Get-NetIPStatistics 拿每 IP 流量
+        # Windows: Get-NetNeighbor 拿热点客户端。
+        # 流量说明: Get-NetIPStatistics 返回的是**本机每个 IP 接口**的累计统计, 没有
+        # "对端设备"维度 —— 拿客户端 IP 去查恒定查不到, 旧实现除了永远返回 null, 还
+        # 白跑一次 PowerShell(每次刷新热点窗口都跑)。这里改取网卡级
+        # Get-NetAdapterStatistics(热点网卡整机收发总量)作为上下文, 并如实标注
+        # "整机口径", 不再假装能按设备拆分。
+        safe_iface = iface.replace("'", "''")
         neigh = netinfo._run_decode([
             "powershell", "-NoProfile", "-Command",
-            f"Get-NetNeighbor -InterfaceAlias '{iface}' -ErrorAction SilentlyContinue | "
+            "Get-NetNeighbor -InterfaceAlias '%s' -ErrorAction SilentlyContinue | "
             "Where-Object {$_.State -eq 'Reachable'} | "
-            "Select-Object -ExpandProperty IPAddress"
+            "Select-Object -ExpandProperty IPAddress" % safe_iface
         ], timeout=8)
         ips = [ln.strip() for ln in neigh.splitlines() if re.match(r"^\d+\.\d+\.\d+\.\d+$", ln.strip())]
-        # 每 IP 流量
-        ipstat = {}
-        if ips:
-            stats = netinfo._run_decode([
-                "powershell", "-NoProfile", "-Command",
-                "Get-NetIPStatistics -ErrorAction SilentlyContinue | "
-                "Where-Object {$_.IPAddress -in @(%s)} | "
-                "Select-Object IPAddress,BytesReceived,BytesSent" % ",".join("'%s'" % x for x in ips)
-            ], timeout=10)
-            for ln in stats.splitlines()[3:]:  # 跳过表头
-                m = re.search(r"(\d+\.\d+\.\d+\.\d+)\s+(\d+)\s+(\d+)", ln)
-                if m:
-                    ipstat[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+        adapter_note = _windows_adapter_note(iface)
         # arp 表查 MAC
         arp_map = {ip: mac for ip, mac in _arp_entries()}
         for ip in ips:
             mac = arp_map.get(ip, "")
             out.append({
                 "ip": ip, "mac": mac, "vendor": vender_lookup(mac),
-                "rx_bytes": ipstat.get(ip, (None, None))[0],
-                "tx_bytes": ipstat.get(ip, (None, None))[1],
-                "iface": iface, "since": None, "note": None,
+                "rx_bytes": None, "tx_bytes": None,
+                "iface": iface, "since": None, "note": adapter_note,
             })
     return out
+
+
+def _windows_adapter_note(iface):
+    """热点网卡的整机收发总量, 作为"这个热点用了多少流量"的上下文(拿不到返 None)。"""
+    safe_iface = str(iface).replace("'", "''")
+    try:
+        out = netinfo._run_decode([
+            "powershell", "-NoProfile", "-Command",
+            "$s = Get-NetAdapterStatistics -Name '%s' -ErrorAction SilentlyContinue | "
+            "Select-Object -First 1; "
+            "if ($s) { \"$($s.ReceivedBytes) $($s.SentBytes)\" }" % safe_iface
+        ], timeout=8)
+        for line in out.splitlines():
+            nums = re.findall(r"\d+", line)
+            if len(nums) >= 2:
+                return "热点网卡 %s 整机 RX/TX: %s / %s (整机口径, 非按设备)" % (
+                    iface, fmt_bytes(int(nums[0])), fmt_bytes(int(nums[1])))
+    except Exception:
+        pass
+    return None
 
 
 def fmt_bytes(n):
@@ -828,7 +837,9 @@ def download_firmware(url, save_path, expected_sha256="", progress_cb=None,
         req_headers.update(headers)
     try:
         req = urllib.request.Request(url, headers=req_headers)
-        with urllib.request.urlopen(req, timeout=30) as response:
+        # 传入的 timeout 必须真的生效: 旧实现硬编码 30s, 参数形同虚设 ——
+        # 校园网/内网镜像下大固件经常需要更长时间, 网络差时又希望能更短地失败。
+        with urllib.request.urlopen(req, timeout=timeout) as response:
             total = int(response.headers.get("Content-Length", "0") or 0)
             os.makedirs(os.path.dirname(os.path.abspath(save_path)) or ".", exist_ok=True)
             done = 0

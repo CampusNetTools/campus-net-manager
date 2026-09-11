@@ -1,5 +1,31 @@
 # 更新记录
 
+## v5.1.2
+
+- **配置层加固（上次审查遗留项全部落地）**
+  - `ensure_lida_profile` 不再强改用户自建档案：旧实现会把任何名为「校园网」且未填 SSID 的档案无条件改名并绑定立达 SSID，用户在 v5 自建的"任意网络"档案会被静默改语义（绑定后不再匹配其他网络）。现在只迁移真正的旧版遗留种子档案，并用 `lida_migrated` 标记保证迁移只做一次，此后即使用户再建同名档案也不会被动。
+  - **Windows 密码改用 DPAPI 加密存储**：此前 Windows 下密码以明文写在 `config.json`。现在用当前用户范围的 `CryptProtectData` 加密为 `password_enc`（`password_store: "dpapi"`），加载时自动解密；旧版明文配置首次加载时自动迁移。导出配置（`config_for_export`）不含密文与明文，可安全分享。
+  - 修复「密码已加密后修改密码不落盘」：原判据会因 `password_store` 已是 dpapi 而跳过写盘；现在按明文是否变化决定是否重新加密。
+- **认证与网络探测**
+  - `check_auth` 增加第二判据：除「注销页」标题外，再匹配 Dr.COM 注销页特征（`注销`/`logout` 等），降低门户改版导致「已登录」被误判为未登录的概率。
+  - `auth_reachable` 增加防抖：守护循环的环境判定连续 3 次失败才翻转，避免单次抖动触发误切档案；同时提供 `debounce=False` 给"此刻必须看真相"的调用点（重登失败后判链路、界面展示、自动切档案），已把守护循环/匹配/控制台/隧道引导四处改为实时探测。
+  - `ensure_login` 改为指数退避（2s 起、封顶 10s），并在重试前先探一次认证服务器：明确不可达时只做 2 次快速重试即收工，不再死等 20 秒×10 次。
+- **安全**
+  - Web 控制台口令比较改用 `hmac.compare_digest`（防时序侧信道）；口令不再出现在 URL 查询串（避免进浏览器历史/被代理日志留存），改为 `X-Console-Key` 头 + 短时 token 校验。
+  - Web 控制台 `/api/status` 增加 TTL 快照缓存，避免多设备并发轮询时反复触发 PowerShell 采集。
+- **更新器**
+  - 自动更新下载增加 **SHA256 校验**：优先取 Release 的 `.sha256` 校验和资产，缺失时才回退到 GitHub API 的 `digest` 字段；不匹配则拒装并提示。新增 `scripts/make_checksum.py` 生成校验和，CI 发布时自动附带 `*.sha256`。
+  - 资产挑选改为按平台精确匹配（macOS 取 `*macos*.zip`、Windows 取 `*win64*.exe`），避免 Release 里多个包时挑错。
+- **竞态与单实例**
+  - `core/matching.py` 与 `core/daemon.py` 遍历档案前先取快照（浅拷贝），消除守护线程自动切档案与 GUI 保存并发的遍历异常。
+  - 单实例锁增加**进程启动时间指纹**：原先只比对 PID，PID 被系统复用时会误判"已有实例在跑"而拒绝启动；现在记录 `pid + 启动时间戳`，指纹不符即视为陈旧锁并接管（兼容旧格式锁文件）。
+- **静态检查抓到的真实缺陷（7 处）**
+  - 修复 `except ... as exc` 后把 `exc` 捕获进延迟执行的 `lambda` —— Python 会在 `except` 块结束时删除该变量，导致这些**错误提示回调本身抛 `NameError`**（用户看到的是"回调崩溃"而非真实错误）。涉及 `gui/daemon_ctl.py`、`gui/router_console_ui.py`(×3)、`gui/router_tools.py`、`gui/update_ui.py`。
+  - 清理 `gui/wizard.py` 重复导入、`scripts/v5_driver_check.py` 无效占位常量、测试中的未用变量。
+  - CI 静态检查由 pyflakes 换成 ruff 高信号规则（`F` + `E9`），并**从"只报告"改为"不通过即失败"**（`F403/F405` 因项目 star-import 架构属已知误报，显式忽略）。
+- **清理**：删除冗余脚本 `lida_keepalive.py`（166 行，与 `keepalive_core.py` 重复且无任何引用）；删除 `core/sysutils.py` 中错误的 `AUTOSTART_CMD` 常量（非打包态指向 `core/sysutils.py` 而非入口脚本，一旦被采用会写出错误的自启命令），并在 `scripts/split_core.py` 归属表中同步移除。
+- 新增 `tests/test_v512_fixes.py` 覆盖上述修复（DPAPI 往返、一次性迁移、口令时序比较、SHA256 校验、进程指纹锁、校验和脚本等）。
+
 ## v5.1.1
 
 - **修复 Windows 下 `get_lan_ips()` 恒返回空的问题**：IP 枚举原本只支持 `ifconfig`（macOS），导致隧道共享引导页显示"本机IP"、网络控制台二维码指向 `127.0.0.1`（手机扫不开）。现在 Windows 走 PowerShell `Get-NetIPAddress` + `ipconfig` + `getaddrinfo` 兜底，并过滤 VPN 虚拟接口（接口名含 VPN / TUN / 198.18.x Clash 假 IP）。

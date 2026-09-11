@@ -1,0 +1,41 @@
+# -*- coding: utf-8 -*-
+"""生成 SHA256 校验和文件: <asset>.sha256, 内容为 "<hex>  <文件名>"。
+
+用法: python scripts/make_checksum.py <文件路径> [<文件路径> ...]
+
+配套 updater.resolve_expected_sha256 / parse_checksum_for —— 发布时每个安装包
+都带上 .sha256 资产, 客户端下载后先校验再替换, 挡住中间人和半截下载。
+"""
+import hashlib
+import os
+import sys
+
+
+def sha256_of_file(path, chunk_size=1 << 20):
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(chunk_size), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def main(paths):
+    if not paths:
+        print(__doc__)
+        return 2
+    rc = 0
+    for path in paths:
+        if not os.path.isfile(path):
+            print("跳过（文件不存在）: %s" % path)
+            rc = 1
+            continue
+        digest = sha256_of_file(path)
+        out_path = path + ".sha256"
+        with open(out_path, "w", encoding="ascii", newline="\n") as handle:
+            handle.write("%s  %s\n" % (digest, os.path.basename(path)))
+        print("%s  ->  %s" % (digest, out_path))
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

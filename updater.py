@@ -4,9 +4,13 @@
 设计要点:
 - 网络请求走系统代理(urllib 默认), 校园网/Clash 环境下都能连 GitHub。
 - 自替换采用"父进程退出后脚本替换"模式: macOS bash / Windows bat。
+- 下载后校验 SHA256: 优先用 GitHub 资产自带的 digest 字段, 否则下载配套的
+  SHA256SUMS/<asset>.sha256 校验和文件; 校验不过直接删除并中止, 绝不替换运行。
 - 所有函数无副作用可测: 网络层通过 opener 注入, 脚本只生成不落盘执行。
 """
 import datetime
+import hashlib
+import hmac
 import json
 import locale
 import os
@@ -86,7 +90,8 @@ def check_for_update(current_version, timeout=10, opener=None):
         return None
     assets = [{"name": a.get("name", ""),
                "url": a.get("browser_download_url", ""),
-               "size": a.get("size", 0)}
+               "size": a.get("size", 0),
+               "digest": a.get("digest") or ""}   # GitHub 会带 "sha256:<hex>"
               for a in data.get("assets", [])]
     return {"tag": tag,
             "version": parse_version(tag),
@@ -95,16 +100,142 @@ def check_for_update(current_version, timeout=10, opener=None):
             "assets": assets}
 
 
-def pick_asset(assets, platform=None):
-    """按平台挑安装包: macOS→*macos*.zip, Windows→*.exe。找不到返回 None。"""
+# 规范资产命名: CampusNetManager-<版本>-win64.exe / CampusNetManager-macOS-arm64-<版本>.zip。
+# 旧版 CI 产出的是下划线版本(CampusNetManager_v5.1.0_win64.exe), 视为次选 ——
+# 历史上 Release 里两个都传过, 按顺序取第一个会取到 Mac 侧误传的重复包。
+_CANONICAL_ASSET = re.compile(
+    r"^campusnetmanager-[^-]+-(win64|windows|macos|arm64)", re.IGNORECASE)
+
+
+def asset_candidates(assets, platform=None):
+    """返回该平台的全部候选资产, 规范命名优先、其次名字更短的。"""
     platform = platform or ("macos" if sys.platform == "darwin" else "windows")
-    for a in assets:
-        name = a.get("name", "").lower()
-        if platform == "macos" and name.endswith(".zip") and "macos" in name:
+    out = []
+    for a in assets or []:
+        name = (a.get("name") or "").lower()
+        if platform == "macos" and not (name.endswith(".zip") and "macos" in name):
+            continue
+        if platform == "windows" and not name.endswith(".exe"):
+            continue
+        out.append(a)
+    out.sort(key=lambda a: (0 if _CANONICAL_ASSET.match(a.get("name") or "") else 1,
+                            len(a.get("name") or "")))
+    return out
+
+
+def pick_asset(assets, platform=None):
+    """按平台挑安装包: macOS→*macos*.zip, Windows→*.exe。找不到返回 None。
+
+    多个候选时优先规范命名, 并写日志记录被跳过的重复包 —— 避免再次出现
+    "Mac 侧误传的重复 exe 抢在规范包前面被选中"的事故。
+    """
+    cands = asset_candidates(assets, platform)
+    if not cands:
+        return None
+    if len(cands) > 1:
+        _log("同平台存在 %d 个安装包, 选用 %s; 其余: %s"
+             % (len(cands), cands[0].get("name", "?"),
+                ", ".join(a.get("name", "?") for a in cands[1:])))
+    return cands[0]
+
+
+# ---------- SHA256 校验 ----------
+
+_HEX64 = re.compile(r"\b([0-9a-fA-F]{64})\b")
+_CHECKSUM_NAMES = ("sha256sums", "sha256sums.txt", "sha256sum", "checksums.txt")
+
+
+def sha256_of_file(path, chunk_size=1 << 20):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            block = f.read(chunk_size)
+            if not block:
+                break
+            h.update(block)
+    return h.hexdigest()
+
+
+def digest_to_hex(digest):
+    """GitHub asset.digest 形如 'sha256:abcdef…' → 纯 hex; 非法返回 ""。"""
+    text = (digest or "").strip().lower()
+    if text.startswith("sha256:"):
+        text = text.split(":", 1)[1]
+    return text if re.fullmatch(r"[0-9a-f]{64}", text) else ""
+
+
+def parse_checksum_for(text, filename):
+    """从 sha256sum 格式文本里取指定文件的哈希。
+
+    支持 "<hex>  <file>" 与 "<hex> *<file>"; 只有单条记录且未写文件名时直接采用。
+    """
+    lines = [ln for ln in (text or "").splitlines() if _HEX64.search(ln)]
+    if not lines:
+        return ""
+    target = (filename or "").strip().lower()
+    for line in lines:
+        match = _HEX64.search(line)
+        rest = line.replace(match.group(1), "", 1).strip().lstrip("*").strip().lower()
+        if target and (rest == target or rest.endswith(target)):
+            return match.group(1).lower()
+    if len(lines) == 1:
+        return _HEX64.search(lines[0]).group(1).lower()
+    return ""
+
+
+def checksum_asset_for(assets, asset_name):
+    """找配套校验和资产: <asset>.sha256 优先, 其次 SHA256SUMS(.txt)。"""
+    wanted = [(asset_name or "").lower() + s
+              for s in (".sha256", ".sha256sum", ".sha256.txt")]
+    fallback = None
+    for a in assets or []:
+        name = (a.get("name") or "").lower()
+        if name in wanted:
             return a
-        if platform == "windows" and name.endswith(".exe"):
-            return a
-    return None
+        if name in _CHECKSUM_NAMES and fallback is None:
+            fallback = a
+    return fallback
+
+
+def resolve_expected_sha256(assets, asset, opener=None, timeout=15):
+    """解析目标资产应有的 SHA256。
+
+    优先级: 资产自带 digest(GitHub API) > 独立校验和文件 > ""(无法校验)。
+    任何网络/解析失败都返回 "", 由调用方决定是否放行(见 verify_download)。
+    """
+    hex_value = digest_to_hex((asset or {}).get("digest"))
+    if hex_value:
+        return hex_value
+    checksum = checksum_asset_for(assets, (asset or {}).get("name", ""))
+    if not checksum or not checksum.get("url"):
+        return ""
+    try:
+        req = urllib.request.Request(checksum["url"], headers=_UA)
+        if opener:
+            with opener.open(req, timeout=timeout) as resp:
+                text = resp.read().decode("utf-8", errors="replace")
+        else:
+            with urllib.request.urlopen(req, timeout=timeout,
+                                        context=_ssl_context()) as resp:
+                text = resp.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        _log("校验和文件下载失败: %r" % exc)
+        return ""
+    return parse_checksum_for(text, (asset or {}).get("name", ""))
+
+
+def verify_download(path, expected_sha256):
+    """校验已下载文件, 返回 (ok, message)。expected 为空时不拦截(只提示未校验)。"""
+    if not expected_sha256:
+        return True, "未提供 SHA256, 跳过校验(建议 Release 附带 SHA256SUMS)"
+    try:
+        actual = sha256_of_file(path)
+    except Exception as exc:
+        return False, "无法读取下载文件: %s" % exc
+    if hmac.compare_digest(actual.lower(), expected_sha256.strip().lower()):
+        return True, "SHA256 校验通过"
+    return False, "SHA256 校验失败(期望 %s…, 实际 %s…)" % (
+        expected_sha256[:12], actual[:12])
 
 
 def download(url, dest, progress=None, timeout=60, opener=None, chunk_size=65536):

@@ -29,8 +29,6 @@ class TunnelModeSplitTests(unittest.TestCase):
     def test_router_mode_text_branch(self):
         """路由器模式 -> 路由器卡片文案应包含「不需要配代理」/「路由器中继」等关键词。"""
         # 模拟 router 模式: 重写 partial _show_tunnel_ready 的文案逻辑
-        gm = {"mode": "router",
-              "description": "经路由器接入(网关 192.168.3.1)"}
         # 模拟 router 模式时, router_card 的文案应包含
         router_body_router = ("✓ 当前已是路由器模式。手机直接连那台路由器的 WiFi 就能借校园网出口, "
                               "**不用配任何代理**。")
@@ -40,8 +38,6 @@ class TunnelModeSplitTests(unittest.TestCase):
         self.assertIn("电脑直连校园网", "② 电脑直连校园网(手机配代理)")
 
     def test_computer_mode_text_branch(self):
-        gm = {"mode": "computer",
-              "description": "电脑直连(网关 10.52.188.1)"}
         # 路由器卡片: 非 router 模式, 显示「向下滚到 ② 段」
         router_body_other = (
             "如果手机与你电脑在同一台路由器下:\n"

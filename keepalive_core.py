@@ -25,7 +25,7 @@ from core.daemon import *  # noqa: F401,F403
 from core import config, netinfo, router, sysutils  # noqa: F401
 
 
-APP_VERSION = "5.1.1"
+APP_VERSION = "5.1.2"
 APP_NAME = "校园网连接管家"
 
 
@@ -91,23 +91,37 @@ def collect_diagnostics():
 
 # ---------- 锁 ----------
 def acquire_lock():
+    """获取单实例锁。返回 False = 已有实例在运行。
+
+    lock 文件格式: "<pid> <启动时刻指纹>"。
+    指纹的意义: 只比 PID 会被 PID 复用坑死 —— 旧守护崩溃留下的 lock 里那个 PID
+    被系统分给别的进程后, "PID 存在"判定恒为真, App 永久拒绝启动且用户不知道
+    要删 lock 文件。带上启动时刻就能区分"同一个进程"和"恰好复用了 PID 的别人"。
+    """
     try:
         if os.path.exists(common.LOCK_PATH):
             with open(common.LOCK_PATH) as f:
-                old_pid = f.read().strip()
+                parts = f.read().split(None, 1)
+            old_pid = parts[0].strip() if parts else ""
+            old_token = parts[1].strip() if len(parts) > 1 else ""
             if old_pid and old_pid != str(os.getpid()):
+                alive = False
                 if common.IS_MACOS:
                     try:
                         os.kill(int(old_pid), 0)
-                        return False
+                        alive = True
                     except (OSError, ValueError):
-                        pass
+                        alive = False
                 else:
                     out = netinfo._run_decode(["tasklist", "/FI", "PID eq %s" % old_pid])
-                    if old_pid in out:
-                        return False
+                    alive = old_pid in out
+                # 有指纹就核对: 指纹不一致 => PID 被复用, 老 lock 属残留, 可直接接管
+                if alive and old_token:
+                    alive = sysutils.process_start_token(old_pid) == old_token
+                if alive:
+                    return False
         with open(common.LOCK_PATH, "w") as f:
-            f.write(str(os.getpid()))
+            f.write("%d %s" % (os.getpid(), sysutils.process_start_token(os.getpid())))
         return True
     except Exception:
         return True
