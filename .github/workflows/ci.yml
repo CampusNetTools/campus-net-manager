@@ -26,13 +26,21 @@ jobs:
       - name: 静态检查（未定义名，防拆分漂移）
         shell: bash
         run: |
-          pip install pyflakes
+          pip install pyflakes ruff
           python -m pyflakes core/*.py gui/*.py *.py mobile/main.py > flakes.txt || true
           cat flakes.txt
           if grep -q "undefined name '" flakes.txt; then
             echo "::error::发现未定义名"
             exit 1
           fi
+      - name: 静态检查（ruff：真 bug 类规则）
+        shell: bash
+        run: |
+          # F=pyflakes 类, E9=语法类。项目是 star-import 架构:
+          # F401(未用导入)/F403/F405 属该架构的已知误报, 显式忽略;
+          # 其余(F821 未定义名、F811 重复定义、F841 未用变量)必须为 0 ——
+          # F821 真的抓到过 7 处 "except ... as e" 被延迟 lambda 引用的静默崩溃。
+          ruff check --no-cache --select F,E9 --ignore F401,F403,F405 .
       - name: 版本号一致性校验
         run: python scripts/sync_version.py --check
 
@@ -67,6 +75,9 @@ jobs:
           mv "校园网连接管家.app" CampusNetManager.app
           zip -rq "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip" CampusNetManager.app
           mv CampusNetManager.app "校园网连接管家.app"
+          # SHA256 校验和资产: 客户端下载后先校验再替换(updater.resolve_expected_sha256)
+          python ../../scripts/make_checksum.py \
+            "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip"
 
       - name: 构建 Windows exe
         if: matrix.target == 'windows'
@@ -77,14 +88,20 @@ jobs:
             --collect-submodules core --collect-submodules gui \
             --distpath dist/windows --workpath build/pyinstaller-windows \
             app_gui.py
+          # 规范命名 CampusNetManager-<tag>-win64.exe（连字符）: 旧的下划线命名会与
+          # Release 里遗留的重复包混淆, updater.pick_asset 也需要可辨认的规范名。
           mv dist/windows/CampusNetManager.exe \
-             "dist/windows/CampusNetManager_${GITHUB_REF_NAME}_win64.exe"
+             "dist/windows/CampusNetManager-${GITHUB_REF_NAME}-win64.exe"
+          python scripts/make_checksum.py \
+            "dist/windows/CampusNetManager-${GITHUB_REF_NAME}-win64.exe"
 
       - name: 上传 macOS 资产到 Release
         if: matrix.target == 'macos'
         uses: softprops/action-gh-release@v2
         with:
-          files: "dist/macos/CampusNetManager-macOS-arm64-${{ github.ref_name }}.zip"
+          files: |
+            dist/macos/CampusNetManager-macOS-arm64-${{ github.ref_name }}.zip
+            dist/macos/CampusNetManager-macOS-arm64-${{ github.ref_name }}.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -92,6 +109,8 @@ jobs:
         if: matrix.target == 'windows'
         uses: softprops/action-gh-release@v2
         with:
-          files: "dist/windows/CampusNetManager_${{ github.ref_name }}_win64.exe"
+          files: |
+            dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe
+            dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
