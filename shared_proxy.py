@@ -165,13 +165,39 @@ class SharedProxy:
 
     @staticmethod
     def _collect_my_ips():
-        """列出本机所有 IPv4 接口(用于识别对'代理自己'的绝对 URL 请求)。"""
+        """列出本机所有 IPv4 接口(用于识别对'代理自己'的绝对 URL 请求)。
+        macOS 走 ifconfig; Windows 没有 ifconfig, 用 getaddrinfo + ipconfig 兜底,
+        否则只有 127.0.0.1, 引导页/PAC 的"代理到自己"识别在 Windows 上失效。"""
         ips = {"127.0.0.1"}
         try:
             out = subprocess.check_output(["ifconfig"], text=True, timeout=3,
                                           stderr=subprocess.DEVNULL)
             for m in re.finditer(r"inet (\d+\.\d+\.\d+\.\d+)", out):
                 ips.add(m.group(1))
+            if len(ips) > 1:
+                return ips
+        except Exception:
+            pass
+        # Windows / ifconfig 缺失: hostname 解析 + ipconfig 解析
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                ip = info[4][0]
+                if ip and not ip.startswith("127."):
+                    ips.add(ip)
+        except Exception:
+            pass
+        try:
+            kwargs = {"capture_output": True, "timeout": 5}
+            if hasattr(subprocess, "CREATE_NO_WINDOW"):
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            out = subprocess.run(["ipconfig"], **kwargs).stdout.decode(
+                "utf-8", errors="replace")
+            # 注: 中文系统 ipconfig 输出是 GBK, 中文标签会乱码, 但 "IPv4"/":"/
+            # 数字都是 ASCII 不受影响, 足以提取地址。
+            for m in re.finditer(r"IPv4[^\r\n]*?:\s*(\d+\.\d+\.\d+\.\d+)", out):
+                ip = m.group(1)
+                if not ip.startswith(("127.", "169.254.")):
+                    ips.add(ip)
         except Exception:
             pass
         return ips
@@ -549,9 +575,36 @@ def _same_net(ip, other, mask_hex):
 
 
 def _iface_ips():
-    """返回 [(接口名, IPv4, 掩码hex), ...] (排除回环/链路本地)。"""
+    """返回 [(接口名, IPv4, 掩码hex), ...] (排除回环/链路本地)。
+    macOS 走 ifconfig; Windows 走 PowerShell Get-NetIPAddress
+    (旧版只用 ifconfig, Windows 上恒返回 [] 导致 get_lan_ips 为空)。"""
     import re
     import subprocess
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        # Windows: PowerShell 拿 接口名/IP/前缀长度, 前缀长度转十六进制掩码
+        try:
+            kwargs = {"capture_output": True, "timeout": 8,
+                      "creationflags": subprocess.CREATE_NO_WINDOW}
+            out = subprocess.run([
+                "powershell", "-NoProfile", "-Command",
+                "Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | "
+                "Where-Object { $_.IPAddress -ne '127.0.0.1' -and $_.IPAddress -notlike '169.254.*' } | "
+                "ForEach-Object { '{0}|{1}|{2}' -f $_.InterfaceAlias, $_.IPAddress, $_.PrefixLength }"
+            ], **kwargs).stdout.decode("utf-8", errors="replace")
+        except Exception:
+            return []
+        rows = []
+        for line in out.splitlines():
+            parts = line.strip().split("|")
+            if len(parts) == 3 and re.match(r"^\d+\.\d+\.\d+\.\d+$", parts[1]):
+                try:
+                    plen = max(0, min(32, int(parts[2])))
+                    mask = (0xFFFFFFFF << (32 - plen)) & 0xFFFFFFFF
+                    mask_hex = "%08x" % mask
+                except Exception:
+                    continue
+                rows.append((parts[0], parts[1], mask_hex))
+        return rows
     try:
         out = subprocess.check_output(["ifconfig"], stderr=subprocess.STDOUT,
                                       timeout=3).decode("utf-8", "replace")
@@ -573,12 +626,19 @@ def _iface_ips():
 
 def _default_gateway_ip():
     """当前"真实出口"默认网关 IP。
-
-    先试 `route get default`; 若默认路由被 VPN/Clash(TUN) 抢走导致无 gateway,
+    Windows: 复用 core.netinfo.get_gateway() 的 route print 解析(已处理 VPN/On-link);
+    macOS: 先试 `route get default`; 若默认路由被 VPN/Clash(TUN) 抢走导致无 gateway,
     回退 netstat -rn 取第一条实体 IPv4 网关(跳过 link# 的虚拟默认路由)。
     """
     import re
     import subprocess
+    try:
+        from core import netinfo as _netinfo
+        gw = _netinfo.get_gateway()
+        if gw:
+            return gw
+    except Exception:
+        pass
     ip_re = r"\d+\.\d+\.\d+\.\d+"
     try:
         out = subprocess.check_output(["route", "-n", "get", "default"],
@@ -618,8 +678,9 @@ def get_lan_ips():
     gw = _default_gateway_ip()
     phys, hot = [], []
     for iface, ip, mask in _iface_ips():
-        if _VIRT.match(iface) or ip.startswith("198.18."):
-            continue                       # 纯虚拟/假 IP, 直接丢弃
+        if (_VIRT.match(iface) or "vpn" in iface.lower()
+                or ip.startswith("198.18.")):
+            continue                       # 纯虚拟/VPN隧道/假 IP, 直接丢弃
         if iface.startswith("bridge"):
             hot.append((iface, ip, mask))  # 热点/共享网段, 放最后
         else:

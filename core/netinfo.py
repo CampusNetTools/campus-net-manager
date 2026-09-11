@@ -82,11 +82,14 @@ def get_physical_route():
                 and parts[2] != "0.0.0.0"
                 and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[3])):
             return parts[2], parts[3]
-    # 兜底: 返回首个普通默认路由的网关
+    # 兜底: 返回首个普通默认路由的网关。
+    # 注意中文 Windows 的 On-link 显示为「在链路上」, 不能只排除英文; 兜底也必须
+    # 校验是合法 IPv4, 否则 VPN 环境下会把「在链路上」当网关返回。
     for line in out.splitlines():
         parts = line.split()
         if (len(parts) >= 3 and parts[0] == "0.0.0.0" and parts[1] == "0.0.0.0"
-                and parts[2] != "On-link" and parts[2] != "0.0.0.0"):
+                and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[2])
+                and parts[2] != "0.0.0.0"):
             return parts[2], (parts[3] if len(parts) >= 4 and re.match(r"^\d{1,3}(?:\.\d{1,3}){3}$", parts[3]) else None)
     return None, None
 
@@ -98,13 +101,19 @@ def get_physical_interface():
 
 
 def vpn_active():
-    """检测是否存在活跃 VPN 隧道；仅用于提示测速路径。"""
+    """检测是否存在活跃 VPN 隧道；仅用于提示测速路径。
+    Windows 关键词必须精确: 宽泛的 "vpn" 子串会匹配接口描述/服务名里的任意字样
+    (装过 VPN 软件即使未连接, route print 的接口列表也常驻 "VPN" 字样), 造成常年误报。"""
     if common.IS_MACOS:
         out = _run_decode(["netstat", "-rn", "-f", "inet"])
         return any(len(line.split()) >= 4 and line.split()[0] == "default"
                    and line.split()[3].startswith("utun") for line in out.splitlines())
+    # Windows: 精确匹配常见 VPN 驱动的接口/驱动名
+    marks = ("wireguard", "wintun", "tap-windows", "tap-surface", "openvpn",
+             "tun2socks", "sing-box", "clash", "mihomo", "zoogvpn")
     out = _run_decode(["route", "print", "-4"])
-    return any(mark in out.lower() for mark in ("wireguard", "wintun", "tap-windows", "vpn"))
+    lowered = out.lower()
+    return any(mark in lowered for mark in marks)
 
 
 def automatic_speed_test_plan():

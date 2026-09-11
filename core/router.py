@@ -605,26 +605,38 @@ def fmt_bytes(n):
 
 
 def start_mobile_hotspot():
-    """Windows 一键开启移动热点 (PowerShell 优先, netsh 兜底).
+    """Windows 一键开启移动热点。
+    真实可行的脚本化方式是 WinRT NetworkOperatorTetheringManager —— Windows
+    根本没有 `Start-MobileHotspot` cmdlet (旧代码调用了一个不存在的命令,
+    永远返回 FAIL); netsh hostednetwork 在新系统/新网卡上也被淘汰。
+    这里走 WinRT; 任何一步失败都如实提示, 并打开系统设置页让用户手动开。
     macOS 上 Internet Sharing 无法脚本化, 返 False 让调用方跳系统设置.
     返回: (ok: bool, message: str)."""
     if common.IS_MACOS:
         return False, "macOS 互联网共享不支持脚本化, 请手动到「系统设置 → 通用 → 共享」开启"
-    # 1) 优先 PowerShell Start-MobileHotspot (需要 Windows 10+ 且网卡支持)
+    winrt_script = (
+        "$profile = [Windows.Networking.Connectivity.NetworkInformation,"
+        "Windows.Networking.Connectivity,ContentType=WindowsRuntime]::GetInternetConnectionProfile(); "
+        "if (-not $profile) { Write-Output 'FAIL: no-active-connection'; exit }; "
+        "$mgr = [Windows.Networking.Connectivity.NetworkOperatorTetheringManager,"
+        "Windows.Networking.Connectivity,ContentType=WindowsRuntime]::CreateFromConnectionProfile($profile); "
+        "if ($mgr.TetheringOperationalState -eq 'On') { Write-Output 'OK'; exit }; "
+        "$null = $mgr.StartTetheringAsync(); "
+        "for ($i = 0; $i -lt 15; $i++) { Start-Sleep 1; "
+        "if ($mgr.TetheringOperationalState -eq 'On') { Write-Output 'OK'; exit } }; "
+        "Write-Output 'FAIL: timeout-or-denied'"
+    )
     out = netinfo._run_decode([
-        "powershell", "-NoProfile", "-Command",
-        "Start-MobileHotspot -ErrorAction SilentlyContinue; "
-        "if ($?) { 'OK' } else { 'FAIL' }"
-    ], timeout=15)
+        "powershell", "-NoProfile", "-Command", winrt_script
+    ], timeout=25)
     if "OK" in out:
-        return True, "已通过 PowerShell 启动移动热点"
-    # 2) 兜底: netsh hostednetwork (老 Win 支持)
-    out2 = netinfo._run_decode([
-        "netsh", "wlan", "start", "hostednetwork"
-    ], timeout=10)
-    if "started" in out2.lower() or "已启动" in out2 or "Started" in out2:
-        return True, "已通过 netsh 启动 hostednetwork 热点"
-    return False, "网卡可能不支持 hostednetwork, 请到「设置 → 移动热点」手动开启"
+        return True, "已通过系统接口启动移动热点"
+    open_hotspot_settings()
+    reason = ""
+    if "FAIL:" in out:
+        reason = out.split("FAIL:", 1)[1].strip().splitlines()[0] if out.split("FAIL:", 1)[1].strip() else ""
+    return False, ("无法脚本化开启热点%s, 已打开「设置 → 移动热点」, 请手动开启"
+                   % ("（%s）" % reason if reason else ""))
 
 
 def get_router_brand():

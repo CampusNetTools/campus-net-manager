@@ -131,41 +131,75 @@ def ensure_lida_profile(cfg):
     return True
 
 
+# 配置读写锁: 守护线程(自动切档案)与 GUI(保存档案)并发读写同一文件,
+# 无锁时 deepcopy/写文件交错可能丢失更新或写出半截文件。
+# 用可重入锁: load_config 持锁期间会调用 save_config(内部再取锁), 普通锁会死锁。
+_CONFIG_LOCK = threading.RLock()
+
+
 def load_config():
-    if not os.path.exists(common.CONFIG_PATH):
-        cfg = {"profiles": [lida_profile()], "active_profile": common.LIDA_PROFILE_NAME,
-               "auth_history": [common.DEFAULT_AUTH_URL]}
-        ensure_preferences(cfg)
+    """加载配置。文件损坏(半写/手改出错)时不再抛异常炸掉整个 App:
+    备份损坏文件为 config.json.corrupt-<时间戳>, 重建默认配置 ——
+    历史教训: save_config 非原子写 + 强杀进程会产生半截 JSON, 导致启动即崩。"""
+    with _CONFIG_LOCK:
+        if not os.path.exists(common.CONFIG_PATH):
+            cfg = {"profiles": [lida_profile()], "active_profile": common.LIDA_PROFILE_NAME,
+                   "auth_history": [common.DEFAULT_AUTH_URL]}
+            ensure_preferences(cfg)
+            return cfg
+        try:
+            with open(common.CONFIG_PATH, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            if not isinstance(cfg, dict):
+                raise ValueError("config.json 顶层不是对象")
+        except Exception:
+            try:
+                stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                os.replace(common.CONFIG_PATH,
+                           common.CONFIG_PATH + ".corrupt-" + stamp)
+                try:
+                    from core import sysutils as _sysutils
+                    _sysutils.log("配置文件损坏已备份为 config.json.corrupt-%s, 已重建默认配置" % stamp)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            cfg = {"profiles": [lida_profile()], "active_profile": common.LIDA_PROFILE_NAME,
+                   "auth_history": [common.DEFAULT_AUTH_URL]}
+            ensure_preferences(cfg)
+            return cfg
+        changed = False
+        # 兼容旧版单档案结构
+        if "profiles" not in cfg:
+            p = default_profile("校园网")
+            p.update({k: cfg.get(k) for k in ("username", "password", "login_type", "interval") if cfg.get(k) is not None})
+            cfg = {"profiles": [p], "active_profile": p["name"]}
+            changed = True
+        if ensure_lida_profile(cfg):
+            changed = True
+        if ensure_preferences(cfg):
+            changed = True
+        # 首次升级时把旧版明文密码迁移进钥匙串；配置文件只保留引用。
+        if common.IS_MACOS:
+            for profile in cfg.get("profiles", []):
+                password = profile.get("password", "")
+                secret_id = _profile_secret_id(profile)
+                if password and keychain_set(secret_id, password):
+                    profile["password_store"] = "keychain"
+                    changed = True
+                elif profile.get("password_store") == "keychain":
+                    profile["password"] = keychain_get(secret_id)
+        if changed:
+            _save_config_locked(cfg)   # 已持锁, 走内部实现避免重入开销
         return cfg
-    with open(common.CONFIG_PATH, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-    changed = False
-    # 兼容旧版单档案结构
-    if "profiles" not in cfg:
-        p = default_profile("校园网")
-        p.update({k: cfg.get(k) for k in ("username", "password", "login_type", "interval") if cfg.get(k) is not None})
-        cfg = {"profiles": [p], "active_profile": p["name"]}
-        changed = True
-    if ensure_lida_profile(cfg):
-        changed = True
-    if ensure_preferences(cfg):
-        changed = True
-    # 首次升级时把旧版明文密码迁移进钥匙串；配置文件只保留引用。
-    if common.IS_MACOS:
-        for profile in cfg.get("profiles", []):
-            password = profile.get("password", "")
-            secret_id = _profile_secret_id(profile)
-            if password and keychain_set(secret_id, password):
-                profile["password_store"] = "keychain"
-                changed = True
-            elif profile.get("password_store") == "keychain":
-                profile["password"] = keychain_get(secret_id)
-    if changed:
-        save_config(cfg)
-    return cfg
 
 
 def save_config(cfg, sync_secrets=False):
+    with _CONFIG_LOCK:
+        _save_config_locked(cfg, sync_secrets)
+
+
+def _save_config_locked(cfg, sync_secrets=False):
     ensure_preferences(cfg)
     disk_cfg = copy.deepcopy(cfg)
     if common.IS_MACOS:
@@ -180,8 +214,11 @@ def save_config(cfg, sync_secrets=False):
             if profile.get("password_store") == "keychain":
                 disk_profile["password"] = ""
                 disk_profile["password_store"] = "keychain"
-    with open(common.CONFIG_PATH, "w", encoding="utf-8") as f:
+    # 原子写: 先写临时文件再 os.replace, 避免写一半崩溃/断电损坏配置
+    tmp_path = common.CONFIG_PATH + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(disk_cfg, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, common.CONFIG_PATH)
 
 
 def config_for_export(cfg):

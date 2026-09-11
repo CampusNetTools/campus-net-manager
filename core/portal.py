@@ -103,7 +103,10 @@ def _run_captive_probe(probe, physical=True):
             head, _, body = text.partition("\n\n")
         return {"probe": probe, "status": status, "headers": head, "body": body[:65536]}
 
-    opener = urllib.request.build_opener(_NoRedirect)
+    # 不跟随跳转 + 绕过系统代理: 认证页探测若走 Clash 等代理,
+    # 结果反映代理出口状态, 会把"已认证"误判成"未认证"或反之。
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}), _NoRedirect())
     request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
         with opener.open(request, timeout=6) as response:
