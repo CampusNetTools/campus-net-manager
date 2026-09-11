@@ -87,7 +87,11 @@ def _run_captive_probe(probe, physical=True):
                         "error": "未找到物理网卡"}
             command[7:7] = ["--noproxy", "*", "--interface", interface]
         try:
-            result = subprocess.run(command, capture_output=True, timeout=8)
+            # Windows 下 curl.exe 是控制台程序, 必须隐藏窗口, 否则探测认证页时会闪黑框
+            run_kwargs = {"capture_output": True, "timeout": 8}
+            if common.IS_WINDOWS:
+                run_kwargs["creationflags"] = _NO_WINDOW
+            result = subprocess.run(command, **run_kwargs)
         except Exception as error:
             return {"probe": probe, "status": 0, "headers": "", "body": "", "error": str(error)}
         text = result.stdout.decode("utf-8", errors="replace")

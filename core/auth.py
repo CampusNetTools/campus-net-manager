@@ -23,13 +23,17 @@ def http_get(url, timeout=6, physical=False):
         if interface:
             curl = "/usr/bin/curl" if common.IS_MACOS else "curl"
             try:
+                # Windows 下 curl.exe 是控制台程序, 必须隐藏窗口, 否则每次探测都会闪黑框
+                run_kwargs = {"capture_output": True, "timeout": timeout + 2}
+                if common.IS_WINDOWS:
+                    run_kwargs["creationflags"] = _NO_WINDOW
                 result = subprocess.run(
                     [curl, "--silent", "--show-error", "--max-time", str(timeout),
                      "--noproxy", "*",
                      "--interface", interface, "--output", "-", "--write-out", "\n%{http_code}",
                      "--user-agent", "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",
                      url],
-                    capture_output=True, timeout=timeout + 2)
+                    **run_kwargs)
                 if result.returncode == 0 and b"\n" in result.stdout:
                     body, raw_status = result.stdout.rsplit(b"\n", 1)
                     return int(raw_status), body
