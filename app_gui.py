@@ -43,9 +43,10 @@ from gui.wizard import WizardMixin  # noqa: F401
 from gui.update_ui import UpdateUiMixin  # noqa: F401
 from gui.console_ui import ConsoleUiMixin  # noqa: F401
 from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
+from gui.device_manager import DeviceManagerMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -345,67 +346,72 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
                                    command=self._toggle_autostart)
         self.btn_auto.grid(row=2, column=1, sticky="ew", pady=(4, 0))
         self._update_auto_btn()
+        self.btn_devices = ttk.Button(nav, text="设备管理（固定在线 / 解除绑定）",
+                                      style="Gray.TButton",
+                                      command=lambda: self._fwin_open(
+                                          "device_manager", self.show_device_manager))
+        self.btn_devices.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # 共享上网
-        _sep(3, "共享上网")
+        _sep(4, "共享上网")
         self.btn_share = ttk.Button(nav, text="隧道共享（手机借电脑网上网）",
                                     style="Gray.TButton", command=self.toggle_share)
-        self.btn_share.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(3, 0))
+        self.btn_share.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(3, 0))
         ttk.Button(nav, text="热点分享", style="Gray.TButton",
-                   command=self.open_hotspot_window).grid(row=5, column=0, sticky="ew",
+                   command=self.open_hotspot_window).grid(row=6, column=0, sticky="ew",
                                                           padx=(0, 6), pady=(4, 0))
         self.btn_console = ttk.Button(nav, text="网络控制台", style="Gray.TButton",
                                       command=self.toggle_console)
-        self.btn_console.grid(row=5, column=1, sticky="ew", pady=(4, 0))
+        self.btn_console.grid(row=6, column=1, sticky="ew", pady=(4, 0))
 
         # VPN 加速
-        _sep(6, "VPN 加速")
+        _sep(7, "VPN 加速")
         self.lbl_vpn = ttk.Label(nav, text="", style="Muted.TLabel", wraplength=300,
                                  justify="left")
-        self.lbl_vpn.grid(row=7, column=0, columnspan=2, sticky="w", pady=(3, 0))
+        self.lbl_vpn.grid(row=8, column=0, columnspan=2, sticky="w", pady=(3, 0))
         ttk.Button(nav, text="配置 VPN 代理", style="Accent.TButton",
-                   command=self._vpn_open_dialog).grid(row=8, column=0, sticky="ew",
+                   command=self._vpn_open_dialog).grid(row=9, column=0, sticky="ew",
                                                        padx=(0, 6), pady=(4, 0))
         ttk.Button(nav, text="一键填本机 7890", style="Gray.TButton",
-                   command=self._vpn_preset_local).grid(row=8, column=1, sticky="ew",
+                   command=self._vpn_preset_local).grid(row=9, column=1, sticky="ew",
                                                         pady=(4, 0))
         self.btn_vpn_disable = ttk.Button(nav, text="停用 VPN 加速", style="Quiet.TButton",
                                           command=self._vpn_disable)
-        self.btn_vpn_disable.grid(row=9, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.btn_vpn_disable.grid(row=10, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # 路由器
-        _sep(10, "路由器")
+        _sep(11, "路由器")
         ttk.Button(nav, text="路由器中继", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router_relay", self.show_router_relay_window)).grid(
-                           row=11, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
+                           row=12, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
         ttk.Button(nav, text="路由器代理", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router_proxy", self.show_router_proxy_window)).grid(
-                           row=11, column=1, sticky="ew", pady=(3, 0))
+                           row=12, column=1, sticky="ew", pady=(3, 0))
         ttk.Button(nav, text="路由器检测", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router", self.show_router_assessment)).grid(
-                           row=12, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
+                           row=13, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
         ttk.Button(nav, text="路由器后台工作台", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router_console", self.show_router_console_window)).grid(
-                           row=12, column=1, sticky="ew", pady=(4, 0))
+                           row=13, column=1, sticky="ew", pady=(4, 0))
 
         # 工具
-        _sep(13, "工具")
+        _sep(14, "工具")
         ttk.Button(nav, text="网络测速", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "speed", self.show_speed_test)).grid(
-                           row=14, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
+                           row=15, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
         ttk.Button(nav, text="新手向导", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "wizard", self.show_wizard)).grid(
-                           row=14, column=1, sticky="ew", pady=(3, 0))
+                           row=15, column=1, sticky="ew", pady=(3, 0))
         ttk.Button(nav, text="偏好设置", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "prefs", self.show_preferences)).grid(
-                           row=15, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+                           row=16, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # ===== 底部: 可收起运行日志 (默认收起, 展开时自动加高窗口) =====
         log_card = ttk.Frame(page, style="Card.TFrame", padding=(18, 8))
