@@ -26,7 +26,7 @@ from core import selfservice  # noqa: F401
 from core import config, netinfo, router, sysutils  # noqa: F401
 
 
-APP_VERSION = "5.2.1"
+APP_VERSION = "5.2.2"
 APP_NAME = "校园网连接管家"
 
 
