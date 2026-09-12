@@ -31,7 +31,10 @@ def main(paths):
             continue
         digest = sha256_of_file(path)
         out_path = path + ".sha256"
-        with open(out_path, "w", encoding="ascii", newline="\n") as handle:
+        # 文件名可能含中文(如 校园网连接管家-v5.2.1-win64.exe), 必须用 UTF-8 写,
+        # 否则 ascii 编码在 Windows 上会 UnicodeEncodeError。客户端 parse_checksum_for
+        # 用 utf-8(errors=replace) 读取 + lower/endswith 匹配, 双向一致。
+        with open(out_path, "w", encoding="utf-8", newline="\n") as handle:
             handle.write("%s  %s\n" % (digest, os.path.basename(path)))
         print("%s  ->  %s" % (digest, out_path))
     return rc
