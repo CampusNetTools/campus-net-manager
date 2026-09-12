@@ -100,9 +100,12 @@ def check_for_update(current_version, timeout=10, opener=None):
             "assets": assets}
 
 
-# 规范资产命名: 校园网连接管家-<版本>-win64.exe / 校园网连接管家-macOS-arm64-<版本>.zip。
-# v5.2.1 起 Windows exe 统一改中文名「校园网连接管家」(与 macOS .app 一致);
-# 旧英文名 CampusNetManager-<版本>-*(连字符)仍视为规范;
+# 规范资产命名: CampusNetManager-<版本>-win64.exe / CampusNetManager-macOS-arm64-<版本>.zip。
+# 注: v5.2.1 曾尝试 Windows 资产名改中文「校园网连接管家-<tag>-win64.exe」, 但 GitHub
+# Release 对含非 ASCII 字符的资产名做规范化(剥掉中文前缀, 只剩 "-v5.2.1-win64.exe"),
+# 属平台层限制无法绕过, 故资产名回退 ASCII。exe 内部名仍是中文「校园网连接管家」,
+# 由 updater 下载后经 final_exe 重命名。这里「校园网连接管家」分支保留以兼容未来
+# GitHub 放开限制或其它镜像源。
 # 更旧的下划线命名 CampusNetManager_v*_* 是次选 —— 历史上 Release 里多个都传过,
 # 按顺序取第一个会取到 Mac 侧误传的重复包。
 _CANONICAL_ASSET = re.compile(

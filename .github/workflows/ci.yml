@@ -88,14 +88,15 @@ jobs:
             --collect-submodules core --collect-submodules gui \
             --distpath dist/windows --workpath build/pyinstaller-windows \
             app_gui.py
-          # 规范命名 校园网连接管家-<tag>-win64.exe: Windows exe 与 macOS .app 统一
-          # 用中文名「校园网连接管家」, 用户下载到的文件名不再是英文。
-          # 注: 中文文件名经 softprops/action-gh-release 上传时用 files 列表(非 glob),
-          # 不会被剥前导"-"; 客户端下载走 browser_download_url(已 URL 编码)。
+          # exe 内部名用中文「校园网连接管家」(标题栏/任务栏/快捷方式显示中文);
+          # 但 Release 资产名必须用 ASCII —— GitHub 对含非 ASCII 字符的资产名会做
+          # 规范化(剥掉中文前缀, 实测「校园网连接管家-v5.2.1-win64.exe」被剥成
+          # "-v5.2.1-win64.exe"), 这是平台层限制, 换上传方式无法绕过。
+          # 客户端 updater 下载后经 final_exe 自动重命名为「校园网连接管家.exe」。
           mv dist/windows/校园网连接管家.exe \
-             "dist/windows/校园网连接管家-${GITHUB_REF_NAME}-win64.exe"
+             "dist/windows/CampusNetManager-${GITHUB_REF_NAME}-win64.exe"
           python scripts/make_checksum.py \
-            "dist/windows/校园网连接管家-${GITHUB_REF_NAME}-win64.exe"
+            "dist/windows/CampusNetManager-${GITHUB_REF_NAME}-win64.exe"
 
       - name: 上传 macOS 资产到 Release
         if: matrix.target == 'macos'
@@ -112,7 +113,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/windows/校园网连接管家-${{ github.ref_name }}-win64.exe
-            dist/windows/校园网连接管家-${{ github.ref_name }}-win64.exe.sha256
+            dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe
+            dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
