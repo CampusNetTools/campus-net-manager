@@ -135,6 +135,66 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("PID eq 5678", s)
         self.assertIn("move /y", s)
 
+    def test_windows_script_renames_to_cn_and_cleans_stale(self):
+        """更新后统一重命名为中文规范名, 并删除旧英文/带版本号 exe。"""
+        s = updater.windows_apply_script(
+            r"C:\Downloads\CampusNetManager-v5.1.0-win64.exe",
+            r"C:\Downloads\校园网连接管家_new.exe", pid=5678,
+            stale_exe=[r"C:\Downloads\CampusNetManager.exe"],
+            final_exe=r"C:\Downloads\校园网连接管家.exe")
+        # 新文件落到中文规范名
+        self.assertIn('move /y "C:\\Downloads\\校园网连接管家_new.exe" '
+                      '"C:\\Downloads\\校园网连接管家.exe"', s)
+        # 旧 exe 被删除(带版本号的当前 exe + 无版本号旧英文 exe)
+        self.assertIn('del /f /q "C:\\Downloads\\CampusNetManager.exe"', s)
+        self.assertIn('del /f /q "C:\\Downloads\\CampusNetManager-v5.1.0-win64.exe"', s)
+        # 启动中文名
+        self.assertIn('start "" "C:\\Downloads\\校园网连接管家.exe"', s)
+
+    def test_windows_script_no_final_exe_keeps_original(self):
+        """缺省 final_exe 时仍覆盖原路径(向后兼容, 不误删自身)。"""
+        s = updater.windows_apply_script(r"C:\Apps\CampusNetManager.exe",
+                                         r"C:\Apps\CampusNetManager_new.exe", pid=5678)
+        self.assertIn('move /y "C:\\Apps\\CampusNetManager_new.exe" '
+                      '"C:\\Apps\\CampusNetManager.exe"', s)
+        # 不能把刚替换好的目标 exe 也写进删除名单
+        self.assertNotIn('del /f /q "C:\\Apps\\CampusNetManager.exe"', s)
+
+    def test_canonical_asset_matches_cn_name(self):
+        self.assertTrue(updater._CANONICAL_ASSET.match("校园网连接管家-v5.2.1-win64.exe"))
+        self.assertTrue(updater._CANONICAL_ASSET.match("校园网连接管家-macOS-arm64-v5.2.1.zip"))
+        # 旧英文连字符名仍兼容
+        self.assertTrue(updater._CANONICAL_ASSET.match("CampusNetManager-v5.2.0-win64.exe"))
+        # 更旧的下划线命名是次选(非规范), 保持向后兼容的优先级语义
+        self.assertIsNone(updater._CANONICAL_ASSET.match("CampusNetManager_v5.1.0_win64.exe"))
+
+    def test_pick_asset_cn_windows(self):
+        assets = [
+            {"name": "校园网连接管家-v9.9.9-win64.exe",
+             "browser_download_url": "https://x/cn.exe", "size": 100},
+            {"name": "CampusNetManager_v9.9.8_win64.exe",
+             "browser_download_url": "https://x/old.exe", "size": 90},
+        ]
+        a = updater.pick_asset(assets, "windows")
+        # 中文规范名优先于旧下划线英文名
+        self.assertEqual(a["name"], "校园网连接管家-v9.9.9-win64.exe")
+
+    def test_find_stale_executables(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            current = os.path.join(td, "校园网连接管家.exe")
+            old_en = os.path.join(td, "CampusNetManager.exe")
+            old_ver = os.path.join(td, "CampusNetManager-v5.1.0-win64.exe")
+            other = os.path.join(td, "readme.txt")
+            for p in (current, old_en, old_ver, other):
+                open(p, "wb").close()
+            stale = updater.find_stale_executables(td, current)
+            self.assertIn(old_en, stale)
+            self.assertIn(old_ver, stale)
+            # 不包含当前运行 exe 与无关文件
+            self.assertNotIn(current, stale)
+            self.assertNotIn(other, stale)
+
     @unittest.skipIf(os.name == "nt", "Windows 无可执行位语义")
     def test_write_script_executable(self):
         path = updater.write_apply_script("#!/bin/bash\necho hi\n", ".sh")

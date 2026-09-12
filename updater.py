@@ -100,11 +100,14 @@ def check_for_update(current_version, timeout=10, opener=None):
             "assets": assets}
 
 
-# 规范资产命名: CampusNetManager-<版本>-win64.exe / CampusNetManager-macOS-arm64-<版本>.zip。
-# 旧版 CI 产出的是下划线版本(CampusNetManager_v5.1.0_win64.exe), 视为次选 ——
-# 历史上 Release 里两个都传过, 按顺序取第一个会取到 Mac 侧误传的重复包。
+# 规范资产命名: 校园网连接管家-<版本>-win64.exe / 校园网连接管家-macOS-arm64-<版本>.zip。
+# v5.2.1 起 Windows exe 统一改中文名「校园网连接管家」(与 macOS .app 一致);
+# 旧英文名 CampusNetManager-<版本>-*(连字符)仍视为规范;
+# 更旧的下划线命名 CampusNetManager_v*_* 是次选 —— 历史上 Release 里多个都传过,
+# 按顺序取第一个会取到 Mac 侧误传的重复包。
 _CANONICAL_ASSET = re.compile(
-    r"^campusnetmanager-[^-]+-(win64|windows|macos|arm64)", re.IGNORECASE)
+    r"^(校园网连接管家|campusnetmanager)-[^-]+-(win64|windows|macos|arm64)",
+    re.IGNORECASE)
 
 
 def asset_candidates(assets, platform=None):
@@ -262,29 +265,76 @@ def download(url, dest, progress=None, timeout=60, opener=None, chunk_size=65536
 
 # ---------- 自替换脚本 ----------
 
-def macos_apply_script(app_path, new_app_path, pid=None):
-    """生成 bash 脚本: 等待当前进程退出 → 替换 .app → 去隔离属性 → 重新打开。"""
+def macos_apply_script(app_path, new_app_path, pid=None, stale_apps=()):
+    """生成 bash 脚本: 等待当前进程退出 → 替换 .app → 去隔离属性 → 重新打开。
+
+    stale_apps: 同目录下要清理的旧版本 .app(历史英文名 CampusNetManager.app 等),
+    在替换成功后 rm -rf, 保证目录里只留最新一个。"""
     pid = pid or os.getpid()
+    cleanup = ""
+    for stale in (stale_apps or ()):
+        if stale and os.path.normcase(os.path.abspath(stale)) != \
+                os.path.normcase(os.path.abspath(app_path)):
+            cleanup += 'rm -rf "%s"\n' % stale
     return """#!/bin/bash
 # CampusNetManager 自更新脚本 (生成后由 App 启动, 然后 App 退出)
 while kill -0 %d 2>/dev/null; do sleep 0.5; done
 sleep 1
 rm -rf "%s"
 mv "%s" "%s"
-xattr -dr com.apple.quarantine "%s" 2>/dev/null
+%sxattr -dr com.apple.quarantine "%s" 2>/dev/null
 open "%s"
 rm -f "$0"
-""" % (pid, app_path, new_app_path, app_path, app_path, app_path)
+""" % (pid, app_path, new_app_path, app_path, cleanup, app_path, app_path)
 
 
-def windows_apply_script(exe_path, new_exe_path, pid=None):
-    """生成 bat 脚本: 等待进程退出 → 替换 exe → 重启。
+def stale_version_patterns():
+    """返回「同目录下旧版本安装包」的文件名匹配模式(用于更新后清理残留)。
+
+    覆盖所有历史命名, 让用户目录里最终只剩当前运行的这一个 exe:
+    - 校园网连接管家.exe            (v5.2.1 起中文名, 无版本号)
+    - 校园网连接管家-vX.Y.Z-win64.exe
+    - CampusNetManager.exe          (v5.2.0 及以前英文名, 无版本号)
+    - CampusNetManager-vX.Y.Z-win64.exe / CampusNetManager_vX.Y.Z_win64.exe
+    """
+    return ("校园网连接管家*.exe", "CampusNetManager*.exe")
+
+
+def windows_apply_script(exe_path, new_exe_path, pid=None, stale_exe=(),
+                         final_exe=None):
+    """生成 bat 脚本: 等待进程退出 → 替换 exe → 清理同目录旧版本 → 重启。
+
+    exe_path:      当前正在运行的 exe 完整路径(等待其退出 + 作为兜底覆盖目标)。
+    new_exe_path:  已下载的新 exe 完整路径(move 的源)。
+    final_exe:     更新后希望保留的最终文件名(规范中文名「校园网连接管家.exe」)。
+                   缺省时=exe_path(即覆盖原路径, 保持原文件名)。
+                   若 final_exe != exe_path: 新文件落到 final_exe, 原 exe_path
+                   与其它旧版本一并删除, 目录里只留这一个规范名 exe。
+    stale_exe:     额外要删除的同目录旧版本 exe(历史英文名/带版本号残留)。
+
     编码: cmd 按系统 ANSI 代码页(中文 Windows=GBK)解码 bat —— write_apply_script
     对 .bat 用本地 ANSI 编码落盘, 中文路径(如 桌面\\校园网连接管家.exe)才能正确解析。
     find/timeout 必须用 System32 绝对路径: PATH 上若有 Git/MSYS 的 GNU find、
     GNU timeout, 裸命令名会被劫持, 导致等待循环与计时全部失效。"""
     pid = pid or os.getpid()
     sys32 = os.environ.get("SystemRoot", r"C:\Windows") + r"\System32"
+    final = final_exe or exe_path
+    # move 的目标: 若 final 与 exe_path 不同, 直接落到 final; 否则覆盖 exe_path。
+    move_target = final
+    cleanup = ""
+    # 清理名单: 旧 exe_path(若 != final) + 所有 stale, 去重且排除最终文件。
+    seen = set()
+    for stale in list(stale_exe or ()) + [exe_path]:
+        if not stale:
+            continue
+        if os.path.normcase(os.path.abspath(stale)) == \
+                os.path.normcase(os.path.abspath(final)):
+            continue
+        key = os.path.normcase(os.path.abspath(stale))
+        if key in seen:
+            continue
+        seen.add(key)
+        cleanup += 'if exist "%s" del /f /q "%s" >nul\n' % (stale, stale)
     return """@echo off
 rem CampusNetManager self-update script
 :wait
@@ -295,9 +345,42 @@ if not errorlevel 1 (
 )
 "%s\\timeout.exe" /t 1 /nobreak >nul
 move /y "%s" "%s" >nul
-start "" "%s"
+%sstart "" "%s"
 del "%%~f0"
-""" % (pid, sys32, pid, sys32, sys32, new_exe_path, exe_path, exe_path)
+""" % (pid, sys32, pid, sys32, sys32, new_exe_path, move_target, cleanup, final)
+
+
+def find_stale_executables(directory, current_exe):
+    """列出目录下应清理的旧版本 exe(不含当前运行的 exe)。
+
+    用 stale_version_patterns 的 glob 匹配, 排除 current_exe 本身 ——
+    供 GUI 在生成自替换脚本前枚举, 把旧版本名单写进脚本一次性清掉。
+    """
+    import glob
+    directory = os.path.abspath(directory)
+    current = os.path.normcase(os.path.abspath(current_exe))
+    stale = []
+    for pattern in stale_version_patterns():
+        for path in glob.glob(os.path.join(directory, pattern)):
+            if os.path.isfile(path) and os.path.normcase(os.path.abspath(path)) != current:
+                stale.append(path)
+    return sorted(set(stale))
+
+
+def find_stale_apps(directory, current_app):
+    """列出目录下应清理的旧版本 .app(不含当前运行的 .app)。
+
+    覆盖中文名「校园网连接管家.app」与历史英文名「CampusNetManager.app」两种,
+    让目录里最终只留最新一个。"""
+    import glob
+    directory = os.path.abspath(directory)
+    current = os.path.normcase(os.path.abspath(current_app))
+    stale = []
+    for pattern in ("校园网连接管家.app", "CampusNetManager.app"):
+        for path in glob.glob(os.path.join(directory, pattern)):
+            if os.path.isdir(path) and os.path.normcase(os.path.abspath(path)) != current:
+                stale.append(path)
+    return sorted(set(stale))
 
 
 def _bat_encoding():

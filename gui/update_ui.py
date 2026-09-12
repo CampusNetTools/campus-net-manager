@@ -203,18 +203,32 @@ class UpdateUiMixin:
                 exe = sys.executable
                 if ".app/Contents/MacOS" in exe:
                     current_app = exe.split(".app/Contents/MacOS")[0] + ".app"
+                # 清理同目录旧版本 .app(历史英文名 CampusNetManager.app 等)。
+                app_dir = os.path.dirname(current_app)
+                stale_apps = updater.find_stale_apps(app_dir, current_app)
                 script = updater.write_apply_script(
-                    updater.macos_apply_script(current_app, new_app), ".sh")
+                    updater.macos_apply_script(current_app, new_app, stale_apps=stale_apps),
+                    ".sh")
                 subprocess.Popen(["/bin/bash", script],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 current_exe = sys.executable
-                new_exe = os.path.join(os.path.dirname(current_exe),
-                                       "CampusNetManager_new.exe")
+                exe_dir = os.path.dirname(current_exe)
+                # 新 exe 用中文临时名(与正式名「校园网连接管家.exe」一致),
+                # 覆盖后不再残留英文 CampusNetManager_new.exe。
+                new_exe = os.path.join(exe_dir, "校园网连接管家_new.exe")
                 import shutil
                 shutil.move(path, new_exe)
+                # 最终统一成规范中文名「校园网连接管家.exe」: 无论用户当前跑的是
+                # 英文名(CampusNetManager.exe)还是带版本号(…-v5.1.0-win64.exe),
+                # 更新后都重命名成中文规范名, 并把旧 exe 一并清掉 —— 目录里只留最新一个。
+                final_exe = os.path.join(exe_dir, "校园网连接管家.exe")
+                # 枚举同目录旧版本 exe(中文名/英文名/带版本号), 排除最终文件与当前 exe。
+                stale = updater.find_stale_executables(exe_dir, current_exe)
                 script = updater.write_apply_script(
-                    updater.windows_apply_script(current_exe, new_exe), ".bat")
+                    updater.windows_apply_script(current_exe, new_exe,
+                                                 stale_exe=stale, final_exe=final_exe),
+                    ".bat")
                 subprocess.Popen(["cmd", "/c", script],
                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             messagebox.showinfo("自动更新", "下载完成，应用将退出并自动完成更新。", parent=self)

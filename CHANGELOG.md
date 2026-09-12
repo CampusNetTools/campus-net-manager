@@ -1,5 +1,11 @@
 # 更新记录
 
+## v5.2.1
+
+- **Windows 软件名统一改中文「校园网连接管家」**：打包产物从英文 `CampusNetManager.exe` 改为 `校园网连接管家.exe`（与 macOS `.app` 一致），发布资产名同步为 `校园网连接管家-<版本>-win64.exe`，用户下载到的不再是英文文件名。
+- **更新后只保留最新一个软件**：自动更新完成时，把新文件统一重命名为规范中文名 `校园网连接管家.exe`（无论之前跑的是英文名还是带版本号的旧名），并删除同目录下所有历史版本残留（`CampusNetManager*.exe`、`校园网连接管家-v*.exe` 等）。macOS 端同样清理旧英文名 `CampusNetManager.app`。旧的下划线命名（`CampusNetManager_v*_*`）仍作次选向后兼容，避免选到历史重复包。
+- 新增 `updater.find_stale_executables` / `find_stale_apps` 枚举待清理旧版本；`windows_apply_script` 增加 `final_exe` 参数支持「重命名为规范中文名 + 清理旧 exe」。
+
 ## v5.2.0
 
 - **新增「设备管理」窗口**（主窗导航「连接」分组新增入口），解决校园网单账号多设备的两个核心诉求：
