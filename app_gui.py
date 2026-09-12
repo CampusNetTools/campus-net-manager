@@ -34,6 +34,7 @@ from gui.profile_form import ProfileFormMixin  # noqa: F401
 from gui.router_tools import RouterToolsMixin  # noqa: F401
 from gui.router_proxy import RouterProxyMixin  # noqa: F401
 from gui.router_console_ui import RouterConsoleMixin  # noqa: F401
+from gui.connect_progress_ui import ConnectProgressMixin  # noqa: F401
 from gui.speed_window import SpeedWindowMixin  # noqa: F401
 from gui.tunnel_ui import TunnelUiMixin  # noqa: F401
 from gui.preferences import PreferencesMixin  # noqa: F401
@@ -46,7 +47,7 @@ from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
 from gui.device_manager import DeviceManagerMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -397,21 +398,25 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
                    command=lambda: self._fwin_open_legacy(
                        "router_console", self.show_router_console_window)).grid(
                            row=13, column=1, sticky="ew", pady=(4, 0))
+        ttk.Button(nav, text="连接进度（断电重启后看这里）", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "connect_progress", self.show_connect_progress_window)).grid(
+                           row=14, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # 工具
-        _sep(14, "工具")
+        _sep(15, "工具")
         ttk.Button(nav, text="网络测速", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "speed", self.show_speed_test)).grid(
-                           row=15, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
+                           row=16, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
         ttk.Button(nav, text="新手向导", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "wizard", self.show_wizard)).grid(
-                           row=15, column=1, sticky="ew", pady=(3, 0))
+                           row=16, column=1, sticky="ew", pady=(3, 0))
         ttk.Button(nav, text="偏好设置", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "prefs", self.show_preferences)).grid(
-                           row=16, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+                           row=17, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # ===== 底部: 可收起运行日志 (默认收起, 展开时自动加高窗口) =====
         log_card = ttk.Frame(page, style="Card.TFrame", padding=(18, 8))

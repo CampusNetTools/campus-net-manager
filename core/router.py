@@ -4,7 +4,7 @@ from core.common import *  # noqa: F401,F403
 from core import common  # noqa: F401
 from core import netinfo  # noqa: F401
 
-__all__ = ['OUI_BRANDS', '_arp_entries', 'get_gateway_mac', 'get_router_admin_url', '_private_http_url', 'parse_upnp_device_description', 'discover_router_upnp', 'inspect_router_admin', 'gen_tunnel_key', 'detect_gateway_mode', 'relay_stealth_check', 'vender_lookup', 'router_fingerprint', 'detect_router_hardware', 'evaluate_flash_readiness', 'hotspot_on', 'open_wifi_settings', 'open_hotspot_settings', 'get_router_brand', '_brand_relay_guide', 'router_guide', 'list_hotspot_clients', 'start_mobile_hotspot', 'fmt_bytes', 'lookup_firmware_urls', 'download_firmware', 'sha256_of_file']
+__all__ = ['OUI_BRANDS', '_arp_entries', 'get_gateway_mac', 'get_router_admin_url', '_private_http_url', 'parse_upnp_device_description', 'discover_router_upnp', 'inspect_router_admin', 'gen_tunnel_key', 'detect_gateway_mode', 'relay_stealth_check', 'vender_lookup', 'router_fingerprint', 'detect_router_hardware', 'evaluate_flash_readiness', 'hotspot_on', 'open_wifi_settings', 'open_hotspot_settings', 'get_router_brand', '_brand_relay_guide', 'router_guide', 'list_hotspot_clients', 'start_mobile_hotspot', 'fmt_bytes', 'lookup_firmware_urls', 'download_firmware', 'sha256_of_file', 'parse_keeper_log', '_median_gap_minutes', 'keeper_log_health', 'local_utc_offset_seconds', 'clock_skew_seconds', 'probe_tcp_port']
 
 OUI_BRANDS = {
     "D4:02:BC": "华为", "88:6B:0F": "华为", "90:9A:4A": "华为", "C0:25:06": "华为",
@@ -865,4 +865,246 @@ def download_firmware(url, save_path, expected_sha256="", progress_cb=None,
             return (True, "下载完成 (%.1f MB)" % (done / 1048576), sha)
     except Exception as exc:
         return (False, "下载失败: %s" % exc, "")
+
+
+# --------------------------------------------------------------------------- #
+# 路由器工作台运行时诊断 (v5.2.0)
+#   - parse_keeper_log / keeper_log_health: 守护日志(中继掉线重连)健康度
+#   - clock_skew_seconds: 用 HTTP Date 头测路由器时钟偏差
+#   - probe_tcp_port: SSH 等端口连通性自检
+# 纯逻辑、不依赖 GUI, 便于单元测试。跨模块调用一律 模块.名字(...)。
+# --------------------------------------------------------------------------- #
+_KEEPER_TS_RE = re.compile(r"(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})")
+_HTTP_DATE_RE = re.compile(r"(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})")
+_MONTH_ABBR = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _fmt_age_minutes(minutes):
+    """把"多少分钟前"格式化成中文短语。"""
+    try:
+        m = float(minutes)
+    except Exception:
+        return "未知"
+    if m < 0:
+        m = 0.0
+    if m < 1:
+        return "刚刚"
+    if m < 60:
+        return "%d 分钟前" % int(m)
+    if m < 60 * 24:
+        return "%.1f 小时前" % (m / 60.0)
+    return "%.1f 天前" % (m / 1440.0)
+
+
+def parse_keeper_log(raw, limit=30):
+    """把工作台 status.sh 的 log 字段解析成条目列表(按时间升序)。
+
+    条目之间以 "~" 分隔(兼容换行)。每个条目形如:
+        {"raw": "2026-09-11 21:53:46 自愈: 中继接口无 IP -> 已尝试重连 (ifup wwan)",
+         "ts": datetime(...), "reconnect": True}
+    时间解析失败时 ts 为 None(条目仍保留, 不丢信息)。limit>0 时只取最后 limit 条。
+    """
+    if not raw:
+        return []
+    parts = re.split(r"[~\n]+", str(raw).replace("\r", ""))
+    out = []
+    for part in parts:
+        text = part.strip()
+        if not text:
+            continue
+        ts = None
+        m = _KEEPER_TS_RE.search(text)
+        if m:
+            try:
+                ts = datetime.datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)),
+                                       int(m.group(4)), int(m.group(5)), int(m.group(6)))
+            except ValueError:
+                ts = None
+        out.append({
+            "raw": text,
+            "ts": ts,
+            "reconnect": ("无 IP" in text) or ("重连" in text),
+        })
+    if limit and limit > 0:
+        out = out[-limit:]
+    return out
+
+
+def _median_gap_minutes(entries):
+    """日志自身的采集节奏(相邻条目间隔的中位数, 分钟)。样本不足返回 None。"""
+    times = sorted(e["ts"] for e in entries if e.get("ts") is not None)
+    gaps = []
+    prev = None
+    for ts in times:
+        if prev is not None:
+            gap = (ts - prev).total_seconds() / 60.0
+            if gap > 0:
+                gaps.append(gap)
+        prev = ts
+    if not gaps:
+        return None
+    gaps.sort()
+    return gaps[len(gaps) // 2]
+
+
+def keeper_log_health(entries, now=None, clock_offset_sec=0, recent_minutes=180,
+                      stale_minutes=15, prev=None):
+    """守护日志健康度: 近期掉线重连次数 + 最近一次自愈距今多久。
+
+    clock_offset_sec: 路由器时钟相对本机的偏差(秒, 正 = 路由器偏快),
+                      用于把日志时间换算成本机时间 (见 clock_skew_seconds)。
+    prev:             上一次调用返回的健康度 dict。若本次最新条目文本与上次完全一致,
+                      说明两次检查之间没有任何新自愈事件 —— 这比看时间戳更可靠,
+                      因为日志时间戳会受路由器时钟漂移/被 NTP 校正的影响
+                      (曾出现: 时钟漂移期写入的时间戳, 校正后看着"很新", 实则早已停息)。
+    返回 dict:
+        entries            总条目数
+        reconnects         重连条目总数
+        recent_reconnects  最近 recent_minutes 分钟内的重连次数
+        last_age_min       最近一条记录距今(本机时间, 分钟); 无法解析为 None
+        cadence_min        日志采集节奏(中位数间隔, 分钟); 样本不足为 None
+        no_new_events      与 prev 相比本轮无新增事件
+        healthy            True = 当前应已稳定
+        clock_anomaly      最新日志时间明显落在未来(疑似时钟偏差)
+        summary            一句话中文摘要(供界面直接显示)
+    """
+    entries = list(entries or [])
+    now = now or datetime.datetime.now()
+    offset = datetime.timedelta(seconds=float(clock_offset_sec or 0))
+
+    def _age_min(entry):
+        ts = entry.get("ts")
+        if ts is None:
+            return None
+        try:
+            return (now - (ts - offset)).total_seconds() / 60.0
+        except Exception:
+            return None
+
+    last_entry = None
+    for e in entries:
+        if e.get("ts") is not None:
+            last_entry = e
+    last_age = _age_min(last_entry) if last_entry is not None else None
+    last_text = (last_entry or {}).get("raw", "")
+
+    reconnects = [e for e in entries if e.get("reconnect")]
+    recent = 0
+    for e in reconnects:
+        age = _age_min(e)
+        if age is not None and age <= recent_minutes:
+            recent += 1
+
+    cadence = _median_gap_minutes(entries)
+
+    # 跨次对比: 最新条目没变 = 本轮无新事件 (时间戳不可靠时的兜底判据)
+    no_new_events = False
+    if isinstance(prev, dict) and prev.get("last_text") is not None:
+        no_new_events = prev.get("last_text") == last_text
+
+    # 最近一次记录落在阈值内 = 此刻可能仍在掉线;
+    # 时间明显在未来(超出容差) = 路由器时钟偏差, 单独标注而不是当成风暴。
+    clock_anomaly = False
+    healthy = True
+    if last_age is not None:
+        if -stale_minutes <= last_age <= stale_minutes:
+            healthy = False
+        elif last_age < -stale_minutes:
+            clock_anomaly = True
+    # 有明确采集节奏时, 以"超过 2 个采集周期没有新条目"判定已停息,
+    # 比写死阈值更能适应不同管家配置(本机实测节奏约 6 分钟)。
+    if not healthy and last_age is not None and cadence:
+        healthy = last_age > max(2.0 * cadence, 8.0)
+    if no_new_events:
+        healthy = True
+        clock_anomaly = False
+
+    if not entries:
+        summary = "无记录"
+    elif no_new_events:
+        summary = "在岗 · 自上次检查无新增重连"
+    elif last_age is None:
+        summary = "在岗 · %d 条记录 (时间无法解析)" % len(entries)
+    elif clock_anomaly:
+        summary = "在岗 · 最新日志时间在未来 %s (疑似路由器时钟偏差)" % _fmt_age_minutes(abs(last_age))
+    elif healthy:
+        summary = "在岗 · 已稳定 (最近一次自愈 %s)" % _fmt_age_minutes(last_age)
+    else:
+        summary = "注意 · 最近一次自愈 %s 且仍在持续 (近期 %d 次)" % (
+            _fmt_age_minutes(last_age), recent)
+
+    return {
+        "entries": len(entries),
+        "reconnects": len(reconnects),
+        "recent_reconnects": recent,
+        "last_age_min": last_age,
+        "last_text": last_text,
+        "cadence_min": cadence,
+        "no_new_events": no_new_events,
+        "healthy": healthy,
+        "clock_anomaly": clock_anomaly,
+        "summary": summary,
+    }
+
+
+def local_utc_offset_seconds(now=None):
+    """本机时区相对 UTC 的偏移秒数 (如 UTC+8 -> 28800), 取不到返回 0。"""
+    try:
+        cur = now or datetime.datetime.now()
+        off = cur.astimezone().utcoffset()
+        return int(off.total_seconds()) if off is not None else 0
+    except Exception:
+        return 0
+
+
+def clock_skew_seconds(http_date_header, now=None, tz_offset_sec=0):
+    """解析 HTTP 响应 Date 头 与本机时间的偏差秒数 (正 = 路由器时钟偏快)。
+
+    tz_offset_sec: 路由器 Date 头把"本地时间标成 GMT"时需要传入本机时区偏移
+                   (见 local_utc_offset_seconds)。小米/OpenWrt 的 busybox uhttpd
+                   实测会把本地时间直接写成 GMT, 不传此参数会凭空多出 8 小时偏差。
+    解析失败返回 None。
+    """
+    m = _HTTP_DATE_RE.search(str(http_date_header or ""))
+    if not m:
+        return None
+    day, mon, year, hh, mm, ss = m.groups()
+    month = _MONTH_ABBR.get(mon.lower())
+    if not month:
+        return None
+    try:
+        remote = datetime.datetime(int(year), month, int(day), int(hh), int(mm), int(ss),
+                                   tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return None
+    current = now or datetime.datetime.now(datetime.timezone.utc)
+    try:
+        if current.tzinfo is None:
+            current = current.replace(tzinfo=datetime.timezone.utc)
+        current = current.astimezone(datetime.timezone.utc)
+    except Exception:
+        return None
+    try:
+        return int((remote - current).total_seconds()) - int(tz_offset_sec or 0)
+    except Exception:
+        return None
+
+
+def probe_tcp_port(host, port, timeout=2.0):
+    """TCP 端口连通性探测 (用于 SSH 22 / 工作台端口自检)。返回 True/False。"""
+    sock = None
+    try:
+        sock = socket.create_connection((str(host), int(port)), timeout=float(timeout))
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            if sock is not None:
+                sock.close()
+        except Exception:
+            pass
 
