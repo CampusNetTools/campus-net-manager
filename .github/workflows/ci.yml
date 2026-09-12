@@ -84,16 +84,18 @@ jobs:
         shell: bash
         run: |
           python -m PyInstaller --noconfirm --clean --onefile --windowed \
-            --name "CampusNetManager" --icon icon.ico --collect-all pystray \
+            --name "校园网连接管家" --icon icon.ico --collect-all pystray \
             --collect-submodules core --collect-submodules gui \
             --distpath dist/windows --workpath build/pyinstaller-windows \
             app_gui.py
-          # 规范命名 CampusNetManager-<tag>-win64.exe（连字符）: 旧的下划线命名会与
-          # Release 里遗留的重复包混淆, updater.pick_asset 也需要可辨认的规范名。
-          mv dist/windows/CampusNetManager.exe \
-             "dist/windows/CampusNetManager-${GITHUB_REF_NAME}-win64.exe"
+          # 规范命名 校园网连接管家-<tag>-win64.exe: Windows exe 与 macOS .app 统一
+          # 用中文名「校园网连接管家」, 用户下载到的文件名不再是英文。
+          # 注: 中文文件名经 softprops/action-gh-release 上传时用 files 列表(非 glob),
+          # 不会被剥前导"-"; 客户端下载走 browser_download_url(已 URL 编码)。
+          mv dist/windows/校园网连接管家.exe \
+             "dist/windows/校园网连接管家-${GITHUB_REF_NAME}-win64.exe"
           python scripts/make_checksum.py \
-            "dist/windows/CampusNetManager-${GITHUB_REF_NAME}-win64.exe"
+            "dist/windows/校园网连接管家-${GITHUB_REF_NAME}-win64.exe"
 
       - name: 上传 macOS 资产到 Release
         if: matrix.target == 'macos'
@@ -110,7 +112,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe
-            dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe.sha256
+            dist/windows/校园网连接管家-${{ github.ref_name }}-win64.exe
+            dist/windows/校园网连接管家-${{ github.ref_name }}-win64.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
