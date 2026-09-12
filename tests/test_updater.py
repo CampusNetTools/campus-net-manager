@@ -6,6 +6,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -222,6 +223,66 @@ class ThrottleTests(unittest.TestCase):
     def test_mark_checked(self):
         prefs = updater.mark_checked({})
         self.assertTrue(prefs["update_last_check"])
+
+    def test_unlink_quietly_swallows_errors(self):
+        """unlink_quietly 不会抛 OSError(用于清理残留 _new.exe)。"""
+        import tempfile
+        # 不存在的文件: 不抛
+        updater.unlink_quietly(r"C:\nonexistent\foo.exe")
+        # 已存在的文件: 删掉
+        with tempfile.TemporaryDirectory() as td:
+            p = os.path.join(td, "stale.exe")
+            open(p, "w").close()
+            updater.unlink_quietly(p)
+            self.assertFalse(os.path.exists(p))
+
+    @unittest.skipUnless(os.name == "nt", "Windows only: 重试真锁")
+    def test_move_with_retry_recovers_from_lock(self):
+        """模拟短持锁: 先抛 WinError 32, 等待 0.2s 后 release, 重试成功。
+
+        通过临时替换 updater.shutil.move 为 flaky 版本, 验证 _retry_on_lock
+        装饰器能正确捕获并重试, 而非 window 直接抛 PermissionError。"""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, "src.bin")
+            with open(src, "wb") as f:
+                f.write(b"hello world")
+            dst = os.path.join(td, "dst.bin")
+
+            call_count = {"n": 0}
+            original = updater.shutil.move
+
+            def flaky_move(s, d):
+                call_count["n"] += 1
+                if call_count["n"] == 1:
+                    time.sleep(0.2)
+                    raise PermissionError(32, "another process is using")
+                return original(s, d)
+
+            # 临时把 _retry_on_lock 的 base_delay 缩短, 让测试 <1s 完成
+            decorator = updater._retry_on_lock(max_attempts=4, base_delay=0.05)
+
+            @decorator
+            def move_under_test(s, d):
+                return flaky_move(s, d)
+
+            try:
+                move_under_test(src, dst)
+            finally:
+                updater.shutil.move = original
+
+            self.assertTrue(os.path.exists(dst))
+            with open(dst, "rb") as f:
+                self.assertEqual(f.read(), b"hello world")
+            self.assertGreaterEqual(call_count["n"], 2)
+
+    def test_retry_non_lock_error_reraises(self):
+        """非 WinError 32/33 异常立即透传, 不浪费重试。"""
+        @updater._retry_on_lock(max_attempts=3, base_delay=0.01)
+        def raise_value_error():
+            raise ValueError("not a lock")
+        with self.assertRaises(ValueError):
+            raise_value_error()
 
 
 if __name__ == "__main__":
