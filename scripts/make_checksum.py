@@ -11,6 +11,19 @@ import os
 import sys
 
 
+def _force_utf8_stdio():
+    """Windows runner 的 stdout 默认 cp1252，打印中文文件名会 UnicodeEncodeError。
+
+    GitHub Actions windows-latest 上 Python 输出走管道时按 ANSI 代码页(cp1252)编码，
+    含中文的路径(如 校园网连接管家-v5.2.1-win64.exe)会崩。强制 UTF-8 规避。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def sha256_of_file(path, chunk_size=1 << 20):
     digest = hashlib.sha256()
     with open(path, "rb") as handle:
@@ -41,4 +54,5 @@ def main(paths):
 
 
 if __name__ == "__main__":
+    _force_utf8_stdio()
     sys.exit(main(sys.argv[1:]))
