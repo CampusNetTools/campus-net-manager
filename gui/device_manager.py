@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
-"""设备管理窗口 Mixin (v5.2.0 新增)。
+"""设备管理窗口 Mixin (v5.2.0 新增, v5.2.2 数据源改 ePortal 门户)。
 
 提供两个能力, 对应校园网"单账号多设备"的两个诉求:
   1. 保护设备 —— 固定某台(路由器/本机)一直在线, 不被新登录的设备挤掉。
      底层靠守护的会话刷新(见 core/daemon.py 的 kick_guard + protected_device),
-     本窗口只负责开/关 + 命名 + 状态展示。
-  2. 在线设备管理 —— 拉取自助服务系统里的在线设备列表, 一键"解除绑定/踢下线",
-     把占用名额的其他设备挤掉。
+     本窗口只负责开/关 + 命名 + 状态展示。设备名可从在线列表"自动识别"回填,
+     无需手输。
+  2. 在线设备管理 —— 拉取 Dr.COM ePortal 门户的在线设备列表(含设备真实名
+     dhcp_host), 标记"当前设备", 一键把某台设为保护对象。
 
-自助服务接口在设备离开校园网时不可达, 本窗口对"拉取失败"做友好提示, 不崩。
+数据源见 core/selfservice.py (v5.2.2 起改为 ePortal 门户接口, 非自助服务)。
+设备离开校园网时接口不可达, 本窗口对"拉取失败"做友好提示, 不崩。
 """
 import threading  # noqa: F401
 import tkinter as tk  # noqa: F401
@@ -72,24 +74,28 @@ class DeviceManagerMixin:
         ttk.Checkbutton(protect_row, text="启用保护", style="Checkmark.TCheckbutton",
                         variable=var_protect).pack(side="left")
 
+        hint_row = ttk.Frame(card, style="Inner.TFrame")
+        hint_row.pack(fill="x", pady=(8, 0))
+        lbl_hint = ttk.Label(hint_row, text="设备名称只是给自己看的标签，可点“自动识别”从在线列表回填。",
+                             style="Muted.TLabel", wraplength=560, justify="left")
+        lbl_hint.pack(anchor="w")
+
         name_row = ttk.Frame(card, style="Inner.TFrame")
         name_row.pack(fill="x", pady=(8, 0))
         ttk.Label(name_row, text="设备名称", style="Field.TLabel").pack(side="left")
-        ent_name = ttk.Entry(name_row, width=30)
-        ent_name.insert(0, pd["name"] or "小米路由器")
+        name_var = tk.StringVar(value=pd["name"] or "")
+        self._protect_name_var = name_var
+        ent_name = ttk.Entry(name_row, width=26, textvariable=name_var)
         ent_name.pack(side="left", padx=(10, 0))
-
-        hint_row = ttk.Frame(card, style="Inner.TFrame")
-        hint_row.pack(fill="x", pady=(4, 0))
-        lbl_hint = ttk.Label(hint_row, text="", style="Muted.TLabel", wraplength=560,
-                             justify="left")
-        lbl_hint.pack(anchor="w")
+        btn_auto = ttk.Button(name_row, text="自动识别", style="Gray.TButton",
+                              command=lambda: self._auto_detect_name(lbl_hint))
+        btn_auto.pack(side="left", padx=(8, 0))
 
         def _render_protect_hint():
             if var_protect.get():
                 lbl_hint.configure(
                     text="保护模式已开启：守护将每轮循环刷新出口会话，确保“%s”不被挤掉。"
-                         % (ent_name.get().strip() or "该设备"))
+                         % (name_var.get().strip() or "该设备"))
             else:
                 lbl_hint.configure(text="保护模式关闭：守护按默认频率刷新会话。")
 
@@ -98,15 +104,15 @@ class DeviceManagerMixin:
 
         btn_save_protect = ttk.Button(card, text="保存保护设置", style="Accent.TButton",
                                       command=lambda: self._on_save_protect(
-                                          win, var_protect, ent_name))
+                                          win, var_protect))
         btn_save_protect.pack(anchor="w", pady=(10, 0))
 
         # ===== 二、在线设备 =====
         ttk.Separator(card, orient="horizontal").pack(fill="x", pady=(16, 12))
-        ttk.Label(card, text="在线设备（校园网自助服务）", style="CardSubTitle.TLabel").pack(
+        ttk.Label(card, text="在线设备（校园网门户）", style="CardSubTitle.TLabel").pack(
             anchor="w", pady=(0, 2))
-        ttk.Label(card, text="查看当前账号在校园网上的在线设备, 点“解除绑定”把占用名额的"
-                              "其他设备踢下线。需设备处于校园网环境。",
+        ttk.Label(card, text="查看当前账号在校园网上的在线设备。点“设为保护”把该设备名回填到"
+                              "上方；点“注销”下线当前设备（本机/路由器）。",
                   style="Muted.TLabel", wraplength=560, justify="left").pack(anchor="w")
 
         list_host = ttk.Frame(card, style="Inner.TFrame")
@@ -130,14 +136,45 @@ class DeviceManagerMixin:
         self.after(200, lambda: self._refresh_devices(list_host, status_lbl, refresh_btn))
 
     # ---------- 事件处理 ----------
-    def _on_save_protect(self, win, var_protect, ent_name):
-        name = ent_name.get().strip()
+    def _on_save_protect(self, win, var_protect):
+        name = (self._protect_name_var.get() if hasattr(self, "_protect_name_var")
+                else "").strip()
         ok = self._save_protected_device(var_protect.get(), name, "router")
         if ok:
             self._log("保护设备设置已保存: %s (%s)" % (
                 name or "未命名", "开启" if var_protect.get() else "关闭"))
             messagebox.showinfo("已保存", "保护设备设置已保存。守护会在下轮循环生效。",
                                 parent=win)
+
+    def _auto_detect_name(self, lbl_hint):
+        """从在线列表自动识别“当前设备”（本机/路由器出口）的名称并回填。"""
+        def work():
+            sess, err1 = core.selfservice.current_session(self.cfg)
+            devices, err2 = core.selfservice.fetch_online_devices(self.cfg)
+
+            def done():
+                if err1 and err2:
+                    lbl_hint.configure(text="自动识别失败：%s" % (err1 or err2))
+                    return
+                cur_ip = (sess or {}).get("ip") or ""
+                matched = None
+                for d in devices or []:
+                    if d.get("ip") and d.get("ip") == cur_ip:
+                        matched = d
+                        break
+                if matched and matched.get("name"):
+                    self._protect_name_var.set(matched["name"])
+                    lbl_hint.configure(
+                        text="已识别当前设备：%s（IP %s）。确认后点“保存保护设置”。"
+                             % (matched["name"], cur_ip))
+                else:
+                    lbl_hint.configure(
+                        text="未能在在线列表里找到当前设备（出口 IP %s），请手动填写名称。"
+                             % cur_ip)
+
+            self.after(0, done)
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _refresh_devices(self, list_host, status_lbl, refresh_btn):
         """异步拉取在线设备列表并渲染。"""
@@ -146,12 +183,15 @@ class DeviceManagerMixin:
 
         def work():
             devices, error = core.selfservice.fetch_online_devices(self.cfg)
+            sess, _ = core.selfservice.current_session(self.cfg)
+            cur_ip = (sess or {}).get("ip") or ""
             self.after(0, lambda: self._render_devices(
-                list_host, status_lbl, refresh_btn, devices, error))
+                list_host, status_lbl, refresh_btn, devices, error, cur_ip))
 
         threading.Thread(target=work, daemon=True).start()
 
-    def _render_devices(self, list_host, status_lbl, refresh_btn, devices, error):
+    def _render_devices(self, list_host, status_lbl, refresh_btn, devices, error,
+                        cur_ip=""):
         refresh_btn.configure(state="normal")
         for child in list_host.winfo_children():
             child.destroy()
@@ -164,8 +204,8 @@ class DeviceManagerMixin:
 
         if not devices:
             status_lbl.configure(text="无在线设备")
-            ttk.Label(list_host, text="未解析到在线设备（可能账号当前无设备在线，或自助"
-                                      "服务返回格式需校准）。", style="Muted.TLabel",
+            ttk.Label(list_host, text="未解析到在线设备（可能账号当前无设备在线，或门户"
+                                      "返回格式需校准）。", style="Muted.TLabel",
                       wraplength=540, justify="left").pack(anchor="w", pady=(6, 6))
             return
 
@@ -183,6 +223,7 @@ class DeviceManagerMixin:
                 row=0, column=col, sticky="w")
 
         for device in devices:
+            is_current = bool(cur_ip and device.get("ip") == cur_ip)
             row = ttk.Frame(list_host, style="Inner.TFrame", padding=(10, 4))
             row.pack(fill="x", pady=(2, 0))
             row.columnconfigure(0, weight=3)
@@ -191,6 +232,8 @@ class DeviceManagerMixin:
             row.columnconfigure(3, weight=2)
 
             name = device.get("name") or device.get("mac") or device.get("ip") or "未知设备"
+            if is_current:
+                name += "（本机/路由器）"
             ip = device.get("ip") or "—"
             mac = device.get("mac") or "—"
             ttk.Label(row, text=name, style="Card.TLabel").grid(
@@ -199,16 +242,32 @@ class DeviceManagerMixin:
                 row=0, column=1, sticky="w")
             ttk.Label(row, text=mac, style="Muted.TLabel").grid(
                 row=0, column=2, sticky="w")
-            btn = ttk.Button(row, text="解除绑定", style="Danger.TButton",
-                             command=lambda d=device, r=row: self._on_kick(d, r))
-            btn.grid(row=0, column=3, sticky="w")
+
+            ops = ttk.Frame(row, style="Inner.TFrame")
+            ops.grid(row=0, column=3, sticky="w")
+            btn_set = ttk.Button(ops, text="设为保护", style="Gray.TButton",
+                                 command=lambda d=device: self._set_protect_name(d))
+            btn_set.pack(side="left", padx=(0, 6))
+            btn_kick = ttk.Button(ops, text="注销" if is_current else "解除绑定",
+                                  style="Danger.TButton",
+                                  command=lambda d=device, r=row: self._on_kick(d, r))
+            btn_kick.pack(side="left")
+
+    def _set_protect_name(self, device):
+        name = device.get("name") or device.get("mac") or device.get("ip") or ""
+        if not name:
+            return
+        if hasattr(self, "_protect_name_var"):
+            self._protect_name_var.set(name)
+        self._log("已把保护设备名设为: %s" % name)
+        messagebox.showinfo("已设为保护设备名", "已把设备名称回填为「%s」。\n请在“保护设备”区域确认并保存。" % name, parent=self)
 
     def _on_kick(self, device, row):
         name = device.get("name") or device.get("ip") or device.get("mac") or "该设备"
         if not messagebox.askyesno(
-                "确认解除绑定",
-                "确定要把「%s」从校园网强制下线吗？\n\n该设备会立即断网，此操作不可撤销。"
-                % name, parent=self):
+                "确认下线",
+                "确定要对「%s」执行下线操作吗？\n\n当前设备（本机/路由器）下线后守护会自动重连；"
+                "其他设备需学校开放用户侧远程下线接口才能在此处操作。" % name, parent=self):
             return
 
         def work():
@@ -219,12 +278,12 @@ class DeviceManagerMixin:
 
     def _kick_done(self, row, ok, error, name):
         if ok:
-            self._log("已解除绑定: %s" % name)
-            messagebox.showinfo("已解除", "「%s」已从校园网下线。" % name, parent=self)
+            self._log("已下线: %s" % name)
+            messagebox.showinfo("已下线", "「%s」已从校园网下线。" % name, parent=self)
             # 行置灰标记
             for child in row.winfo_children():
                 if isinstance(child, ttk.Label):
                     child.configure(style="Muted.TLabel")
         else:
-            self._log("解除绑定失败: %s" % error)
+            self._log("下线失败: %s" % error)
             messagebox.showerror("操作失败", error or "未知错误", parent=self)

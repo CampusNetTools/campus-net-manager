@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""v5.2.0 设备管理功能回归测试。
+"""v5.2.2 设备管理回归测试 (数据源改为 Dr.COM ePortal 门户)。
 
 覆盖:
 - config: protected_device 默认值 + ensure_preferences 补齐(含嵌套 dict)
-- selfservice.discover_selfservice_url: 由认证地址推导自助服务地址
-- selfservice.SelfServiceClient._parse_devices: JSON / HTML 两种列表解析
-- selfservice.SelfServiceClient._is_logged_in / _is_kick_success 判据
-- selfservice.fetch_online_devices / kick_device: 无凭据时优雅报错(不崩)
+- selfservice.discover_selfservice_url: 由认证地址推导 ePortal 门户地址(801)
+- selfservice._jsonp_load: JSONP 解析(含 Dr.COM 实际返回的结尾分号)
+- selfservice._device_from_row: online_list 行 -> 统一设备 dict 映射
+- selfservice.fetch_online_devices / kick_device: 无凭据优雅报错 + 远程下线拒绝
 - daemon 保护模式: protected_device.enabled 时刷新阈值降为 1
 """
 import json
@@ -33,7 +33,6 @@ class ProtectedDeviceConfigTests(unittest.TestCase):
         config.ensure_preferences(cfg)
         self.assertEqual(cfg["protected_device"]["enabled"], False)
 
-        # 已存在部分字段时, 只补缺不覆盖
         cfg2 = {"protected_device": {"enabled": True, "name": "小米路由器"}}
         config.ensure_preferences(cfg2)
         self.assertEqual(cfg2["protected_device"]["enabled"], True)
@@ -46,93 +45,120 @@ class ProtectedDeviceConfigTests(unittest.TestCase):
         self.assertEqual(cfg["protected_device"]["enabled"], False)
 
 
-class DiscoverSelfServiceUrlTests(unittest.TestCase):
-    def test_derives_port_and_path(self):
+class DiscoverPortalUrlTests(unittest.TestCase):
+    def test_derives_eportal_port_801(self):
+        # v5.2.2: 不再猜 8080/Self/, 而是认证主机 801 端口的 ePortal 门户
         self.assertEqual(
             selfservice.discover_selfservice_url("http://192.168.16.3/"),
-            "http://192.168.16.3:8080/Self/")
+            "http://192.168.16.3:801")
 
-    def test_preserves_existing_8080_or_self(self):
-        # 已含 8080/Self 的地址直接沿用(去掉尾部斜杠, 下游拼接前会统一 rstrip)
+    def test_strips_existing_port(self):
         self.assertEqual(
-            selfservice.discover_selfservice_url("http://192.168.16.3:8080/Self/"),
-            "http://192.168.16.3:8080/Self")
+            selfservice.discover_selfservice_url("http://192.168.16.3:8080/"),
+            "http://192.168.16.3:801")
 
     def test_none_on_empty(self):
         self.assertIsNone(selfservice.discover_selfservice_url(""))
 
 
-class ParseDevicesTests(unittest.TestCase):
-    def test_json_array(self):
-        text = json.dumps([
-            {"id": "s1", "name": "手机", "ip": "10.52.163.90", "mac": "aa:bb:cc:dd:ee:ff"},
-            {"sessionId": "s2", "ip": "10.52.163.91"},
-        ])
-        devices = selfservice.SelfServiceClient._parse_devices(text)
-        self.assertEqual(len(devices), 2)
-        self.assertEqual(devices[0]["ip"], "10.52.163.90")
-        self.assertEqual(devices[1]["id"], "s2")
+class JsonpLoadTests(unittest.TestCase):
+    def test_parses_jsonp_with_trailing_semicolon(self):
+        # Dr.COM 实际返回 callback({...}); —— 结尾带分号
+        text = 'dr1003({"result":1,"list":[{"a":1}]});'
+        self.assertEqual(selfservice._jsonp_load(text)["result"], 1)
 
-    def test_json_wrapped_in_rows(self):
-        text = json.dumps({"rows": [{"id": "x1", "ip": "10.0.0.1"}]})
-        devices = selfservice.SelfServiceClient._parse_devices(text)
-        self.assertEqual(len(devices), 1)
-        self.assertEqual(devices[0]["id"], "x1")
+    def test_parses_jsonp_without_semicolon(self):
+        text = 'dr1003({"result":1});'
+        self.assertEqual(selfservice._jsonp_load(text)["result"], 1)
 
-    def test_html_table_rows(self):
-        text = ("<table><tr><td>s1</td><td>iPhone</td><td>10.52.163.90</td>"
-                "<td>aa:bb:cc:dd:ee:ff</td></tr></table>")
-        devices = selfservice.SelfServiceClient._parse_devices(text)
-        self.assertEqual(len(devices), 1)
-        self.assertEqual(devices[0]["ip"], "10.52.163.90")
-        self.assertEqual(devices[0]["mac"], "aa:bb:cc:dd:ee:ff")
+    def test_parses_plain_json(self):
+        self.assertEqual(selfservice._jsonp_load('{"a": 1}')["a"], 1)
 
-    def test_empty_on_garbage(self):
-        self.assertEqual(
-            selfservice.SelfServiceClient._parse_devices("<html>no devices</html>"), [])
+    def test_raises_on_garbage(self):
+        with self.assertRaises(ValueError):
+            selfservice._jsonp_load("not json at all")
 
 
-class LoginAndKickJudgeTests(unittest.TestCase):
-    def test_logged_in_detection(self):
-        self.assertTrue(selfservice.SelfServiceClient._is_logged_in(
-            200, "用户信息 在线 注销"))
-        self.assertFalse(selfservice.SelfServiceClient._is_logged_in(
-            200, "密码错误，请重试"))
+class DeviceFromRowTests(unittest.TestCase):
+    def test_maps_online_list_row(self):
+        row = {
+            "online_session": 10353,
+            "online_ip": "10.52.163.90",
+            "online_mac": "56926a2d0a6e",
+            "dhcp_host": "MiWiFi-RD08",
+            "online_time": "2026-09-12 13:32:05",
+            "time_long": "28731",
+            "uplink_bytes": "889520",
+            "downlink_bytes": "7096654",
+        }
+        d = selfservice._device_from_row(row)
+        self.assertEqual(d["id"], "10353")
+        self.assertEqual(d["name"], "MiWiFi-RD08")
+        self.assertEqual(d["ip"], "10.52.163.90")
+        self.assertEqual(d["mac"], "56926a2d0a6e")
+        self.assertEqual(d["time"], "2026-09-12 13:32:05")
+        self.assertEqual(d["duration"], "28731")
 
-    def test_kick_success_detection(self):
-        self.assertTrue(selfservice.SelfServiceClient._is_kick_success(
-            200, "下线成功", "s1"))
-        self.assertTrue(selfservice.SelfServiceClient._is_kick_success(
-            200, "ok", "s1"))
-        # 200 且不再含会话 id 也视为可能成功
-        self.assertTrue(selfservice.SelfServiceClient._is_kick_success(
-            200, "no session here", "s1"))
+    def test_name_falls_back_to_mac(self):
+        d = selfservice._device_from_row(
+            {"online_session": 1, "online_mac": "aa:bb:cc:dd:ee:ff"})
+        self.assertEqual(d["name"], "aa:bb:cc:dd:ee:ff")
+
+    def test_name_prefers_dhcp_host_over_alias(self):
+        d = selfservice._device_from_row(
+            {"online_session": 1, "dhcp_host": "MiWiFi-RD08",
+             "device_alias": "我的路由器"})
+        self.assertEqual(d["name"], "MiWiFi-RD08")
 
 
 class FetchAndKickGuardTests(unittest.TestCase):
-    def test_fetch_without_credentials_graceful(self):
-        cfg = {"profiles": [{"name": "p", "username": "", "password": "",
-                             "auth_url": core.DEFAULT_AUTH_URL}],
-               "active_profile": "p"}
-        devices, error = selfservice.fetch_online_devices(cfg)
+    def _cfg_no_username(self):
+        return {"profiles": [{"name": "p", "username": "", "password": "",
+                              "auth_url": core.DEFAULT_AUTH_URL}],
+                "active_profile": "p"}
+
+    def test_fetch_without_username_graceful(self):
+        devices, error = selfservice.fetch_online_devices(self._cfg_no_username())
         self.assertEqual(devices, [])
-        self.assertIn("账号密码", error)
+        self.assertIn("账号", error)
 
-    def test_kick_without_credentials_graceful(self):
-        cfg = {"profiles": [{"name": "p", "username": "", "password": "",
+    def test_kick_without_username_graceful(self):
+        ok, error = selfservice.kick_device(self._cfg_no_username(), {"id": "x"})
+        self.assertFalse(ok)
+        self.assertIn("账号", error)
+
+    def test_kick_other_device_rejected(self):
+        # 学校门户 logout 只能注销"源 IP"(本机/路由器), 无法远程下线其他设备
+        cfg = {"profiles": [{"name": "p", "username": "u", "password": "pwd",
                              "auth_url": core.DEFAULT_AUTH_URL}],
                "active_profile": "p"}
-        ok, error = selfservice.kick_device(cfg, {"id": "x"})
-        self.assertFalse(ok)
-        self.assertIn("账号密码", error)
+        with patch.object(selfservice, "SelfServiceClient") as MockClient:
+            mock_client = MockClient.return_value
+            mock_client.current_session.return_value = {
+                "ip": "10.52.163.90", "mac": "x", "uid": "u@cmcc",
+                "online": True}
+            ok, error = selfservice.kick_device(
+                cfg, {"id": "20019", "ip": "10.52.177.199"})
+            self.assertFalse(ok)
+            self.assertIn("远程下线", error)
+            # 不应调用 logout
+            mock_client.logout.assert_not_called()
 
-    def test_kick_missing_device_id(self):
-        # 设备没有任何可定位的字段 -> 明确报错, 不瞎发请求
-        client = selfservice.SelfServiceClient(
-            "http://192.168.16.3:8080/Self/", "u", "pwd")
-        with patch.object(client, "login", return_value=True):
-            with self.assertRaises(selfservice.SelfServiceError):
-                client.kick_device({"name": "无标识设备"})
+    def test_kick_current_device_calls_logout(self):
+        cfg = {"profiles": [{"name": "p", "username": "u", "password": "pwd",
+                             "auth_url": core.DEFAULT_AUTH_URL}],
+               "active_profile": "p"}
+        with patch.object(selfservice, "SelfServiceClient") as MockClient:
+            mock_client = MockClient.return_value
+            mock_client.current_session.return_value = {
+                "ip": "10.52.163.90", "mac": "x", "uid": "u@cmcc",
+                "online": True}
+            mock_client.logout.return_value = (True, "已注销")
+            ok, error = selfservice.kick_device(
+                cfg, {"id": "10353", "ip": "10.52.163.90"})
+            self.assertTrue(ok)
+            self.assertIsNone(error)
+            mock_client.logout.assert_called_once()
 
 
 class DaemonProtectModeTests(unittest.TestCase):
@@ -153,9 +179,6 @@ class DaemonProtectModeTests(unittest.TestCase):
         return d
 
     def test_protect_flag_reflects_config(self):
-        from core import daemon
-        # 用反射触发 run 里的初始化分支不方便, 这里直接验证配置读取逻辑的等价形式:
-        # 守护在首轮会读 cfg["protected_device"]["enabled"] 决定 _protect。
         d = self._make_daemon(True)
         self.assertTrue(d.cfg["protected_device"]["enabled"])
         d2 = self._make_daemon(False)
