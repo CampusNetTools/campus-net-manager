@@ -217,8 +217,14 @@ class UpdateUiMixin:
                 # 新 exe 用中文临时名(与正式名「校园网连接管家.exe」一致),
                 # 覆盖后不再残留英文 CampusNetManager_new.exe。
                 new_exe = os.path.join(exe_dir, "校园网连接管家_new.exe")
-                import shutil
-                shutil.move(path, new_exe)
+                # 先清掉上一轮残留的 _new.exe(若上次更新中途中断, 该残留文件
+                # 偶发被 Defender 短持锁, 下面 move 覆盖它必抛 WinError 32)。
+                updater.unlink_quietly(new_exe)
+                # 用 shutil.move + Windows 文件锁自动重试替换裸调用。
+                # 旧实现是 shutil.move 无重试, Defender/PopServ 偶发短持锁直接
+                # 弹 WinError 32, 误导用户以为"自动更新失败"。最多重试 6 次, 累计
+                # 等待 ≤16s, 完全覆盖 Defender 短锁的 0.5~2s 持续时长。
+                updater.move_with_retry(path, new_exe)
                 # 最终统一成规范中文名「校园网连接管家.exe」: 无论用户当前跑的是
                 # 英文名(CampusNetManager.exe)还是带版本号(…-v5.1.0-win64.exe),
                 # 更新后都重命名成中文规范名, 并把旧 exe 一并清掉 —— 目录里只留最新一个。

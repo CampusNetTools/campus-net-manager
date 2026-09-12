@@ -1,5 +1,10 @@
 # 更新记录
 
+## v5.2.3
+
+- **修复自动更新 WinError 32**：「应用更新失败：[WinError 32] 另一个程序正在使用此文件」是 Windows Defender / PopService 扫描刚写入的 exe 时短持锁（0.5~2s）触发的，shutil.move 内置不重试直接抛错。现在 `updater.move_with_retry` 最多重试 6 次、间隔指数退避（0.5s/1s/2s/4s/8s，累计 ≤16s），完全覆盖 Defender 短持锁时长；非 WinError 32/33 的异常立即透传，不浪费重试。在「校园网连接管家_new.exe」move 之前先 `unlink_quietly` 清掉上轮残留的同名文件（上次更新中断留下的，避免 move 覆盖锁文件）。
+- 升级器 fallback 路径：`unlink_quietly(path)` best-effort 删除（吞 OSError）；`_retry_on_lock` 装饰器（仅 Windows 生效）；`move_with_retry(src, dst)` 公开 API。新增 3 个测试（unlink_quietly、模拟短锁重试恢复、非锁异常透传），unittest 24 项全绿、ruff 干净。
+
 ## v5.2.2
 
 - **修复「设备管理」在线设备列表拉取失败**：v5.2.0 猜的 Dr.COM 自助服务地址 `8080/Self/` 在立达学院并未部署（认证服务器只开 80 登录页 + 801 ePortal 门户），导致「刷新设备列表」所有请求连不上、被误报成"自助服务登录失败"。实测校准后改用 Dr.COM 哆点 ePortal 门户接口 `http://<认证主机>:801/eportal/portal/online_list`，仅凭 `user_account`（账号@运营商后缀）即可返回当前账号下所有在线设备，无需登录自助服务、甚至不需要密码。

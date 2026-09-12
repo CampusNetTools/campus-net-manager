@@ -15,10 +15,12 @@ import json
 import locale
 import os
 import re
+import shutil
 import ssl
 import stat
 import sys
 import tempfile
+import time
 import urllib.request
 import urllib.error
 
@@ -149,6 +151,50 @@ def pick_asset(assets, platform=None):
 
 _HEX64 = re.compile(r"\b([0-9a-fA-F]{64})\b")
 _CHECKSUM_NAMES = ("sha256sums", "sha256sums.txt", "sha256sum", "checksums.txt")
+
+
+def _retry_on_lock(max_attempts=6, base_delay=0.5):
+    """装饰器: 遇 Windows 文件锁 WinError 32/33 时按指数退避自动重试。
+
+    第 1 次立即, 之后 0.5s/1s/2s/4s/8s, 最多 6 次。仅在 Windows 生效。"""
+    def deco(fn):
+        def wrapper(*args, **kwargs):
+            if os.name != "nt":
+                return fn(*args, **kwargs)
+            delay = 0.0
+            last_err = None
+            for attempt in range(max_attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except (PermissionError, OSError) as e:
+                    err_no = e.errno if e.errno else getattr(e, "winerror", None)
+                    if err_no not in (32, 33):
+                        raise
+                    last_err = e
+                    if attempt < max_attempts - 1:
+                        time.sleep(delay)
+                        delay = base_delay * (2 ** attempt)
+            raise last_err  # type: ignore[misc]
+        return wrapper
+    return deco
+
+
+@_retry_on_lock()
+def move_with_retry(src, dst):
+    """shutil.move 的增强版: 遇 Windows 文件锁自动重试。
+
+    写 20MB exe 时, Defender/PopService 偶发短持锁 0.5~2s, shutil.move
+    内置不重试, 必抛 WinError 32。该函数最多重试 6 次(cumulative ≤ 16s)。"""
+    return shutil.move(src, dst)
+
+
+def unlink_quietly(path):
+    """best-effort unlink: 忽略任何错误。用于清理上轮残留(同目录 _new.exe 等)。"""
+    try:
+        if path and os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
 
 
 def sha256_of_file(path, chunk_size=1 << 20):
