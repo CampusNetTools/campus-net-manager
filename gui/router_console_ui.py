@@ -1,17 +1,24 @@
 # -*- coding: utf-8 -*-
-"""「路由器后台工作台」窗口 Mixin (v5.1.0 新增)。
+"""「路由器后台工作台」窗口 Mixin (v5.1.0 新增, v5.2.0 扩展)。
 
-把部署在路由器上的监控工作台 (uhttpd :8088) 融合进管家:
+把部署在路由器上的监控工作台 (uhttpd :8088) 与其它"管理界面看不到"的路由器侧
+能力全部融合进管家:
 
   1. 直接读取路由器控制台的状态接口 (HTTP JSON), 不依赖 SSH / paramiko
   2. 实时展示: 无线中继 / 本机 AP / 校园网认证 / 外网 / 透明代理 / VPN /
      SSH / 防护开关(OTA/MLO) / 系统信息 / 守护日志
   3. 一键操作: 重启透明代理 / 重启 VPN / 重新登录校园网 / 重连中继 /
-     重启 WiFi / 重启路由器
+     重启 WiFi / 重启路由器 / 清空守护日志
   4. 可视化切换中继目标 (换成其它校园网 SSID, 不必再登 SSH)
+  5. v5.2.0 新增「深度自检」: SSH 22 端口连通性 / 校园网认证台可用性 /
+     路由器时钟偏差 / 守护自愈健康度(掉线重连风暴识别), 并给出中文结论
+  6. v5.2.0 新增: 打开 mihomo 控制面板 (9091) / MLO(hostapd) 状态 /
+     三套密码(管理密码 / SSH 密码 / 校园网账号)关系说明
 
 设计取舍: 只做 HTTP 客户端。路由器侧的工作台 + 守护脚本 (campus-keeper.sh)
 负责采集与自愈; 本窗口只做展示与下发指令, 因此路由器不在线时窗口安全性不受影响。
+诊断计算全部落在 core.router 的纯函数里 (parse_keeper_log / keeper_log_health /
+clock_skew_seconds / probe_tcp_port), 便于单元测试。
 """
 import json
 import threading
@@ -23,6 +30,7 @@ from urllib.error import URLError
 from urllib.parse import urlencode
 
 import keepalive_core as core
+from core import router as core_router
 
 from gui.theme import *  # noqa: F401,F403
 from gui.scrollkit import fit_geometry  # noqa: F401
@@ -30,8 +38,36 @@ from gui.scrollkit import fit_geometry  # noqa: F401
 # 路由器工作台默认参数 (与 /data/other_vol/console 部署一致)
 RC_DEFAULT_HOST = "192.168.31.1"
 RC_DEFAULT_PORT = 8088
-RC_DEFAULT_TOKEN = "12345678"
+RC_DEFAULT_TOKEN = "20050927"
 RC_TIMEOUT = 12
+RC_SSH_PORT = 22
+# 校园网认证台 (portal_auth 配置台) 部署在路由器 LAN:8080
+RC_PORTAL_CONSOLE_PORT = 8080
+RC_PROXY_PANEL_PORT = 9091
+
+
+def rc_server_date(base):
+    """取路由器 HTTP 响应里的 Date 头。
+
+    工作台的 CGI (status.sh) 响应不带 Date, 只有静态面板页 / 带, 所以单独取一次。
+    busybox uhttpd 实测会把本地时间直接标成 GMT, 因此这里只返回原始字符串,
+    由调用方配合 core_router.local_utc_offset_seconds() 换算出真实时钟偏差。
+    """
+    try:
+        with urlrequest.urlopen(base + "/", timeout=RC_TIMEOUT) as resp:
+            return resp.headers.get("Date")
+    except Exception:
+        return None
+
+
+def rc_clock_skew(base):
+    """工作台对应路由器相对本机的时钟偏差秒数 (已做 busybox 时区标注校正)。"""
+    try:
+        return core_router.clock_skew_seconds(
+            rc_server_date(base),
+            tz_offset_sec=core_router.local_utc_offset_seconds())
+    except Exception:
+        return None
 
 
 class RouterConsoleMixin:
@@ -152,11 +188,28 @@ class RouterConsoleMixin:
                        command=lambda o=op, d=danger: self._rc_action(o, confirm=d)).grid(
                 row=idx // 3, column=idx % 3, sticky="ew", padx=(0, 6), pady=(0, 6))
 
+        # ---------- 工具 / 自检 (v5.2.0) ----------
+        ttk.Label(card, text="工具 / 自检", style="Field.TLabel").grid(
+            row=7, column=0, sticky="w", pady=(4, 4))
+        tools = ttk.Frame(card, style="Card.TFrame")
+        tools.grid(row=8, column=0, sticky="ew")
+        for i in range(3):
+            tools.columnconfigure(i, weight=1, uniform="rcact")
+        ttk.Button(tools, text="深度自检 (SSH/认证台/时钟/守护)",
+                   command=self._rc_deep_check).grid(
+            row=0, column=0, sticky="ew", padx=(0, 6), pady=(0, 6))
+        ttk.Button(tools, text="打开代理面板 (9091)", style="Gray.TButton",
+                   command=self._rc_open_proxy_panel).grid(
+            row=0, column=1, sticky="ew", padx=(0, 6), pady=(0, 6))
+        ttk.Button(tools, text="清空守护日志", style="Gray.TButton",
+                   command=lambda: self._rc_action("clearlog", confirm=True)).grid(
+            row=0, column=2, sticky="ew", pady=(0, 6))
+
         # ---------- 切换中继目标 ----------
         ttk.Label(card, text="切换中继目标 (换成其它校园网 / WiFi)", style="Field.TLabel").grid(
-            row=7, column=0, sticky="w", pady=(6, 4))
+            row=9, column=0, sticky="w", pady=(6, 4))
         sw = ttk.Frame(card, style="Card.TFrame")
-        sw.grid(row=8, column=0, sticky="ew")
+        sw.grid(row=10, column=0, sticky="ew")
         sw.columnconfigure(1, weight=1)
         sw.columnconfigure(3, weight=1)
         ttk.Label(sw, text="SSID", style="Field.TLabel").grid(row=0, column=0, sticky="w")
@@ -172,22 +225,32 @@ class RouterConsoleMixin:
             card,
             text="提示: 切换后约 1 分钟生效; 校园网通常还需要重新登录认证 (可用上面的「重新登录校园网」)。",
             style="Muted.TLabel", wraplength=780)
-        lbl_hint.grid(row=9, column=0, sticky="w", pady=(6, 6))
+        lbl_hint.grid(row=11, column=0, sticky="w", pady=(6, 6))
+
+        # ---------- 密码关系说明 (v5.2.0) ----------
+        lbl_pw = ttk.Label(
+            card,
+            text="关于密码: 管家里涉及三套互不影响的密码 —— ① 路由器管理密码(网页/APP 改设置用); "
+                 "② SSH 密码(登录路由器系统用, SSH 服务是路由器本体的 dropbear, 跑在 22 端口, "
+                 "不在电脑上; 改它要 SSH 登录后执行 passwd, 改管理密码不会同步改 SSH 密码); "
+                 "③ 校园网账号密码(认证上网用)。",
+            style="Muted.TLabel", wraplength=780)
+        lbl_pw.grid(row=12, column=0, sticky="w", pady=(0, 8))
 
         # ---------- 守护日志 ----------
         ttk.Label(card, text="守护日志 (最近 30 行)", style="Field.TLabel").grid(
-            row=10, column=0, sticky="w", pady=(4, 4))
+            row=13, column=0, sticky="w", pady=(4, 4))
         logbox = tk.Text(card, height=7, width=1, bg="#09101c", fg="#9fb0c8",
                          font=("PingFang SC", 9), relief="flat", wrap="none",
                          padx=10, pady=8, state="disabled")
-        logbox.grid(row=11, column=0, sticky="nsew")
-        card.rowconfigure(11, weight=1)
+        logbox.grid(row=14, column=0, sticky="nsew")
+        card.rowconfigure(14, weight=1)
         self._rc_logbox = logbox
 
         win.protocol("WM_DELETE_WINDOW", lambda: (setattr(self, "_rc_window", None), win.destroy()))
 
         # 说明文字随窗口宽度自动换行 (不再写死 780)
-        wrap_labels = [lbl_sub, self._rc_head, lbl_hint]
+        wrap_labels = [lbl_sub, self._rc_head, lbl_hint, lbl_pw]
 
         def _rc_on_resize(_event=None):
             try:
@@ -296,7 +359,9 @@ class RouterConsoleMixin:
                 with urlrequest.urlopen(base + "/cgi-bin/status.sh", timeout=RC_TIMEOUT) as resp:
                     raw = resp.read().decode("utf-8", errors="replace")
                 data = json.loads(raw)
-                self.after(0, lambda: self._rc_render(data))
+                # Date 头: 工作台 CGI 不返回, 从面板根单独取 (含 busybox 时区标注校正)
+                skew = rc_clock_skew(base)
+                self.after(0, lambda: self._rc_render(data, {"skew_sec": skew}))
             except URLError as exc:
                 # 异常绑定为默认参数: except ... as exc 结束后 exc 会被删除,
                 # 延迟执行的 lambda 直接引用它会抛 NameError(错误提示弹不出来)。
@@ -305,6 +370,83 @@ class RouterConsoleMixin:
                 self.after(0, lambda err=exc: self._rc_fail("读取失败: %s" % err))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _rc_deep_check(self):
+        """深度自检 (v5.2.0): SSH 22 端口 / 校园网认证台 / 时钟 / 守护健康度。
+
+        全部为只读探测, 不修改路由器任何配置:
+          - SSH 22: TCP 连通性 (SSH 服务跑在路由器本体 dropbear)
+          - 认证台: portal_auth 配置台 (LAN:8080) 是否真正可达
+          - 时钟  : HTTP Date 头 vs 本机
+          - 守护  : 解析守护日志, 识别"中继频繁重连"风暴是否仍在持续
+        """
+        conf = self._rc_settings()
+        host = conf["host"]
+        self._rc_set_head("正在深度自检 %s (SSH 22 / 认证台 / 时钟 / 守护)…" % host, None)
+
+        def worker():
+            diag = {}
+            # 1) SSH 22 端口
+            try:
+                diag["ssh22"] = core_router.probe_tcp_port(host, RC_SSH_PORT, timeout=2.5)
+            except Exception:
+                diag["ssh22"] = False
+            # 2) 校园网认证台 (portal_auth 配置台, LAN:8080)
+            url = "http://%s:%s/cgi-bin/portal?action=status" % (host, RC_PORTAL_CONSOLE_PORT)
+            try:
+                opener = urlrequest.build_opener(urlrequest.ProxyHandler({}))
+                with opener.open(url, timeout=4) as resp:
+                    body = resp.read(400).decode("utf-8", errors="replace")
+                if resp.status == 200 and ("status" in body.lower() or body.strip().startswith("{")):
+                    diag["portal_console"] = "可用"
+                else:
+                    diag["portal_console"] = "不可用 (HTTP %s, 端口可能被管理界面占用)" % resp.status
+            except URLError as exc:
+                reason = getattr(exc, "reason", None) or "连接失败"
+                diag["portal_console"] = "不可用 (%s)" % reason
+            except Exception:
+                diag["portal_console"] = "不可用 (连接失败, 端口 %s 无服务)" % RC_PORTAL_CONSOLE_PORT
+
+            # 3) 时钟 + 4) 守护健康度 (顺带重新拉一次状态)
+            meta = {}
+            try:
+                with urlrequest.urlopen("http://%s:%s/cgi-bin/status.sh" % (host, conf["port"]),
+                                        timeout=RC_TIMEOUT) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                data = json.loads(raw)
+                skew = rc_clock_skew("http://%s:%s" % (host, conf["port"]))
+                meta = {"skew_sec": skew}
+                entries = core_router.parse_keeper_log(data.get("log"))
+                health = core_router.keeper_log_health(entries, clock_offset_sec=skew or 0)
+                diag["health"] = health
+            except Exception as exc:
+                diag["health"] = {"summary": "读取失败: %s" % exc, "healthy": False}
+                data = None
+
+            def done():
+                self._rc_diag = diag
+                if data is not None:
+                    self._rc_render(data, meta)
+                parts = ["SSH 22 端口: %s" % ("开放" if diag.get("ssh22") else "不通"),
+                         "认证台: %s" % diag.get("portal_console", "未知")]
+                if diag.get("health"):
+                    parts.append("守护: %s" % diag["health"].get("summary", ""))
+                ok = bool(diag.get("ssh22")) and diag.get("health", {}).get("healthy", False)
+                self._rc_set_head("深度自检完成 → " + "  |  ".join(parts), ok)
+
+            self.after(0, done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _rc_open_proxy_panel(self):
+        """打开路由器上的 mihomo 控制面板 (9091)。"""
+        conf = self._rc_settings()
+        url = "http://%s:%s/ui" % (conf["host"], RC_PROXY_PANEL_PORT)
+        try:
+            webbrowser.open(url)
+            self._rc_set_head("已尝试打开代理面板 %s (若无响应说明面板未启用)" % url, None)
+        except Exception as exc:
+            messagebox.showwarning("打开失败", str(exc))
 
     def _rc_fail(self, msg):
         self._rc_set_head(msg + " (确认路由器已开机、工作台端口 %s 正常)" % RC_DEFAULT_PORT, False)
@@ -316,7 +458,7 @@ class RouterConsoleMixin:
                           % (RC_DEFAULT_PORT, RC_DEFAULT_PORT))
         self._rc_fill_log("")
 
-    def _rc_render(self, d):
+    def _rc_render(self, d, meta=None):
         relay = d.get("relay", {}) or {}
         ap = d.get("ap", {}) or {}
         proxy = d.get("proxy", {}) or {}
@@ -324,6 +466,7 @@ class RouterConsoleMixin:
         ssh = d.get("ssh", {}) or {}
         sysd = d.get("sys", {}) or {}
         guard = d.get("guard", {}) or {}
+        meta = meta or {}
 
         auth = d.get("auth", "-")
         net = d.get("net", "-")
@@ -341,6 +484,15 @@ class RouterConsoleMixin:
                 return "-"
             good = (n == 0) if good_when_zero else (n > 0)
             return "[正常]" if good else "[注意]"
+
+        entries = core_router.parse_keeper_log(d.get("log"))
+        skew = meta.get("skew_sec")
+        # 传入上一次的健康度 -> 若最新日志条目没变, 直接判定"无新增" (免受时钟漂移影响)
+        health = core_router.keeper_log_health(
+            entries, clock_offset_sec=skew or 0,
+            prev=getattr(self, "_rc_prev_health", None))
+        self._rc_prev_health = health
+        diag = getattr(self, "_rc_diag", None) or {}
 
         lines = []
         lines.append("── 无线中继 (上游校园网) ──────────────────────────────")
@@ -365,9 +517,25 @@ class RouterConsoleMixin:
         lines.append("")
         lines.append("── 远程访问 / 防护 ────────────────────────────────")
         lines.append("  SSH(dropbear): %s" % ssh.get("dropbear", "0"))
-        lines.append("  自动固件下载(OTA): %s %s       MLO: %s %s"
+        lines.append("  自动固件下载(OTA): %s %s    MLO: %s %s (hostapd: %s)"
                      % (guard.get("ota_auto", "-"), onoff(guard.get("ota_auto", "-")),
-                        guard.get("mlo_support", "-"), onoff(guard.get("mlo_support", "-"))))
+                        guard.get("mlo_support", "-"), onoff(guard.get("mlo_support", "-")),
+                        guard.get("mlo_enable", "-")))
+        lines.append("")
+        lines.append("── 运行时诊断 (v5.2.0) ────────────────────────────")
+        lines.append("  路由器时钟: %s %s"
+                     % (self._rc_fmt_skew(skew),
+                        "[正常]" if (skew is None or abs(skew) <= 300) else "[注意]"))
+        lines.append("  自愈守护  : %s %s" % (health["summary"], "[正常]" if health["healthy"] else "[注意]"))
+        if "ssh22" in diag:
+            lines.append("  SSH 端口 22: %s %s"
+                         % ("开放" if diag.get("ssh22") else "不通",
+                            "[正常]" if diag.get("ssh22") else "[注意]"))
+        else:
+            lines.append("  SSH 端口 22: 未检测 (点「深度自检」)")
+        lines.append("  校园网认证台: %s %s"
+                     % (diag.get("portal_console", "未检测 (点「深度自检」)"),
+                        "[正常]" if diag.get("portal_console") == "可用" else ""))
         lines.append("")
         mem_used = sysd.get("mem_used", "0")
         mem_total = sysd.get("mem_total", "0")
@@ -381,18 +549,36 @@ class RouterConsoleMixin:
                         sysd.get("uptime", "-"), sysd.get("load", "-"), mem_txt))
         self._rc_fill_box("\n".join(lines))
 
-        log_text = (d.get("log", "") or "").replace("~", "\n")
-        self._rc_fill_log(log_text or "(暂无日志)")
+        log_text = "\n".join(e["raw"] for e in entries) if entries else "(暂无日志)"
+        self._rc_fill_log(log_text)
+
+    @staticmethod
+    def _rc_fmt_skew(sec):
+        """把时钟偏差秒数格式化成中文短语 (正 = 路由器偏快)。"""
+        if sec is None:
+            return "无法判断 (无 Date 头)"
+        if abs(sec) <= 90:
+            return "与本机一致"
+        mins = sec / 60.0
+        if abs(mins) < 60:
+            return "与本机相差 %+.0f 分钟" % mins
+        return "与本机相差 %+.1f 小时" % (mins / 60.0)
 
     def _rc_action(self, op, confirm=False):
         labels = {
             "restart_proxy": "重启透明代理", "restart_vpn": "重启 VPN",
             "relogin": "重新登录校园网", "reconnect_relay": "重连中继",
             "restart_ap": "重启 WiFi", "restart_router": "重启路由器",
+            "clearlog": "清空守护日志",
         }
         title = labels.get(op, op)
-        if confirm and not messagebox.askyesno("确认操作", "确定要执行「%s」吗？\n可能造成短暂断网。" % title):
-            return
+        if confirm:
+            if op == "clearlog":
+                tip = "确定清空路由器上的守护日志吗？\n仅清空日志记录, 不影响运行。"
+            else:
+                tip = "确定要执行「%s」吗？\n可能造成短暂断网。" % title
+            if not messagebox.askyesno("确认操作", tip):
+                return
         conf = self._rc_settings()
         url = "%s/cgi-bin/action.sh?%s" % (
             self._rc_base(conf["host"], conf["port"]),
