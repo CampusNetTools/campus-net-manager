@@ -23,6 +23,14 @@ def default_preferences():
         "history_enabled": False,
         "history_log_path": "",  # 用户指定的网络稳定性历史保存位置; 留空用默认 ~/Library/Application Support/CampusNetManager/network_history.jsonl
         "kick_guard": True,   # 防踢: 周期性刷新登录, 让本机/路由器会话保持最新不被挤掉
+        # 保护设备: 用户显式指定"要一直在线、不被新设备挤掉"的设备。
+        # enabled 开启后, 守护把 kick_guard 刷新强化为"保护模式"(更频繁刷新本会话,
+        # 让被保护设备始终最新); name 仅供界面展示; kind 用于区分保护对象。
+        "protected_device": {
+            "enabled": False,
+            "name": "",        # 用户给被保护设备起的名字 (如"小米路由器")
+            "kind": "router",  # router=路由器/本机出口会话 / self=这台电脑
+        },
         "auto_update_check": True,      # 启动时自动检查 GitHub 新版本(20小时间隔)
         "update_skip_version": "",      # 用户选择跳过的版本 tag
         "update_last_check": "",        # 上次检查时间 ISO
@@ -44,6 +52,16 @@ def ensure_preferences(cfg):
         if key not in cfg:
             cfg[key] = defaults[key]
             changed = True
+    # 保护设备配置 (嵌套 dict, 单独补齐)
+    if "protected_device" not in cfg or not isinstance(cfg.get("protected_device"), dict):
+        cfg["protected_device"] = defaults["protected_device"]
+        changed = True
+    else:
+        pd = cfg["protected_device"]
+        for k, v in defaults["protected_device"].items():
+            if k not in pd:
+                pd[k] = v
+                changed = True
     notifications = cfg.setdefault("notifications", {})
     for key, value in defaults["notifications"].items():
         if key not in notifications:

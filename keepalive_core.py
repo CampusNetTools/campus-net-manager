@@ -22,10 +22,11 @@ from core.matching import *  # noqa: F401,F403
 from core.auth import *  # noqa: F401,F403
 from core.sysutils import *  # noqa: F401,F403
 from core.daemon import *  # noqa: F401,F403
+from core import selfservice  # noqa: F401
 from core import config, netinfo, router, sysutils  # noqa: F401
 
 
-APP_VERSION = "5.1.2"
+APP_VERSION = "5.2.0"
 APP_NAME = "校园网连接管家"
 
 

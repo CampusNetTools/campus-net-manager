@@ -195,6 +195,10 @@ class KeepAliveDaemon(threading.Thread):
                 if not hasattr(self, "_refresh_count"):
                     self._refresh_count = 0
                     self._kickguard = bool(self.cfg.get("kick_guard", True))
+                    # 保护设备模式: 用户显式要求某台设备一直在线不被挤掉。
+                    # 保护模式下刷新更激进(每轮都刷新), 确保被保护设备会话始终最新,
+                    # 新设备登录时被挤掉的是别人而非被保护设备。
+                    self._protect = bool(self.cfg.get("protected_device", {}).get("enabled"))
                 authed, paths = self._check_and_publish_status(auth_url)
                 # 一次完整检测成功 = 健康循环, 清零连续异常计数
                 self._consecutive_errors = 0
@@ -213,10 +217,16 @@ class KeepAliveDaemon(threading.Thread):
                         # Dr.COM 名额按会话新鲜度淘汰: 第N+1台登录会挤掉最旧会话。
                         # 定期 try_login (同来源IP=刷新续期, 已实测会话IP不变) 使被保护
                         # 设备始终为最新, 新设备登录时被挤掉的是别人而不是本机/路由器。
+                        # 保护设备模式下刷新更激进: 每轮都刷(间隔更短), 普通模式每 3 轮一刷。
                         self._refresh_count += 1
-                        if self._kickguard and self._refresh_count >= 3:
+                        threshold = 1 if self._protect else 3
+                        if self._kickguard and self._refresh_count >= threshold:
                             self._refresh_count = 0
-                            self._log("防踢保活: 刷新登录会话, 保持本设备名额最新")
+                            pname = (self.cfg.get("protected_device", {}) or {}).get("name", "")
+                            if self._protect and pname:
+                                self._log("保护设备「%s」: 刷新登录会话, 保持其名额最新不被挤掉" % pname)
+                            else:
+                                self._log("防踢保活: 刷新登录会话, 保持本设备名额最新")
                             if auth.try_login(profile):
                                 self._log("会话刷新成功")
                             else:
