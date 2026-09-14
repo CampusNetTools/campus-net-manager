@@ -1,5 +1,9 @@
 # 更新记录
 
+## v5.2.4
+
+- **修复 Windows 系统托盘图标「网」字糊化**：用户反馈托盘里只看到一个绿点、中间的「网」字消失。根因：`_make_tray_icon` 用 PIL 默认位图字体（8x8 像素）渲染「网」字，64x64 上字勉强可见，但 Windows 托盘实际渲染 16x16~24x24，`LANCZOS` 缩放后字完全糊化成绿色填充。现在用 truetype 字体（`msyh.ttc` 微软雅黑 / `simhei.ttf` 黑体 等，36px）+ 4 向 2px 绿色描边（与底色同色，缩到 16x16 时描边会被部分吃掉但字形仍清晰）；truetype 不可用时降级到几何网状图形（4 根白色放射线 + 中心节点，不依赖字体）。`Image` 模式由 `RGB` 改为 `RGBA`（背景透明避免边缘色晕）。新增 `tests/test_tray_icon.py`（3 项：尺寸正确 / 绿底白字占比 / 缩到 32/24/16 后白色像素仍存在）。
+
 ## v5.2.3
 
 - **修复自动更新 WinError 32**：「应用更新失败：[WinError 32] 另一个程序正在使用此文件」是 Windows Defender / PopService 扫描刚写入的 exe 时短持锁（0.5~2s）触发的，shutil.move 内置不重试直接抛错。现在 `updater.move_with_retry` 最多重试 6 次、间隔指数退避（0.5s/1s/2s/4s/8s，累计 ≤16s），完全覆盖 Defender 短持锁时长；非 WinError 32/33 的异常立即透传，不浪费重试。在「校园网连接管家_new.exe」move 之前先 `unlink_quietly` 清掉上轮残留的同名文件（上次更新中断留下的，避免 move 覆盖锁文件）。
