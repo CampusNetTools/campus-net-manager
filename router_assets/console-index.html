@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>校园网路由器 · 工作台</title>
+<style>
+:root{
+  --bg:#0f1115; --card:#171a21; --card2:#1d2129; --line:#272c35;
+  --fg:#e6e9ef; --muted:#8b93a1; --ok:#31c48d; --warn:#f0a33c; --bad:#ef5960; --accent:#4b8bf5;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+header{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:600}
+.tag{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.spacer{flex:1}
+.btn{background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 13px;font-size:13px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{border-color:#5a2a2d;color:#ff9ba0}
+.wrap{padding:16px 20px 40px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h2{font-size:13px;margin:0 0 10px;color:var(--muted);font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:13.5px}
+.row span:first-child{color:var(--muted)}
+.k{font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.ok{background:var(--ok)} .warn{background:var(--warn)} .bad{background:var(--bad)}
+.badge{font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--line)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+pre{background:#0b0d11;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:260px;overflow:auto;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-all;margin:0}
+input{background:#0b0d11;border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:8px 10px;font-size:13px;width:100%}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 4px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+#toast{position:fixed;right:16px;bottom:16px;background:var(--card2);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;font-size:13px;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>📡 校园网路由器 · 工作台</h1>
+  <span class="tag" id="modelTag">RD08</span>
+  <span class="tag" id="tsTag">--</span>
+  <div class="spacer"></div>
+  <input id="token" placeholder="访问令牌" style="width:150px">
+  <button class="btn" onclick="saveToken()">保存令牌</button>
+  <button class="btn primary" onclick="load()">刷新</button>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="card">
+      <h2>无线中继 (上游校园网)</h2>
+      <div class="row"><span>目标 SSID</span><b class="k" id="r_ssid">--</b></div>
+      <div class="row"><span>信号强度</span><b class="k" id="r_sig">--</b></div>
+      <div class="row"><span>本机 IP</span><b class="k" id="r_ip">--</b></div>
+      <div class="row"><span>上游 BSSID</span><b class="k" id="r_bssid">--</b></div>
+    </div>
+
+    <div class="card">
+      <h2>本机 WiFi (AP)</h2>
+      <div class="row"><span>SSID</span><b class="k" id="a_ssid">--</b></div>
+      <div class="row"><span>信道</span><b class="k" id="a_ch">--</b></div>
+      <div class="row"><span>校园网认证</span><b class="k" id="auth">--</b></div>
+      <div class="row"><span>外网连通</span><b class="k" id="net">--</b></div>
+    </div>
+
+    <div class="card">
+      <h2>透明代理 (mihomo)</h2>
+      <div class="row"><span>运行状态</span><b class="k" id="p_proc">--</b></div>
+      <div class="row"><span>混合端口 7890</span><b class="k" id="p_7890">--</b></div>
+      <div class="row"><span>透明端口 7891</span><b class="k" id="p_7891">--</b></div>
+      <div class="row"><span>控制面板 9091</span><b class="k" id="p_9091">--</b></div>
+      <div class="row"><span>DNS 端口 7892</span><b class="k" id="p_7892">--</b></div>
+      <div class="row"><span>透明接管</span><b class="k" id="p_tp">--</b></div>
+      <div class="row"><span>节点</span><b class="k" id="p_nodes">--</b></div>
+    </div>
+
+    <div class="card">
+      <h2>VPN 服务 (L2TP/IPSec)</h2>
+      <div class="row"><span>xl2tpd</span><b class="k" id="v_x">--</b></div>
+      <div class="row"><span>IPSec(pluto)</span><b class="k" id="v_i">--</b></div>
+      <div class="row"><span>UDP 500</span><b class="k" id="v_5">--</b></div>
+    </div>
+
+    <div class="card">
+      <h2>远程访问 / 防护</h2>
+      <div class="row"><span>SSH(dropbear)</span><b class="k" id="s_d">--</b></div>
+      <div class="row"><span>自动固件升级</span><b class="k" id="g_ota">--</b></div>
+      <div class="row"><span>MLO(misc)</span><b class="k" id="g_mlo">--</b></div>
+      <div class="row"><span>MLO(hostapd)</span><b class="k" id="g_mlo2">--</b></div>
+    </div>
+
+    <div class="card">
+      <h2>系统</h2>
+      <div class="row"><span>型号 / 固件</span><b class="k" id="y_model">--</b></div>
+      <div class="row"><span>运行时长</span><b class="k" id="y_up">--</b></div>
+      <div class="row"><span>负载</span><b class="k" id="y_load">--</b></div>
+      <div class="row"><span>内存</span><b class="k" id="y_mem">--</b></div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-top:14px">
+    <div class="card">
+      <h2>一键操作</h2>
+      <div class="actions">
+        <button class="btn" onclick="act('restart_proxy')">重启透明代理</button>
+        <button class="btn" onclick="act('rotate_node')">换一个可用节点</button>
+        <button class="btn" onclick="act('enable_transparent',true)">当前设备试用120秒</button>
+        <button class="btn" onclick="act('disable_transparent',true)">关闭透明接管</button>
+        <button class="btn" onclick="act('restart_vpn')">重启 VPN</button>
+        <button class="btn" onclick="act('relogin')">重新登录校园网</button>
+        <button class="btn" onclick="act('reconnect_relay')">重连中继</button>
+        <button class="btn" onclick="act('restart_ap')">重启 WiFi</button>
+        <button class="btn danger" onclick="act('restart_router',true)">重启路由器</button>
+      </div>
+      <div class="hint">「当前设备试用120秒」只对本机生效，120 秒后自动恢复直连；想给全屋设备走代理才需要长期接管。<br>重启 WiFi / 路由器会短暂断网（约 1-2 分钟）</div>
+    </div>
+
+    <div class="card">
+      <h2>切换中继目标 (换校园网)</h2>
+      <label>目标 WiFi 名称 (SSID)</label>
+      <input id="sw_ssid" placeholder="例如 LIDA-UNIVERSITY">
+      <label>密码 (开放网络可留空)</label>
+      <input id="sw_pass" placeholder="校园网 WiFi 密码">
+      <div class="actions" style="margin-top:12px">
+        <button class="btn primary" onclick="switchRelay()">切换中继</button>
+      </div>
+      <div class="hint">切换后约 1 分钟生效；校园网认证通常需要另外登录（可用上面的"重新登录校园网"）</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>节点轮换 (最近 3 次自动切换)</h2>
+    <pre id="rotbox">加载中…</pre>
+    <div class="hint">看门狗每 2 分钟检查一次：显式代理不通时自动测速并切到最优节点，全不可用则还原。</div>
+  </div>
+
+  <div class="card" style="margin-top:14px">
+    <h2>守护日志 (最近 30 行)</h2>
+    <pre id="logbox">加载中…</pre>
+    <div class="actions" style="margin-top:10px">
+      <button class="btn" onclick="act('clearlog')">清空日志</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const dot=v=>v==='ok'?'<span class="dot ok"></span>':v==='warn'?'<span class="dot warn"></span>':'<span class="dot bad"></span>';
+// 与 PC 端工作台 (gui/router_console_ui.py) 的中文名保持一致, 避免确认框里露出内部动作名
+const OPNAME={restart_proxy:'重启透明代理',rotate_node:'换一个可用节点',enable_transparent:'当前设备试用透明代理 120 秒',disable_transparent:'关闭透明接管',restart_vpn:'重启 VPN',relogin:'重新登录校园网',reconnect_relay:'重连中继',restart_ap:'重启 WiFi',restart_router:'重启路由器',clearlog:'清空守护日志',switch_relay:'切换中继目标'};
+
+function saveToken(){localStorage.setItem('rtk',$('token').value.trim());toast('令牌已保存');}
+function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3000);}
+
+async function load(){
+  try{
+    const r=await fetch('cgi-bin/status.sh?t='+Date.now());
+    const d=await r.json();
+    $('modelTag').textContent=d.sys.model||'RD08';
+    $('tsTag').textContent=d.sys.ts||d.sys.uptime;
+
+    $('r_ssid').textContent=d.relay.ssid||'--';
+    $('r_sig').innerHTML=(d.relay.signal||'--')+' dBm';
+    $('r_ip').textContent=d.relay.ip||'--';
+    $('r_bssid').textContent=d.relay.bssid||'--';
+
+    $('a_ssid').textContent=d.ap.ssid||'--';
+    $('a_ch').textContent=d.ap.channel||'--';
+    const authOk=/在线/.test(d.auth);
+    $('auth').innerHTML=dot(authOk?'ok':(/不可达|未知/.test(d.auth)?'warn':'bad'))+d.auth;
+    const netOk=/正常/.test(d.net);
+    $('net').innerHTML=dot(netOk?'ok':'bad')+d.net;
+
+    const pc=+d.proxy.proc>0;
+    $('p_proc').innerHTML=dot(pc?'ok':'bad')+(pc?('运行中 ('+d.proxy.proc+')'):'未运行');
+    $('p_7890').innerHTML=dot(+d.proxy.p7890?'ok':'bad')+(+d.proxy.p7890?'监听':'未监听');
+    $('p_7891').innerHTML=dot(+d.proxy.p7891?'ok':'warn')+(+d.proxy.p7891?'监听':'未开启(无节点)');
+    $('p_9091').innerHTML=dot(+d.proxy.panel?'ok':'bad')+(+d.proxy.panel?'监听':'未监听');
+    $('p_7892').innerHTML=dot(+d.proxy.p7892?'ok':'warn')+(+d.proxy.p7892?'监听':'未监听');
+    const tp=String(d.proxy.transparent)==='1';
+    $('p_tp').innerHTML=dot(tp?'warn':'ok')+(tp?'已开启 (流量被接管)':'已关闭 (安全直连)');
+    $('p_nodes').textContent=d.proxy.nodes;
+
+    $('v_x').innerHTML=dot(+d.vpn.xl2tpd?'ok':'bad')+(+d.vpn.xl2tpd?'运行中':'未运行');
+    $('v_i').innerHTML=dot(+d.vpn.ipsec?'ok':'bad')+(+d.vpn.ipsec?'运行中':'未运行');
+    $('v_5').innerHTML=dot(+d.vpn.udp500?'ok':'warn')+(+d.vpn.udp500?'监听':'未监听');
+
+    $('s_d').innerHTML=dot(+d.ssh.dropbear?'ok':'bad')+(+d.ssh.dropbear?'运行中':'未运行');
+    const ota=d.guard.ota_auto, mlo=d.guard.mlo_support;
+    $('g_ota').innerHTML=(ota==='0'?dot('ok')+'已关闭(安全)':dot('bad')+'开启(有风险)');
+    $('g_mlo').innerHTML=(mlo==='0'?dot('ok')+'已关闭(安全)':dot('warn')+mlo);
+    $('g_mlo2').textContent=(d.guard.mlo_enable==='-'?'(已移除)':d.guard.mlo_enable);
+
+    $('y_model').textContent=(d.sys.model||'')+' / '+(d.sys.rom||'');
+    $('y_up').textContent=d.sys.uptime||'--';
+    $('y_load').textContent=d.sys.load||'--';
+    $('y_mem').textContent=Math.round(d.sys.mem_used/1024)+'MB / '+Math.round(d.sys.mem_total/1024)+'MB';
+
+    $('rotbox').textContent=(d.proxy.rotate||'(暂无轮换记录)').split('~').join('\n');
+    $('logbox').textContent=(d.log||'(无日志)').split('~').join('\n');
+  }catch(e){
+    $('logbox').textContent='状态获取失败: '+e;
+  }
+}
+
+async function act(op,confirmIt){
+  const nm=OPNAME[op]||op;
+  if(confirmIt && !confirm('确定要执行「'+nm+'」吗？')) return;
+  const tk=localStorage.getItem('rtk')||'';
+  if(!tk){toast('请先填写并保存访问令牌');return;}
+  try{
+    const r=await fetch('cgi-bin/action.sh?op='+op+'&token='+encodeURIComponent(tk));
+    const d=await r.json();
+    toast(d.msg||(d.ok?(nm+' 完成'):(nm+' 失败')));
+    if(d.ok) setTimeout(load,1500);
+  }catch(e){toast(nm+' 操作失败: '+e);}
+}
+
+async function switchRelay(){
+  const tk=localStorage.getItem('rtk')||'';
+  if(!tk){toast('请先填写并保存访问令牌');return;}
+  const s=$('sw_ssid').value.trim();
+  if(!s){toast('请填写目标 WiFi 名称');return;}
+  if(!confirm('确定把中继切换到「'+s+'」吗？切换期间路由器会短暂断网。'))return;
+  const p=$('sw_pass').value;
+  try{
+    const r=await fetch('cgi-bin/action.sh?op=switch_relay&token='+encodeURIComponent(tk)+'&ssid='+encodeURIComponent(s)+'&pass='+encodeURIComponent(p));
+    const d=await r.json();
+    toast(d.msg||'已提交');
+    setTimeout(load,3000);
+  }catch(e){toast('切换失败: '+e);}
+}
+
+$('token').value=localStorage.getItem('rtk')||'';
+load();
+setInterval(load,5000);
+</script>
+</body>
+</html>

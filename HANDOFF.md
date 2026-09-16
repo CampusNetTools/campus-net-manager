@@ -153,7 +153,7 @@ curl -s -X POST -H @"C:/Users/lugua/AppData/Local/Temp/ghhdr.txt" \
   `relay{ssid,signal,bssid,ip}` / `ap{ssid,channel,up}` / `auth` / `net` /
   `proxy{proc,p7890,p7891,panel,nodes}` / `vpn{xl2tpd,ipsec,udp500}` / `ssh` / `console` /
   `sys{model,rom,uptime,load,mem_used,mem_total}` / `guard{ota_auto,mlo_support,mlo_enable}` / `log`
-- `POST .../cgi-bin/action.sh` → 执行操作，需令牌（现值 `20050927`，2026-09-12 已统一改密；存在 `/data/other_vol/console/token`）
+- `POST .../cgi-bin/action.sh` → 执行操作，需令牌（**令牌值严禁写入仓库**；源在路由器 `/data/other_vol/console/token`，本机存在 `config.json` 的 `router_console.token`——该文件已被 `.gitignore` 排除）
 - 自愈守护：`/etc/crontabs/patches/campus-keeper.sh`（重启代理/VPN/重连中继/重登校园网）。**自启必须走 crontab**——`rc.local` 会被固件清空。
 
 **Windows 端实现要点（`gui/router_console_ui.py`）**
