@@ -180,6 +180,29 @@ def subscription_summary(nodes, rejected=0):
     return {"node_count": len(nodes), "protocols": dict(protocols), "rejected": rejected}
 
 
+# 订阅里可能出现的协议 (用于「切换协议」: 部署时只保留勾选的协议)
+PROTOCOL_OPTIONS = (("vless", "VLESS"), ("hysteria2", "Hysteria2"))
+DEFAULT_PROTOCOLS = ("vless", "hysteria2")
+
+
+def filter_by_protocols(nodes, allow_types=None):
+    """按协议过滤节点; allow_types 为空表示不过滤。
+
+    校园网对 UDP 的态度不稳定, Hysteria2 这类基于 UDP 的协议可能整体不可用,
+    因此部署前允许只保留 VLESS, 避免把一堆必然失败的节点塞进配置里。
+    """
+    if not allow_types:
+        return list(nodes)
+    allowed = {str(item).lower() for item in allow_types}
+    return [n for n in nodes if str(n.get("type", "")).lower() in allowed]
+
+
+def protocol_labels(allow_types):
+    """协议标识 -> 展示名, 用于 UI 与日志。"""
+    wanted = {str(item).lower() for item in (allow_types or ())}
+    return [label for key, label in PROTOCOL_OPTIONS if key in wanted]
+
+
 def _yaml_value(value):
     if isinstance(value, bool):
         return "true" if value else "false"
@@ -198,9 +221,10 @@ def _emit_mapping(lines, mapping, indent):
             lines.append("%s%s: %s" % (prefix, key, _yaml_value(value)))
 
 
-def build_mihomo_config(nodes, controller_secret=None):
+def build_mihomo_config(nodes, controller_secret=None, allow_types=None):
+    nodes = filter_by_protocols(nodes, allow_types)
     if not nodes:
-        raise SubscriptionError("至少需要一个节点")
+        raise SubscriptionError("按所选协议过滤后没有可用节点")
     secret = controller_secret or secrets.token_urlsafe(24)
     names = [node["name"] for node in nodes]
     lines = [

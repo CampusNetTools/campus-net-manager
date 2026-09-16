@@ -1,0 +1,14 @@
+# 换行符策略
+#
+# 本仓库在 Windows 上 core.autocrlf=true。如果不显式声明, 一次 checkout 就会把
+# *.sh 在工作区里转成 CRLF —— 而 router_assets/ 下的脚本是直接部署到路由器上给
+# busybox sh 执行的, CRLF 会让脚本首行变成 "#!/bin/sh\r", 直接跑不起来
+# (tests/test_clash_nodes.py 也会因 assertNotIn("\r\n") 而失败)。
+# 因此 shell 脚本一律强制 LF, 不随平台漂移。
+
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows 脚本保持 CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf

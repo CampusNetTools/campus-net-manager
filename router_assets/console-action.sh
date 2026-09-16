@@ -40,5 +40,6 @@ case "$OP" in
   restart_router) say "重启路由器"; (sleep 2; reboot) >/dev/null 2>&1 &
     ok "路由器正在重启";;
   clearlog) : > "$LOG"; ok "日志已清空";;
+  rotate_node) (sleep 1; sh "$PROXY/rotate.sh" --force >/dev/null 2>&1) >/dev/null 2>&1 & say "手动轮换代理节点"; ok "正在切换到下一个可用节点(约 10 秒生效)";;
   *) err "未知操作";;
 esac

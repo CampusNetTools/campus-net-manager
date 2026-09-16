@@ -44,9 +44,10 @@ from gui.console_ui import ConsoleUiMixin  # noqa: F401
 from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
 from gui.device_manager import DeviceManagerMixin  # noqa: F401
 from gui.subscription_ui import SubscriptionUiMixin  # noqa: F401
+from gui.clash_nodes_ui import ClashNodesMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SubscriptionUiMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SubscriptionUiMixin, ClashNodesMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -419,10 +420,14 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
                    command=lambda: self._fwin_open_legacy(
                        "router_console", self.show_router_console_window)).grid(
                            row=14, column=1, sticky="ew", pady=(4, 0))
+        ttk.Button(nav, text="Clash 节点管理", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "clash_nodes", self.show_clash_nodes_window)).grid(
+                           row=15, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
         ttk.Button(nav, text="连接进度（断电重启后看这里）", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "connect_progress", self.show_connect_progress_window)).grid(
-                           row=15, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+                           row=15, column=1, sticky="ew", pady=(4, 0))
 
         # 工具
         _sep(16, "工具")
