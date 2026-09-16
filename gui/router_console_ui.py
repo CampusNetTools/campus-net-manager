@@ -199,6 +199,7 @@ class RouterConsoleMixin:
             ("重连中继", "reconnect_relay", False),
             ("重启 WiFi", "restart_ap", True),
             ("重启路由器", "restart_router", True),
+            ("换一个可用节点", "rotate_node", False),
         ]
         for idx, (text, op, danger) in enumerate(buttons):
             ttk.Button(acts, text=text, style="Gray.TButton",
@@ -530,6 +531,11 @@ class RouterConsoleMixin:
         if transparent is not None:
             lines.append("  透明接管: %s" % ("已开启" if str(transparent) == "1" else "已关闭（安全直连）"))
         lines.append("  节点: %s" % proxy.get("nodes", "-"))
+        rotate = proxy.get("rotate")
+        if rotate:
+            last = [x for x in str(rotate).split("~") if x.strip()]
+            if last:
+                lines.append("  节点看门狗: %s" % last[-1])
         lines.append("")
         lines.append("── VPN (L2TP/IPSec) ──────────────────────────────")
         lines.append("  xl2tpd: %s    IPSec(pluto): %s    UDP 500: %s"
@@ -591,7 +597,7 @@ class RouterConsoleMixin:
             "disable_transparent": "关闭透明接管",
             "relogin": "重新登录校园网", "reconnect_relay": "重连中继",
             "restart_ap": "重启 WiFi", "restart_router": "重启路由器",
-            "clearlog": "清空守护日志",
+            "clearlog": "清空守护日志", "rotate_node": "换一个可用代理节点",
         }
         title = labels.get(op, op)
         if confirm:

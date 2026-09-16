@@ -65,6 +65,20 @@ class SubscriptionUiMixin:
         router_var = tk.StringVar(value=(section.get("router_host") or "192.168.31.1"))
         ttk.Entry(form, textvariable=router_var).grid(row=1, column=1, sticky="ew", padx=(10, 0), pady=(10, 0))
 
+        # 协议选择 (「切换协议」): 决定部署时保留哪几类节点
+        enabled = section.get("protocols_enabled") or list(proxy_subscription.DEFAULT_PROTOCOLS)
+        proto_vars = {}
+        proto_row = ttk.Frame(form, style="Inner.TFrame")
+        proto_row.grid(row=2, column=0, columnspan=2, sticky="w", pady=(10, 0))
+        ttk.Label(proto_row, text="启用协议", style="Field.TLabel").pack(side="left")
+        for key, label in proxy_subscription.PROTOCOL_OPTIONS:
+            var = tk.BooleanVar(value=key in enabled)
+            proto_vars[key] = var
+            ttk.Checkbutton(proto_row, text=label, variable=var,
+                            style="Checkmark.TCheckbutton").pack(side="left", padx=(10, 0))
+        ttk.Label(proto_row, text="(校园网对 UDP 不稳定，Hy2 常整批不可用)",
+                  style="Muted.TLabel").pack(side="left", padx=(10, 0))
+
         status_var = tk.StringVar(value="尚未校验")
         ttk.Label(card, textvariable=status_var, style="Muted.TLabel", wraplength=650,
                   justify="left").grid(row=3, column=0, sticky="ew", pady=(14, 8))
@@ -88,7 +102,7 @@ class SubscriptionUiMixin:
             detail.insert("1.0", text)
             detail.configure(state="disabled")
 
-        def save_url(url, router_host, summary, controller_secret=""):
+        def save_url(url, router_host, summary, controller_secret="", protocols=None):
             encrypted = core.dpapi_encrypt(url)
             if not encrypted:
                 raise proxy_subscription.SubscriptionError("当前系统无法用 DPAPI 加密订阅地址，已拒绝明文保存")
@@ -102,6 +116,7 @@ class SubscriptionUiMixin:
                 "router_host": router_host,
                 "node_count": summary["node_count"],
                 "protocols": summary["protocols"],
+                "protocols_enabled": list(protocols or proxy_subscription.DEFAULT_PROTOCOLS),
                 "controller_secret_enc": secret_enc,
             }
             core.save_config(self.cfg)
@@ -109,21 +124,35 @@ class SubscriptionUiMixin:
         def ui(callback):
             self.after(0, callback)
 
+        def chosen_protocols():
+            picked = [key for key, var in proto_vars.items() if var.get()]
+            if not picked:
+                raise proxy_subscription.SubscriptionError("至少勾选一种协议")
+            return picked
+
         def validate_worker(url, router_host, deploy=False):
             try:
+                allow = chosen_protocols()
                 raw = proxy_subscription.fetch_subscription(url)
                 nodes, rejected = proxy_subscription.parse_subscription(raw)
+                all_summary = proxy_subscription.subscription_summary(nodes, rejected)
+                nodes = proxy_subscription.filter_by_protocols(nodes, allow)
+                if not nodes:
+                    raise proxy_subscription.SubscriptionError(
+                        "订阅里没有勾选协议的节点（可换一种协议再试）")
                 summary = proxy_subscription.subscription_summary(nodes, rejected)
                 state["nodes"] = nodes
-                save_url(url, router_host, summary)
-                text = "校验通过：%d 个节点；协议 %s；忽略 %d 条不支持/无效记录。" % (
-                    summary["node_count"], json.dumps(summary["protocols"], ensure_ascii=False), rejected)
+                save_url(url, router_host, summary, protocols=allow)
+                labels = "/".join(proxy_subscription.protocol_labels(allow))
+                text = ("校验通过：订阅共 %d 个节点，按 [%s] 保留 %d 个；忽略 %d 条不支持/无效记录。"
+                        % (all_summary["node_count"], labels, summary["node_count"], rejected))
                 if not deploy:
                     ui(lambda: status_var.set(text))
                     ui(lambda: set_detail(text + "\n\n此时只保存了加密订阅，尚未改变电脑或路由器流量。"))
                     return
 
-                config_text, controller_secret = proxy_subscription.build_mihomo_config(nodes)
+                config_text, controller_secret = proxy_subscription.build_mihomo_config(
+                    nodes, allow_types=allow)
                 host = router_host
                 console = self._rc_settings()
                 token = console.get("token", "")

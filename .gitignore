@@ -13,6 +13,8 @@ release/
 __pycache__/
 *.pyc
 .DS_Store
+# 部署到桌面的产物 (由 dist/CampusNetManager.exe 复制而来, 不入库)
+CampusNetManager.exe
 
 # 诊断导出
 校园网连接管家诊断_*.txt
