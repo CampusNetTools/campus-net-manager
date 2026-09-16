@@ -38,12 +38,18 @@ from gui.scrollkit import fit_geometry  # noqa: F401
 # 路由器工作台默认参数 (与 /data/other_vol/console 部署一致)
 RC_DEFAULT_HOST = "192.168.31.1"
 RC_DEFAULT_PORT = 8088
-RC_DEFAULT_TOKEN = "20050927"
+RC_DEFAULT_TOKEN = ""
 RC_TIMEOUT = 12
 RC_SSH_PORT = 22
 # 校园网认证台 (portal_auth 配置台) 部署在路由器 LAN:8080
 RC_PORTAL_CONSOLE_PORT = 8080
 RC_PROXY_PANEL_PORT = 9091
+
+
+def rc_urlopen(target, timeout=RC_TIMEOUT):
+    """Open a router-local URL without inheriting a stale system proxy."""
+    opener = urlrequest.build_opener(urlrequest.ProxyHandler({}))
+    return opener.open(target, timeout=timeout)
 
 
 def rc_server_date(base):
@@ -54,7 +60,7 @@ def rc_server_date(base):
     由调用方配合 core_router.local_utc_offset_seconds() 换算出真实时钟偏差。
     """
     try:
-        with urlrequest.urlopen(base + "/", timeout=RC_TIMEOUT) as resp:
+        with rc_urlopen(base + "/", timeout=RC_TIMEOUT) as resp:
             return resp.headers.get("Date")
     except Exception:
         return None
@@ -81,16 +87,25 @@ class RouterConsoleMixin:
         except Exception:
             cfg = {}
         section = cfg.get("router_console") or {}
+        token = section.get("token") or ""
+        if section.get("token_store") == "dpapi":
+            token = core.dpapi_decrypt(section.get("token_enc", ""))
         return {
             "host": section.get("host") or RC_DEFAULT_HOST,
             "port": str(section.get("port") or RC_DEFAULT_PORT),
-            "token": section.get("token") or RC_DEFAULT_TOKEN,
+            "token": token,
         }
 
     def _rc_save_settings(self, host, port, token):
         try:
             cfg = core.load_config()
-            cfg["router_console"] = {"host": host, "port": str(port), "token": token}
+            section = {"host": host, "port": str(port)}
+            encrypted = core.dpapi_encrypt(token)
+            if encrypted:
+                section.update({"token_store": "dpapi", "token_enc": encrypted})
+            elif token:
+                raise RuntimeError("无法安全加密控制令牌，已拒绝明文保存")
+            cfg["router_console"] = section
             core.save_config(cfg)
             return True
         except Exception as exc:
@@ -177,6 +192,8 @@ class RouterConsoleMixin:
             acts.columnconfigure(i, weight=1, uniform="rcact")
         buttons = [
             ("重启透明代理", "restart_proxy", False),
+            ("当前设备试用120秒", "enable_transparent", True),
+            ("关闭透明接管", "disable_transparent", False),
             ("重启 VPN", "restart_vpn", False),
             ("重新登录校园网", "relogin", False),
             ("重连中继", "reconnect_relay", False),
@@ -356,7 +373,7 @@ class RouterConsoleMixin:
 
         def worker():
             try:
-                with urlrequest.urlopen(base + "/cgi-bin/status.sh", timeout=RC_TIMEOUT) as resp:
+                with rc_urlopen(base + "/cgi-bin/status.sh", timeout=RC_TIMEOUT) as resp:
                     raw = resp.read().decode("utf-8", errors="replace")
                 data = json.loads(raw)
                 # Date 头: 工作台 CGI 不返回, 从面板根单独取 (含 busybox 时区标注校正)
@@ -410,8 +427,8 @@ class RouterConsoleMixin:
             # 3) 时钟 + 4) 守护健康度 (顺带重新拉一次状态)
             meta = {}
             try:
-                with urlrequest.urlopen("http://%s:%s/cgi-bin/status.sh" % (host, conf["port"]),
-                                        timeout=RC_TIMEOUT) as resp:
+                with rc_urlopen("http://%s:%s/cgi-bin/status.sh" % (host, conf["port"]),
+                                timeout=RC_TIMEOUT) as resp:
                     raw = resp.read().decode("utf-8", errors="replace")
                 data = json.loads(raw)
                 skew = rc_clock_skew("http://%s:%s" % (host, conf["port"]))
@@ -506,9 +523,12 @@ class RouterConsoleMixin:
         lines.append("  校园网认证: %s     外网: %s" % (auth, net))
         lines.append("")
         lines.append("── 透明代理 (mihomo) ──────────────────────────────")
-        lines.append("  进程: %s 个    混合端口 7890: %s    透明端口 7891: %s    面板 9091: %s"
+        lines.append("  进程: %s 个    混合端口 7890: %s    TCP接管 7892: %s    面板 9091: %s"
                      % (proxy.get("proc", "0"), proxy.get("p7890", "0"),
-                        proxy.get("p7891", "0"), proxy.get("panel", "0")))
+                        proxy.get("p7892", "0"), proxy.get("panel", "0")))
+        transparent = proxy.get("transparent")
+        if transparent is not None:
+            lines.append("  透明接管: %s" % ("已开启" if str(transparent) == "1" else "已关闭（安全直连）"))
         lines.append("  节点: %s" % proxy.get("nodes", "-"))
         lines.append("")
         lines.append("── VPN (L2TP/IPSec) ──────────────────────────────")
@@ -567,6 +587,8 @@ class RouterConsoleMixin:
     def _rc_action(self, op, confirm=False):
         labels = {
             "restart_proxy": "重启透明代理", "restart_vpn": "重启 VPN",
+            "enable_transparent": "当前设备透明代理试用120秒",
+            "disable_transparent": "关闭透明接管",
             "relogin": "重新登录校园网", "reconnect_relay": "重连中继",
             "restart_ap": "重启 WiFi", "restart_router": "重启路由器",
             "clearlog": "清空守护日志",
@@ -580,14 +602,15 @@ class RouterConsoleMixin:
             if not messagebox.askyesno("确认操作", tip):
                 return
         conf = self._rc_settings()
-        url = "%s/cgi-bin/action.sh?%s" % (
-            self._rc_base(conf["host"], conf["port"]),
-            urlencode({"op": op, "token": conf["token"]}))
+        url = "%s/cgi-bin/action.sh" % self._rc_base(conf["host"], conf["port"])
+        request = urlrequest.Request(
+            url, data=urlencode({"op": op, "token": conf["token"]}).encode("ascii"), method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded"})
         self._rc_set_head("正在执行「%s」…" % title, None)
 
         def worker():
             try:
-                with urlrequest.urlopen(url, timeout=RC_TIMEOUT) as resp:
+                with rc_urlopen(request, timeout=RC_TIMEOUT) as resp:
                     data = json.loads(resp.read().decode("utf-8", errors="replace"))
                 msg = data.get("msg") or ("完成" if data.get("ok") else "失败")
                 self.after(0, lambda: self._rc_set_head("「%s」: %s" % (title, msg), bool(data.get("ok"))))
@@ -607,15 +630,16 @@ class RouterConsoleMixin:
                                    "确定把中继切换到「%s」吗？\n切换期间路由器会短暂断网 (约 1 分钟)。" % ssid):
             return
         conf = self._rc_settings()
-        url = "%s/cgi-bin/action.sh?%s" % (
-            self._rc_base(conf["host"], conf["port"]),
-            urlencode({"op": "switch_relay", "token": conf["token"],
-                       "ssid": ssid, "pass": password}))
+        url = "%s/cgi-bin/action.sh" % self._rc_base(conf["host"], conf["port"])
+        request = urlrequest.Request(
+            url, data=urlencode({"op": "switch_relay", "ssid": ssid,
+                                 "pass": password, "token": conf["token"]}).encode("utf-8"), method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"})
         self._rc_set_head("正在切换中继到「%s」…" % ssid, None)
 
         def worker():
             try:
-                with urlrequest.urlopen(url, timeout=RC_TIMEOUT) as resp:
+                with rc_urlopen(request, timeout=RC_TIMEOUT) as resp:
                     data = json.loads(resp.read().decode("utf-8", errors="replace"))
                 msg = data.get("msg") or "已提交"
                 self.after(0, lambda: self._rc_set_head(msg, bool(data.get("ok"))))

@@ -225,9 +225,12 @@ class TestRouterConsoleUiSource(unittest.TestCase):
 
     def test_clearlog_and_proxy_panel(self):
         self.assertIn('"clearlog"', self.src)
+        self.assertIn('"enable_transparent"', self.src)
+        self.assertIn('"disable_transparent"', self.src)
         self.assertIn("清空守护日志", self.src)
         self.assertIn("RC_PROXY_PANEL_PORT = 9091", self.src)
         self.assertIn("def _rc_open_proxy_panel", self.src)
+        self.assertIn('proxy.get("transparent")', self.src)
 
     def test_runtime_diagnostics_rendered(self):
         for token in ("parse_keeper_log", "keeper_log_health", "clock_skew_seconds",
@@ -240,6 +243,11 @@ class TestRouterConsoleUiSource(unittest.TestCase):
         self.assertIn("def rc_clock_skew", self.src)
         self.assertIn("local_utc_offset_seconds", self.src)
         self.assertIn("_rc_prev_health", self.src)     # 跨次对比, 抑制时钟漂移误报
+
+    def test_router_requests_bypass_system_proxy(self):
+        """局域网工作台不得被系统里失效的 VPN/代理地址劫持。"""
+        self.assertIn("def rc_urlopen", self.src)
+        self.assertIn("ProxyHandler({})", self.src)
 
     def test_password_relationship_hint(self):
         """窗口内必须说明管理密码 / SSH 密码 / 校园网密码是三套。"""

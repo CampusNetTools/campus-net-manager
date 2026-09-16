@@ -14,7 +14,7 @@ import json
 import threading
 import time
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
 from urllib import request as urlrequest
 
 from core import recovery as core_recovery
@@ -22,7 +22,7 @@ from core import recovery as core_recovery
 from gui.theme import *  # noqa: F401,F403
 from gui.router_console_ui import (  # noqa: F401
     RC_DEFAULT_HOST, RC_DEFAULT_PORT, RC_DEFAULT_TOKEN, RC_TIMEOUT,
-    rc_server_date)
+    rc_server_date, rc_urlopen)
 
 CP_POLL_MS = 2000          # 轮询间隔
 CP_NUDGE_COOLDOWN = 25     # 同一动作最短间隔(秒), 防止动作打太密
@@ -241,8 +241,8 @@ class ConnectProgressMixin:
         def worker():
             snap, reachable = None, False
             try:
-                with urlrequest.urlopen(base + "/cgi-bin/status.sh",
-                                         timeout=RC_TIMEOUT) as resp:
+                with rc_urlopen(base + "/cgi-bin/status.sh",
+                                timeout=RC_TIMEOUT) as resp:
                     snap = json.loads(resp.read().decode("utf-8", errors="replace"))
                 reachable = True
             except Exception:
@@ -325,19 +325,22 @@ class ConnectProgressMixin:
             return
         conf = self._cp_settings()
         base = "http://%s:%s" % (conf["host"], conf["port"])
-        url = "%s/cgi-bin/action.sh?op=%s&token=%s" % (base, op, conf["token"])
+        url = "%s/cgi-bin/action.sh" % base
+        request = urlrequest.Request(
+            url, data=("op=" + op + "&token=" + conf["token"]).encode("ascii"), method="POST",
+            headers={"Content-Type": "application/x-www-form-urlencoded"})
         label = {"reconnect_relay": "重连中继", "relogin": "重新登录校园网"}.get(op, op)
 
         def worker():
             try:
                 opener = urlrequest.build_opener(urlrequest.ProxyHandler({}))
-                with opener.open(url, timeout=RC_TIMEOUT) as resp:
+                with opener.open(request, timeout=RC_TIMEOUT) as resp:
                     data = json.loads(resp.read().decode("utf-8", errors="replace"))
                 ok = bool(data.get("ok"))
                 msg = data.get("msg") or ("完成" if ok else "失败")
                 self.after(0, lambda: self._cp_log("「%s」%s: %s" % (
                     label, "成功" if ok else "未成功", msg)))
             except Exception as exc:
-                self.after(0, lambda: self._cp_log("「%s」请求失败: %s" % (label, exc)))
+                self.after(0, lambda err=exc: self._cp_log("「%s」请求失败: %s" % (label, err)))
 
         threading.Thread(target=worker, daemon=True).start()
