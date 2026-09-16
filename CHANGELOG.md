@@ -17,6 +17,14 @@
 - `scripts/deploy_router_assets.py`：路由资产部署工具纳入仓库，映射表补全为全部 12 个文件（原来只有 2 个，其余靠手工部署），并加上**覆盖前自动备份**（归档到 `/data/other_vol/proxy/backup/`）与 sha256 回读校验。凭据不硬编码，从 `--pwd` / `ROUTER_PWD` / `config.json` 取。
 - CI 新增两道检查：路由器工作台页面检查、敏感值扫描。
 
+### 发布过程中踩到并修掉的三个 CI 陷阱
+
+v5.4.4 推上去后 CI 连红两次，而且**两次本地都是全绿** —— 这类"只在 CI 上红"的问题排查成本极高，所以连同修法一起记下来：
+
+- **敏感值扫描漏扫未跟踪文件**：`secret_scan.py` 原来用 `git ls-files`（只列**已跟踪**文件）遍历仓库，于是"本地刚新建、还没 `git add`"的文件根本不进扫描 —— 而那恰恰是最可能夹带口令的时刻。本地新建的测试夹具含假值 → 本地绿；CI 是 checkout 出来的、所有文件都已跟踪 → 全部命中 → 红。已改为 `git ls-files --cached --others --exclude-standard`，并加"防回退"测试；测试夹具里的假值用行内 `# secret-scan:allow` 豁免。
+- **Windows runner 的 stdout 默认是 cp1252**：脚本里一句 `print("检查通过")` 就会抛 `UnicodeEncodeError`，脚本以非 0 退出、CI 判该步骤失败。诡异之处在于**同一份逻辑在单测里是通过的**（unittest 不往 stdout 打中文），所以症状是"macOS 绿、只有 Windows 红"。已在 workflow 顶层设 `PYTHONIOENCODING: utf-8`，从源头消除这一类失败；同时给各独立脚本补上 `sys.stdout/stderr.reconfigure(encoding="utf-8")`（stderr 也要改 —— `sys.exit("中文提示")` 走的是 stderr）。
+- **裸 `open().read()` 依赖 GC 关文件**：`console_page_lint.py` 与几个测试里都有，在 Windows 上会短暂锁住文件，且开启 `-W error::ResourceWarning` 时直接抛异常。已全部改为 `with`。
+
 ## v5.4.3
 
 全仓库线程安全普查 + 下载测速口径修正。这一轮的多数问题只有真机才会暴露，静态检查与单元测试原本都是绿的。

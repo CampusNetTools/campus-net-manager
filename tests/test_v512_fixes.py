@@ -85,7 +85,8 @@ class SecretStoreTests(unittest.TestCase):
                 cfg = self._profile_cfg()
                 config.ensure_preferences(cfg)
                 config.save_config(cfg, sync_secrets=True)
-                raw = open(path, encoding="utf-8").read()
+                with open(path, encoding="utf-8") as handle:
+                    raw = handle.read()
                 stored = json.loads(raw)
                 loaded = config.load_config()
         self.assertNotIn("secret123", raw)                     # 明文没落盘
@@ -120,7 +121,8 @@ class SecretStoreTests(unittest.TestCase):
                 json.dump(cfg_bad, handle)
             with patch.object(common, "CONFIG_PATH", path):
                 loaded = config.load_config()
-                stored = json.loads(open(path, encoding="utf-8").read())
+                with open(path, encoding="utf-8") as handle:
+                    stored = json.loads(handle.read())
         # 解不开就清空并提示, 不留残骸; 也不抛异常
         self.assertEqual(loaded["profiles"][0]["password"], "")
         self.assertEqual(loaded["profiles"][0]["password_store"], "")
@@ -429,10 +431,12 @@ class SingleInstanceLockTests(unittest.TestCase):
                     self.skipTest("本环境拿不到进程启动指纹")
                 with patch.object(common, "LOCK_PATH", lock):
                     # 同 PID + 正确指纹 => 真的已有实例
-                    open(lock, "w").write("%d %s" % (child.pid, token))
+                    with open(lock, "w", encoding="utf-8") as handle:
+                        handle.write("%d %s" % (child.pid, token))
                     self.assertFalse(core.acquire_lock())
                     # 同 PID + 过期指纹(= PID 被复用) => 应能接管
-                    open(lock, "w").write("%d %s" % (child.pid, "1234567"))
+                    with open(lock, "w", encoding="utf-8") as handle:
+                        handle.write("%d %s" % (child.pid, "1234567"))
                     self.assertTrue(core.acquire_lock())
             finally:
                 child.terminate()

@@ -33,6 +33,15 @@ import sys
 import tempfile
 from html.parser import HTMLParser
 
+# GitHub 的 Windows runner 默认 stdout 编码是 cp1252 —— 直接 print 中文会抛
+# UnicodeEncodeError, 脚本以非 0 退出, CI 步骤判失败(而同一份逻辑在单测里是通过的,
+# 因为 unittest 不往 stdout 打中文)。统一改成 UTF-8。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PAGE = os.path.join(REPO_ROOT, "router_assets", "console-index.html")
 DEFAULT_ACTION = os.path.join(REPO_ROOT, "router_assets", "console-action.sh")
@@ -73,8 +82,12 @@ def _check(rows, name, ok, detail=""):
 def lint(page_path=DEFAULT_PAGE, action_path=DEFAULT_ACTION):
     """返回 [(ok, name, detail), ...]"""
     rows = []
-    html = open(page_path, encoding="utf-8").read()
-    sh = open(action_path, encoding="utf-8").read()
+    # 必须用 with: 裸 open().read() 依赖 GC 关文件, 在 -W error::ResourceWarning
+    # 下会直接炸(而且 Windows 上还会短暂锁住文件)。
+    with open(page_path, encoding="utf-8") as fh:
+        html = fh.read()
+    with open(action_path, encoding="utf-8") as fh:
+        sh = fh.read()
 
     # 1. 标签配对
     p = _Pair()

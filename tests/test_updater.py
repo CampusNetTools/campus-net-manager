@@ -117,7 +117,8 @@ class DownloadTests(unittest.TestCase):
             updater.download("https://x/a.bin", dest,
                              progress=lambda d, t: seen.append((d, t)),
                              opener=_FakeOpener(payload))
-            self.assertEqual(open(dest, "rb").read(), payload)
+            with open(dest, "rb") as handle:
+                self.assertEqual(handle.read(), payload)
         self.assertTrue(seen)
         self.assertEqual(seen[-1], (100, 100))
 
