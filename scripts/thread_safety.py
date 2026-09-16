@@ -35,6 +35,14 @@ import ast
 import os
 import sys
 
+# 非 UTF-8 控制台(cp1252)上 print 中文会抛 UnicodeEncodeError, 让"检查通过"变成
+# 非 0 退出 —— 检查器自己把自己判成失败。统一改成 UTF-8, stdout/stderr 都要改。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 TK_METHODS = {

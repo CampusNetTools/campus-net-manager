@@ -14,6 +14,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ikev2_profile import IKEv2ProfileController
 
+# 非 UTF-8 控制台(cp1252)上 print 中文会抛 UnicodeEncodeError。本机是中文 Windows
+# (cp936)不受影响, 但换个环境/管道就会崩, 统一改成 UTF-8。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 
 def write_private(path: Path, payload: bytes) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

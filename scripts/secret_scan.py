@@ -27,6 +27,14 @@ import re
 import subprocess
 import sys
 
+# GitHub 的 Windows runner 默认 stdout 编码是 cp1252 —— 直接 print 中文会抛
+# UnicodeEncodeError 让脚本以非 0 退出, CI 步骤判失败。统一改成 UTF-8。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 SUFFIXES = (".py", ".md", ".sh", ".json", ".txt", ".yml", ".yaml", ".cfg", ".ini")

@@ -35,6 +35,14 @@ import sys
 
 import paramiko
 
+# 非 UTF-8 控制台(cp1252)上 print 中文会抛 UnicodeEncodeError, 推送脚本会在"全部
+# 推送完成"那一行崩掉 —— 文件其实已经传上去了, 却报失败。统一改成 UTF-8。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except (AttributeError, ValueError):
+    pass
+
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOCAL = os.path.join(REPO_ROOT, "router_assets")
 BACKUP_DIR = "/data/other_vol/proxy/backup"

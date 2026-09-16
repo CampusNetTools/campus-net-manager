@@ -6,6 +6,13 @@ on:
     tags: ["v*"]
   pull_request:
 
+# Windows runner 的默认 stdout 编码是 cp1252 —— 脚本里一句 print("检查通过") 就会抛
+# UnicodeEncodeError 让脚本以非 0 退出, CI 步骤判失败。诡异的是同一份逻辑在单测里是
+# 通过的(unittest 不往 stdout 打中文), 于是表现为"本地全绿、只有 Windows 红"。
+# 在源头统一成 UTF-8, 这一类失败就不必逐个脚本去补 reconfigure。
+env:
+  PYTHONIOENCODING: utf-8
+
 jobs:
   test:
     name: 测试与版本校验 (${{ matrix.os }})
