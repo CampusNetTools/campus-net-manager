@@ -7,23 +7,21 @@
 """
 import os
 import queue
-import threading
-import webbrowser
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 
 import keepalive_core as core
 import shared_proxy
 from PIL import Image, ImageDraw, ImageTk
 
 try:
-    import pystray
+    import pystray  # noqa: F401
     HAS_TRAY = True
 except Exception:
     HAS_TRAY = False
 
 try:
-    import qrcode
+    import qrcode  # noqa: F401
     HAS_QR = True
 except Exception:
     HAS_QR = False
@@ -45,12 +43,14 @@ from gui.update_ui import UpdateUiMixin  # noqa: F401
 from gui.console_ui import ConsoleUiMixin  # noqa: F401
 from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
 from gui.device_manager import DeviceManagerMixin  # noqa: F401
+from gui.subscription_ui import SubscriptionUiMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SubscriptionUiMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
+        self._instance_lock_handle = None
         if not self._acquire_instance_lock():
             self.destroy()
             raise SystemExit(0)
@@ -89,7 +89,24 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
 
 
     def _acquire_instance_lock(self):
-        """macOS 单实例保护，避免自启或重复双击产生多个窗口。"""
+        """跨平台单实例保护，避免重复守护、认证和托盘图标。"""
+        if core.IS_WINDOWS:
+            try:
+                import ctypes
+                kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+                kernel.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
+                kernel.CreateMutexW.restype = ctypes.c_void_p
+                kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+                handle = kernel.CreateMutexW(None, False, "Local\\CampusNetManager.GUI.v1")
+                if not handle:
+                    return False
+                if ctypes.get_last_error() == 183:  # ERROR_ALREADY_EXISTS
+                    kernel.CloseHandle(handle)
+                    return False
+                self._instance_lock_handle = handle
+                return True
+            except Exception:
+                return False
         if not core.IS_MACOS:
             return True
         try:
@@ -376,47 +393,51 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
         ttk.Button(nav, text="一键填本机 7890", style="Gray.TButton",
                    command=self._vpn_preset_local).grid(row=9, column=1, sticky="ew",
                                                         pady=(4, 0))
+        ttk.Button(nav, text="导入 VPN 订阅", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "vpn_subscription", self.show_subscription_window)).grid(
+                           row=10, column=0, columnspan=2, sticky="ew", pady=(4, 0))
         self.btn_vpn_disable = ttk.Button(nav, text="停用 VPN 加速", style="Quiet.TButton",
                                           command=self._vpn_disable)
-        self.btn_vpn_disable.grid(row=10, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+        self.btn_vpn_disable.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # 路由器
-        _sep(11, "路由器")
+        _sep(12, "路由器")
         ttk.Button(nav, text="路由器中继", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router_relay", self.show_router_relay_window)).grid(
-                           row=12, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
+                           row=13, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
         ttk.Button(nav, text="路由器代理", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router_proxy", self.show_router_proxy_window)).grid(
-                           row=12, column=1, sticky="ew", pady=(3, 0))
+                           row=13, column=1, sticky="ew", pady=(3, 0))
         ttk.Button(nav, text="路由器检测", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router", self.show_router_assessment)).grid(
-                           row=13, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
+                           row=14, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
         ttk.Button(nav, text="路由器后台工作台", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "router_console", self.show_router_console_window)).grid(
-                           row=13, column=1, sticky="ew", pady=(4, 0))
+                           row=14, column=1, sticky="ew", pady=(4, 0))
         ttk.Button(nav, text="连接进度（断电重启后看这里）", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "connect_progress", self.show_connect_progress_window)).grid(
-                           row=14, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+                           row=15, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # 工具
-        _sep(15, "工具")
+        _sep(16, "工具")
         ttk.Button(nav, text="网络测速", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "speed", self.show_speed_test)).grid(
-                           row=16, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
+                           row=17, column=0, sticky="ew", padx=(0, 6), pady=(3, 0))
         ttk.Button(nav, text="新手向导", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "wizard", self.show_wizard)).grid(
-                           row=16, column=1, sticky="ew", pady=(3, 0))
+                           row=17, column=1, sticky="ew", pady=(3, 0))
         ttk.Button(nav, text="偏好设置", style="Gray.TButton",
                    command=lambda: self._fwin_open_legacy(
                        "prefs", self.show_preferences)).grid(
-                           row=17, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+                           row=18, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
         # ===== 底部: 可收起运行日志 (默认收起, 展开时自动加高窗口) =====
         log_card = ttk.Frame(page, style="Card.TFrame", padding=(18, 8))

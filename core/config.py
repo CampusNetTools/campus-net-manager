@@ -385,6 +385,10 @@ def config_for_export(cfg):
         profile["password"] = ""
         for key in ("secret_id", "password_store", "password_enc"):
             profile.pop(key, None)
+    exported.pop("vpn_subscription", None)
+    if isinstance(exported.get("router_console"), dict):
+        exported["router_console"].pop("token", None)
+        exported["router_console"].pop("token_enc", None)
     return exported
 
 
