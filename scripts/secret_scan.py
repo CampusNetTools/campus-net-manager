@@ -36,9 +36,10 @@ KEYWORDS = r"(?:token|密码|口令|passwd|password|secret|pwd|令牌|密钥|api
 
 # 关键词 + 紧跟的具体值。
 # 值的判定要同时满足"抓得到"和"不误报", 三种写法都必须覆盖:
-#     TOKEN = "9f3a71bc"          (英文关键词 + 等号 + 带引号)
-#     路由器口令：77033129        (中文关键词 + 全角冒号 + 不带引号)
-#     {"token": "88273911"}       (JSON: 关键词后面先跟一个引号)
+#     TOKEN = "9f3a71bc"          (英文关键词 + 等号 + 带引号)      secret-scan:allow
+#     路由器口令：77033129        (中文关键词 + 全角冒号 + 不带引号) secret-scan:allow
+#     {"token": "88273911"}       (JSON: 关键词后面先跟一个引号)     secret-scan:allow
+#   ↑ 这三行是解释规则的文档示例, 自身会被规则命中, 所以显式豁免。
 # 而 ``token = section.get("token")`` 这类**变量引用**不能算 —— 所以要求值里
 # 必须含数字, 否则 ``section`` 这种 7 位标识符会被当成口令。
 _VALUE = (r"("
@@ -63,8 +64,17 @@ ALLOW_MARK = "secret-scan:allow"
 
 
 def tracked_files():
-    out = subprocess.run(["git", "ls-files"], cwd=REPO_ROOT,
-                         capture_output=True, text=True).stdout.split()
+    """受版本控制的文件 + **未跟踪但未被忽略**的文件。
+
+    为什么必须包含后者: 新写的文件在 `git add` 之前是 untracked 状态, 而那恰恰是
+    "刚粘进来一个口令"最可能的时刻。只看 `git ls-files`(已跟踪) 会让扫描器在开发
+    过程中形同虚设 —— v5.4.4 第一次推 CI 就是这样: 本地跑显示干净(新文件还没提交,
+    不在扫描范围内), CI 上却红了(文件已 checkout 成 tracked)。
+    被 `.gitignore` 排除的文件(.secrets.local / config.json 等)仍然不扫。
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard"],
+        cwd=REPO_ROOT, capture_output=True, text=True).stdout.split()
     return [f for f in out if f.endswith(SUFFIXES)]
 
 
