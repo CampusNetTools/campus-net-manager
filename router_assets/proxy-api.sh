@@ -69,11 +69,21 @@ esac
 URL="http://127.0.0.1:9091/$APIPATH$Q"
 
 if [ "$METHOD" = "PUT" ]; then
-  curl -sS -m 25 -X PUT \
+  OUT=$(curl -sS -m 25 -X PUT \
     -H "Authorization: Bearer $SECRET" \
     -H "Content-Type: application/json" \
-    -d "{\"name\":\"$NAME\"}" "$URL" 2>/dev/null
+    -d "{\"name\":\"$NAME\"}" "$URL" 2>/dev/null)
 else
-  curl -sS -m 25 -H "Authorization: Bearer $SECRET" "$URL" 2>/dev/null
+  OUT=$(curl -sS -m 25 -H "Authorization: Bearer $SECRET" "$URL" 2>/dev/null)
 fi
+RC=$?
+
+# mihomo 完全无响应时 curl 既不成功也不留正文。若原样返回空 body, 电脑端会把它
+# 解析成 "{}", 界面上就变成「0 个节点 / 全部节点超时」—— 把用户引向完全错误的
+# 方向。明确报出来, 管家才能提示「路由器上的代理没在运行」。
+if [ "$RC" -ne 0 ] && [ -z "$OUT" ]; then
+  printf '{"ok":false,"msg":"mihomo 无响应 (curl 退出码 %s), 请检查路由器上代理是否在运行"}\n' "$RC"
+  exit 0
+fi
+printf '%s' "$OUT"
 echo ""

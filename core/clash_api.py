@@ -46,7 +46,20 @@ PROTO_LABEL = {
 
 
 class ClashApiError(RuntimeError):
-    """路由器代理接口调用失败(网络、令牌或路由器侧拒绝)。"""
+    """路由器代理接口调用失败(网络、令牌或路由器侧拒绝)。
+
+    ``kind`` 用来区分失败层级, 调用方据此给用户不同措辞的提示:
+
+      * ``network``  —— 工作台/路由器根本不可达(超时、连接被拒)。**不是**节点的问题,
+        不能当成业务失败吞掉, 否则界面上会显示成「所有节点都超时」, 把用户引向
+        完全错误的方向(实测踩到: 路由器重启期间批量测速显示 0/N 可用)。
+      * ``rejected`` —— 路由器明确拒绝(令牌错、接口不在白名单、mihomo 没在运行)。
+      * ``badjson``  —— 路由器返回了非 JSON(通常是被中间设备劫持的页面)。
+    """
+
+    def __init__(self, message, kind="unknown"):
+        super().__init__(message)
+        self.kind = kind
 
 
 # --------------------------------------------------------------------- 纯函数
@@ -117,10 +130,24 @@ def build_nodes(proxies, group_json):
     return nodes
 
 
-def sort_nodes(nodes, by="delay"):
-    """按延迟升序(未测/失败的排最后), 同延迟保持原名顺序。"""
+def sort_nodes(nodes, by="delay", desc=False):
+    """排序节点。
+
+    ``by``: ``delay``(默认) / ``name`` / ``proto``。
+    未测过或测速失败的节点**永远排在最后**, 即使开降序也一样 —— 否则点一下
+    「延迟」列头, 一堆「—」就会跑到最上面挡住真正可用的节点。
+    """
+    nodes = list(nodes or [])
     if by == "name":
-        return sorted(nodes, key=lambda n: n.get("name", ""))
+        return sorted(nodes, key=lambda n: n.get("name", ""), reverse=bool(desc))
+    if by == "proto":
+        return sorted(nodes, key=lambda n: (n.get("proto", ""), n.get("name", "")),
+                      reverse=bool(desc))
+    if desc:
+        # 不用 reverse=True: 那样 "未测" 会被翻到最前面
+        return sorted(nodes, key=lambda n: (n.get("delay") is None,
+                                            -(n.get("delay") or 0),
+                                            n.get("name", "")))
     return sorted(nodes, key=lambda n: (n.get("delay") is None, n.get("delay") or 0,
                                         n.get("name", "")))
 
@@ -148,6 +175,32 @@ def throughput_mbps(byte_count, seconds):
     if not seconds or seconds <= 0 or not byte_count:
         return 0.0
     return round(byte_count * 8 / seconds / 1_000_000.0, 2)
+
+
+def protocol_choices(nodes, include_all=True):
+    """从实际节点派生协议筛选项。
+
+    之前界面上是硬编码 ``["全部","VLESS","Hysteria2"]``, 一旦订阅里出现 VMess/
+    Trojan, 那些节点就只能靠「全部」看, 没法单独筛出来。
+    """
+    labels = sorted({n.get("proto") for n in (nodes or []) if n.get("proto")})
+    return (["全部"] + labels) if include_all else labels
+
+
+def error_hint(exc):
+    """把 ClashApiError 的 kind 翻译成可执行的排查建议(给界面用)。"""
+    kind = getattr(exc, "kind", "unknown")
+    if kind == "network":
+        return ("连不上路由器工作台。检查: ① 路由器是否在线、电脑有没有接到它的网络; "
+                "② 连接参数里的主机与端口是否填对。")
+    if kind == "rejected":
+        return ("路由器拒绝了请求。常见原因: ① 工作台令牌与路由器不一致"
+                "(默认 20050927); ② 路由器上 mihomo 没在运行; "
+                "③ 代理接口脚本 proxy-api.sh 没部署。")
+    if kind == "badjson":
+        return ("路由器返回的是网页而不是 JSON, 通常是被校园网门户劫持了: "
+                "确认当前连的是校园网、且本机没有挂其它代理。")
+    return ""
 
 
 # --------------------------------------------------------------------- 网络
@@ -182,17 +235,21 @@ def relay_request(host, port, token, path, method="GET", name=None, timeout=RELA
         opener = urlrequest.build_opener(urlrequest.ProxyHandler({}))
         with opener.open(req, timeout=timeout) as resp:
             raw = resp.read().decode("utf-8", "replace")
-    except (HTTPError, URLError, OSError) as exc:
-        raise ClashApiError("路由器代理接口不可达: %s" % exc) from exc
+    except HTTPError as exc:
+        # 能连上工作台但 HTTP 出错(404/500...) —— 属于配置/部署问题
+        raise ClashApiError("路由器代理接口返回 HTTP %s" % exc.code,
+                            kind="rejected") from exc
+    except (URLError, OSError) as exc:
+        raise ClashApiError("路由器代理接口不可达: %s" % exc, kind="network") from exc
     text = (raw or "").strip()
     if not text:
         return {}
     try:
         payload = json.loads(text)
     except ValueError as exc:
-        raise ClashApiError("路由器返回了非 JSON 响应") from exc
+        raise ClashApiError("路由器返回了非 JSON 响应", kind="badjson") from exc
     if isinstance(payload, dict) and payload.get("ok") is False:
-        raise ClashApiError(payload.get("msg") or "路由器拒绝了请求")
+        raise ClashApiError(payload.get("msg") or "路由器拒绝了请求", kind="rejected")
     return payload
 
 
@@ -214,12 +271,15 @@ def api_select(host, port, token, name, group=SELECT_GROUP, timeout=20):
 
 
 def api_delay(host, port, token, node, timeout=25):
-    """测试单个节点的延迟(毫秒); 失败返回 None。"""
+    """测试单个节点的延迟(毫秒); 节点握手失败返回 None。
+
+    注意**不吞 ClashApiError**: 节点不通是正常业务结果(mihomo 返回带 ``message``
+    的 JSON, 没有 ``delay`` 字段), 走下面 ``int(None)`` 那条路返回 None;
+    而抛异常意味着「路由器/工作台/mihomo 本身出问题」, 那是环境故障, 必须让
+    调用方看见 —— 否则批量测速会把路由器重启误报成「52 个节点全挂了」。
+    """
     path = "proxies/%s/delay" % node
-    try:
-        data = relay_request(host, port, token, path, timeout=timeout)
-    except ClashApiError:
-        return None
+    data = relay_request(host, port, token, path, timeout=timeout)
     try:
         delay = int((data or {}).get("delay"))
     except (TypeError, ValueError):
