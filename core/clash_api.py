@@ -195,7 +195,8 @@ def error_hint(exc):
                 "② 连接参数里的主机与端口是否填对。")
     if kind == "rejected":
         return ("路由器拒绝了请求。常见原因: ① 工作台令牌与路由器不一致"
-                "(默认 20050927); ② 路由器上 mihomo 没在运行; "
+                "(与路由器 /data/other_vol/console/token 里的值不一致); "
+                "② 路由器上 mihomo 没在运行; "
                 "③ 代理接口脚本 proxy-api.sh 没部署。")
     if kind == "badjson":
         return ("路由器返回的是网页而不是 JSON, 通常是被校园网门户劫持了: "

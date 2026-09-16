@@ -70,7 +70,7 @@ class SecretStoreTests(unittest.TestCase):
         return {
             "profiles": [{
                 "name": core.LIDA_PROFILE_NAME, "preset": core.LIDA_PROFILE_ID,
-                "ssid": core.LIDA_SSID, "username": "student", "password": "secret123",
+                "ssid": core.LIDA_SSID, "username": "student", "password": "secret123",  # secret-scan:allow 夹具假值
                 "auth_url": core.DEFAULT_AUTH_URL, "interval": 60,
             }],
             "active_profile": core.LIDA_PROFILE_NAME,

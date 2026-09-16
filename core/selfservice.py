@@ -9,7 +9,7 @@ v5.2.2 重写。原实现猜 Dr.COM 用户自助服务系统挂在 ``8080/Self/`
 实测校准后的真实数据源 (Dr.COM 哆点 ePortal 用户门户, 无需登录自助服务):
 
   1. 在线设备列表  GET  http://<auth-host>:801/eportal/portal/online_list
-       参数: user_account = 账号@运营商后缀 (如 24012752@cmcc)
+       参数: user_account = 账号@运营商后缀 (如 12345678@cmcc)
        返回: JSONP ``dr1003({"result":1,"list":[...],"total":N})``,
        每项含 online_session / online_ip / online_mac / dhcp_host(设备名,
        如 MiWiFi-RD08) / online_time / time_long(在线秒数) / uplink_bytes /

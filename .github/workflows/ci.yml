@@ -43,6 +43,10 @@ jobs:
           ruff check --no-cache --select F,E9 --ignore F401,F403,F405 .
       - name: 版本号一致性校验
         run: python scripts/sync_version.py --check
+      - name: 路由器工作台页面检查（动作名与后端双向一致）
+        run: python scripts/console_page_lint.py
+      - name: 敏感值扫描（本仓库是 public，禁止明文口令入库）
+        run: python scripts/secret_scan.py --strict
 
   release:
     name: 构建并发布 (${{ matrix.target }})
