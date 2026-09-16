@@ -12,6 +12,7 @@ import shared_proxy  # noqa: F401
 from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
+from gui.ui_dispatch import post
 
 try:
     import pystray  # noqa: F401
@@ -146,20 +147,30 @@ class DaemonCtlMixin:
                 text = core.collect_diagnostics()
                 with open(fname, "w", encoding="utf-8") as f:
                     f.write(text)
-                try:
-                    self.clipboard_clear()
-                    self.clipboard_append(text)
-                except Exception:
-                    pass
+
                 def done():
+                    # 剪贴板是 tkinter 操作, 必须在主线程做。
+                    # 以前这两行在工作线程里, 异常又被 except 静默吞掉 —— 于是
+                    # "复制失败"时提示语照样宣称"内容也已复制到剪贴板", 等于骗用户。
+                    copied = True
+                    try:
+                        self.clipboard_clear()
+                        self.clipboard_append(text)
+                    except Exception:
+                        copied = False
                     self._log("诊断报告已保存: %s" % fname)
-                    messagebox.showinfo("诊断完成",
-                                        "诊断报告已保存到：\n%s\n\n内容也已复制到剪贴板，可直接粘贴发给技术人员。" % fname)
-                self.after(0, done)
+                    messagebox.showinfo(
+                        "诊断完成",
+                        "诊断报告已保存到：\n%s\n\n%s"
+                        % (fname,
+                           "内容也已复制到剪贴板，可直接粘贴发给技术人员。" if copied
+                           else "（剪贴板复制未成功，请直接打开上面这个文件发送。）"))
+
+                post(self, done)
             except Exception as e:
                 # 必须把异常绑定成默认参数: except ... as e 会在块结束时 del e,
                 # lambda 稍后由事件循环调用时 e 已不存在 → 错误提示本身抛 NameError。
-                self.after(0, lambda err=e: messagebox.showerror("诊断失败", str(err)))
+                post(self, lambda err=e: messagebox.showerror("诊断失败", str(err)))
         threading.Thread(target=_do, daemon=True).start()
 
 

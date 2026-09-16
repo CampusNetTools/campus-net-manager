@@ -363,10 +363,14 @@ class ClashNodesMixin:
         head = ("当前节点: %s   |   共 %d 个节点 (%s)   |   mihomo %s   |   在线 %d"
                 % (self._clash_current or "未知", len(nodes), proto_txt,
                    version.get("version", "-"), len(alive)))
-        if probe_code is not None:
+        if probe_code is None:
+            head += "   |   代理探活不可用(没连上 %s:7890)" % self._clash_conf()[0]
+        else:
             head += "   |   代理探活 HTTP %s %s" % (
                 probe_code, "正常" if probe_code == 204 else "不通")
-        self._clash_set_head(head, probe_code == 204)
+        # 探活失败(None)时不要把整行染红: 节点列表、mihomo 版本都是好的, 出问题的
+        # 只是"从本机经路由器代理"这一段。整行标红会让人以为节点全挂了。
+        self._clash_set_head(head, None if probe_code is None else (probe_code == 204))
         if not nodes:
             self._clash_log(
                 "路由器上的代理没有任何可用节点。\n\n"
@@ -814,54 +818,69 @@ class ClashNodesMixin:
 
     def _clash_speed_test(self):
         host, port, _ = self._clash_conf()
+        # 下载测速走的是路由器 mihomo 的「节点选择」当前出口, 跟列表里高亮哪一行
+        # 无关。所以标题必须报"当前出口", 否则用户会把结果当成选中节点的带宽。
+        current = getattr(self, "_clash_current", "") or "当前节点"
         node = self._clash_selected_node()
-        label = node["name"] if node else (getattr(self, "_clash_current", "") or "当前节点")
+        warn = ""
+        if node and node["name"] != current:
+            warn = ("\n\n注意: 列表里选中的是「%s」, 但代理当前走「%s」——\n"
+                    "这次测的是**当前出口**的带宽。想测选中那个, 请先点「切换到选中节点」。"
+                    % (node["name"], current))
         if not messagebox.askyesno(
                 "下载测速",
                 "将通过路由器代理下载 5 MB 测试数据, 占用 5~15 秒带宽。\n"
-                "目标是 %s。继续吗？" % label, parent=self._clash_window):
+                "测的是当前出口: %s。继续吗？%s" % (current, warn),
+                parent=self._clash_window):
             return
-        self._clash_set_head("正在下载测速 (约 5 MB)…", None)
+        # 下载测速也吃带宽、也会在结束时刷新头部, 必须和批量测速共用忙闲闸,
+        # 否则两个任务叠着跑, 结果互相覆盖(以前漏了这一步)。
+        if not self._clash_begin_busy("正在下载测速 (约 5 MB)…"):
+            return
 
         def worker():
             proxy = "http://%s:7890" % host
             opener = urlrequest.build_opener(urlrequest.ProxyHandler(
                 {"http": proxy, "https": proxy}))
             last_err = "没有可用的测速源"
-            for url in SPEED_URLS:
-                started = time.monotonic()
-                got = 0
-                try:
-                    with opener.open(url, timeout=30) as resp:
-                        while True:
-                            chunk = resp.read(65536)
-                            if not chunk:
-                                break
-                            got += len(chunk)
-                            if got >= SPEED_BYTES:
-                                break
-                            # socket 超时只约束"两次读取之间", 对一根一直滴答的
-                            # 慢速管道等于没有上限, 所以自己盯总时长。
-                            if time.monotonic() - started > SPEED_MAX_SECONDS:
-                                break
-                except (HTTPError, URLError, OSError) as exc:
-                    last_err = str(exc)
-                    continue
-                elapsed = time.monotonic() - started
-                if got < SPEED_MIN_BYTES:
-                    last_err = ("只收到 %.0f KB, 样本太小算不出可信带宽"
-                                % (got / 1024.0))
-                    continue
-                mbps = clash.throughput_mbps(got, elapsed)
-                self._clash_ui(lambda g=got, e=elapsed, m=mbps: self._clash_log(
-                    "下载测速完成: %.1f MB / %.1f 秒 = %.2f Mbps\n(经 %s 代理, 目标 %s)"
-                    % (g / 1048576.0, e, m, host, label)))
+            try:
+                for url in SPEED_URLS:
+                    started = time.monotonic()
+                    got = 0
+                    try:
+                        with opener.open(url, timeout=30) as resp:
+                            while True:
+                                chunk = resp.read(65536)
+                                if not chunk:
+                                    break
+                                got += len(chunk)
+                                if got >= SPEED_BYTES:
+                                    break
+                                # socket 超时只约束"两次读取之间", 对一根一直滴答的
+                                # 慢速管道等于没有上限, 所以自己盯总时长。
+                                if time.monotonic() - started > SPEED_MAX_SECONDS:
+                                    break
+                    except (HTTPError, URLError, OSError) as exc:
+                        last_err = str(exc)
+                        continue
+                    elapsed = time.monotonic() - started
+                    if got < SPEED_MIN_BYTES:
+                        last_err = ("只收到 %.0f KB, 样本太小算不出可信带宽"
+                                    % (got / 1024.0))
+                        continue
+                    mbps = clash.throughput_mbps(got, elapsed)
+                    self._clash_ui(lambda g=got, e=elapsed, m=mbps: self._clash_log(
+                        "下载测速完成: %.1f MB / %.1f 秒 = %.2f Mbps\n(经 %s 代理, 出口 %s)"
+                        % (g / 1048576.0, e, m, host, current)))
+                    return
+                self._clash_ui(lambda msg=last_err: self._clash_fail_msg(
+                    "下载测速失败",
+                    "%s\n\n说明当前出口「%s」过不了真实流量(常见的「假活」节点), "
+                    "建议点「换一个可用节点」。" % (msg, current)))
+            finally:
+                # 必须先松开忙闲闸再排队刷新 —— 否则 _clash_refresh 会被
+                # "正在忙"挡掉, 头部状态行会一直卡在「正在下载测速…」。
+                self._clash_end_busy()
                 self._clash_ui(self._clash_refresh)
-                return
-            self._clash_ui(lambda msg=last_err: self._clash_fail_msg(
-                "下载测速失败",
-                "%s\n\n说明当前节点过不了真实流量(常见的「假活」节点), "
-                "建议点「换一个可用节点」。" % msg))
-            self._clash_ui(self._clash_refresh)
 
         threading.Thread(target=worker, daemon=True).start()

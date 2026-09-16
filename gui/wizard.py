@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageTk  # noqa: F401
 
 from gui.theme import *  # noqa: F401,F403
 from gui.scrollkit import fit_geometry
+from gui.ui_dispatch import post
 
 try:
     import pystray  # noqa: F401
@@ -131,7 +132,6 @@ class WizardMixin:
 
                 def detect():
                     brand, gw, guide = core.router_guide(target_ssid, need_auth)
-                    state["brand"], state["gw"], state["guide"] = brand, gw, guide
                     head = "检测到副路由器：%s\n管理地址：http://%s\n\n" % (brand or "未知品牌", gw or "无法获取")
                     if need_auth:
                         up_txt = "校园网 %s" % target_ssid
@@ -143,9 +143,17 @@ class WizardMixin:
                         tail = ("👇 让副路由器中继连接「%s」（%s）：\n\n" % (target_ssid, up_txt)
                                 + guide +
                                 "\n\n完成后：副路由会扩展「%s」的信号范围，手机/电脑连副路由(或主路由)都能上网。" % target_ssid)
-                    set_body(head + tail)
-                    btn_act2.configure(state="normal" if gw else "disabled",
-                                       command=lambda: webbrowser.open("http://%s" % gw))
+
+                    def apply():
+                        # set_body 会操作 Text 控件、btn_act2 本身也是控件 —— 都是
+                        # tkinter 调用, 必须回到主线程。以前这两句直接在 detect 这个
+                        # 工作线程里跑, 撞上事件循环的空档就是 RuntimeError。
+                        state["brand"], state["gw"], state["guide"] = brand, gw, guide
+                        set_body(head + tail)
+                        btn_act2.configure(state="normal" if gw else "disabled",
+                                           command=lambda: webbrowser.open("http://%s" % gw))
+
+                    post(self, apply)
                 threading.Thread(target=detect, daemon=True).start()
 
         def enter_plan_c():
