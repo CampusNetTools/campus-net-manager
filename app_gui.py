@@ -45,9 +45,10 @@ from gui.feature_windows import FeatureWindowsMixin  # noqa: F401
 from gui.device_manager import DeviceManagerMixin  # noqa: F401
 from gui.subscription_ui import SubscriptionUiMixin  # noqa: F401
 from gui.clash_nodes_ui import ClashNodesMixin  # noqa: F401
+from gui.nas_ui import NasUiMixin  # noqa: F401
 
 
-class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SubscriptionUiMixin, ClashNodesMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
+class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMixin, ConnectProgressMixin, SubscriptionUiMixin, ClashNodesMixin, NasUiMixin, SpeedWindowMixin, TunnelUiMixin, PreferencesMixin, TrayMixin, DaemonCtlMixin, WizardMixin, UpdateUiMixin, ConsoleUiMixin, FeatureWindowsMixin, DeviceManagerMixin, tk.Tk):
     def __init__(self):
         super().__init__()
         self._instance_lock_file = None
@@ -428,6 +429,10 @@ class App(ProfileFormMixin, RouterToolsMixin, RouterProxyMixin, RouterConsoleMix
                    command=lambda: self._fwin_open_legacy(
                        "connect_progress", self.show_connect_progress_window)).grid(
                            row=15, column=1, sticky="ew", pady=(4, 0))
+        ttk.Button(nav, text="NAS 管家", style="Gray.TButton",
+                   command=lambda: self._fwin_open_legacy(
+                       "nas", self.show_nas_window)).grid(
+                           row=16, column=0, sticky="ew", padx=(0, 6), pady=(4, 0))
 
         # 工具
         _sep(16, "工具")

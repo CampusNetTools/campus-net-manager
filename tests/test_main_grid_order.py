@@ -21,8 +21,8 @@ class TestV5LayoutReplacesGrid(unittest.TestCase):
         from app_gui import App
         src = inspect.getsource(App._build_ui)
         self.assertIn("_fwin_open_legacy", src)
-        # 路由器/连接进度/VPN 订阅/Clash 节点/工具窗口均走单实例机制，共 10 处。
-        self.assertEqual(src.count("_fwin_open_legacy"), 10)
+        # 路由器/连接进度/VPN 订阅/Clash 节点/NAS 管家/工具窗口均走单实例机制，共 11 处。
+        self.assertEqual(src.count("_fwin_open_legacy"), 11)
 
 
 class TestRouterWindowsSplit(unittest.TestCase):
