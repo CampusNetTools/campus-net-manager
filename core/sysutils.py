@@ -70,7 +70,7 @@ def set_autostart(enabled):
         try:
             if enabled:
                 os.makedirs(os.path.dirname(path), exist_ok=True)
-                args = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.join(os.path.dirname(__file__), "app_gui.py")]
+                args = [sys.executable] if getattr(sys, "frozen", False) else [sys.executable, os.path.join(BASE_DIR, "app_gui.py")]
                 with open(path, "wb") as f:
                     plistlib.dump({"Label": _MAC_LAUNCH_LABEL, "ProgramArguments": args,
                                    "RunAtLoad": True, "ProcessType": "Interactive"}, f)
