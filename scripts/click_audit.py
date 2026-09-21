@@ -10,8 +10,8 @@
 结果输出: /tmp/click_audit.json
 """
 import sys, os, time, json, subprocess
-sys.path.insert(0, "/Users/nanyu/Desktop/校园连接助手")
-os.chdir("/Users/nanyu/Desktop/校园连接助手")
+sys.path.insert(0, "/Users/nanyu/Documents/项目/校园连接助手")
+os.chdir("/Users/nanyu/Documents/项目/校园连接助手")
 
 import tkinter as tk
 from tkinter import ttk

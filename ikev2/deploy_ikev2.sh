@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # 校园网连接管家 · IKEv2 网关一键部署 (v1.0)
-# 用法: sudo bash /Users/nanyu/Desktop/校园连接助手/ikev2/deploy_ikev2.sh [可选:目标IP]
+# 用法: sudo bash /Users/nanyu/Documents/项目/校园连接助手/ikev2/deploy_ikev2.sh [可选:目标IP]
 # 作用: 启动 strongSwan 网关 + 开启 IP 转发/NAT + 加载 iPhone 凭据
 #       IP 变化时重跑本脚本即可(自动重签服务器证书并更新手机描述文件)
 # ============================================================

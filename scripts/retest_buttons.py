@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """v5.0.8 针对性复测: 上轮审计可疑 DEAD 按钮逐个复测(等待 5s + 截图)。"""
 import sys, os, time, json, subprocess
-sys.path.insert(0, "/Users/nanyu/Desktop/校园连接助手")
-os.chdir("/Users/nanyu/Desktop/校园连接助手")
+sys.path.insert(0, "/Users/nanyu/Documents/项目/校园连接助手")
+os.chdir("/Users/nanyu/Documents/项目/校园连接助手")
 
 import tkinter as tk
 import Quartz

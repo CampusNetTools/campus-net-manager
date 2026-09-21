@@ -25,7 +25,7 @@ C:/Users/lugua/Desktop/keepalive.log             # 运行日志（同上）
 
 **macOS（另一台机器，用户名 nanyu）**
 ```
-/Users/nanyu/Desktop/校园连接助手
+/Users/nanyu/Documents/项目/校园连接助手
 ```
 - 两台机器都对齐 GitHub main；**改代码前先 `git pull`**，两边可能并行改（v5.1.0 发布时 Mac 侧也并行上传过资产）。
 - `/Users/nanyu/Documents/Codex/2026-08-28/hi-2/campus-net-manager` 为旧主仓库（已归档）。
@@ -96,7 +96,7 @@ uv run --with pyinstaller --with pystray --with pillow --with qrcode \
 
 **macOS**
 ```bash
-cd /Users/nanyu/Desktop/校园连接助手
+cd /Users/nanyu/Documents/项目/校园连接助手
 unset http_proxy https_proxy   # 必须! 否则构建/测试走系统代理
 export PYTHON_BIN="$PWD/.venv/bin/python"
 bash scripts/build_macos.sh    # 产物 dist/macos/校园网连接管家.app
@@ -109,7 +109,7 @@ cd dist/macos && zip -rq "校园网连接管家-macOS-arm64-${VER}.zip" "校园�
 # Windows
 cd /c/Users/lugua/projects/lida-net-keepalive && python -m pytest tests/ -q
 # macOS
-cd /Users/nanyu/Desktop/校园连接助手 && env -u http_proxy -u https_proxy .venv/bin/python -m unittest discover -s tests
+cd /Users/nanyu/Documents/项目/校园连接助手 && env -u http_proxy -u https_proxy .venv/bin/python -m unittest discover -s tests
 ```
 - **260 项通过 / 2 skipped**（约 18 秒）。若套件整体卡住超 1 分钟，必有测试在真实网络/死循环——用 `-v` 定位。
 - **测试里禁止写死绝对日期**：`tests/test_timeline_stealth.py` 曾写死 `2026-09-04` 配合 `days=7` 窗口，到期后必假失败（v5.1.0 已改相对日期）。

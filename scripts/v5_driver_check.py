@@ -13,8 +13,8 @@ import sys
 import time
 import urllib.request
 
-sys.path.insert(0, "/Users/nanyu/Desktop/校园连接助手")
-os.chdir("/Users/nanyu/Desktop/校园连接助手")
+sys.path.insert(0, "/Users/nanyu/Documents/项目/校园连接助手")
+os.chdir("/Users/nanyu/Documents/项目/校园连接助手")
 
 import tkinter as tk  # noqa: E402
 import shared_proxy  # noqa: E402
