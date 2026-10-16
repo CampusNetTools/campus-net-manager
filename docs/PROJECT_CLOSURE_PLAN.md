@@ -88,9 +88,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 外部发布门槛
 
-- Google Play 新应用和更新当前要求 target API 36；若开发者是 2023-11-13 后创建的个人账号，申请生产发布前需 12 名测试者连续参加封闭测试 14 天。
-- Apple VPN App Store 发布需组织开发者账号，并按审核要求披露网络数据处理；账号、法律主体、隐私政策和实际审核需用户本人参与。
-- 不把开发者密码、验证码、签名私钥或账号恢复码写入仓库/记忆。
+- 截至 2026-10-16，Google Play 官方政策规定：从 2026-08-31 起，新应用和更新须 target Android 16/API 36 或更高；本项目 API 36 是必要条件，但构建通过不等于 Play 接收。[Target API level requirements](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en)
+- 若 Play Console 个人开发者账号创建于 2023-11-13 之后，申请生产访问前需完成封闭测试，至少 12 名测试者连续 opt-in 满 14 天，并提交测试反馈及生产准备情况；组织账号不适用这项个人账号门槛。[App testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en)
+- 若 iOS 版本提供 VPN 服务，Apple App Review Guideline 5.4 要求使用 `NEVPNManager`，仅允许组织开发者账号提交，并在使用前清楚披露收集/使用的数据；还要求承诺不出售、使用或向第三方披露用户数据，并写入隐私政策。[App Review Guidelines 5.4](https://developer.apple.com/app-store/review/guidelines/uk/)
+- 这些账号、组织主体、测试者、隐私声明和实际审核均依赖用户的开发者账号及申报信息；不把开发者密码、验证码、签名私钥或账号恢复码写入仓库/记忆。
 
 ## 验收记录模板
 
