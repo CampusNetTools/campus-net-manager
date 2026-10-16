@@ -165,3 +165,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12058786072` 外层 ZIP SHA-256 `20c5326c765aa96b605e7afb3e8bbcad325d985360766b5fafd202115f8cd3e4`，与 Actions artifact digest 一致；ZIP CRC 通过。内层候选 ZIP SHA-256 `995352b656d0ac192184352f0f51b21900badb94bfe6285802e9f65f8497aa1c`，与 sidecar 一致且 CRC 通过。`ditto` 解包后的 `CampusNetManager.app` 通过 `codesign --verify --deep --strict`，bundle id `com.campusnettools.campusnetmanager`，版本 `5.5.0`，含 62 个符号链接；签名为 adhoc，无 Team ID。
 - Windows artifact `12059100129` 外层 ZIP SHA-256 `97872106757484d77a558cf0d9ce12645d7ef997bded9e688148b43f1253128b`，与 Actions artifact digest 一致；ZIP CRC 通过。内层 `CampusNetManager-windows.exe` SHA-256 `7e6ea599c57eedf18119c9e3b77b9c4ddaad16fe9a71a44d4a932343be9b94c5`，与 sidecar 一致；文件格式为 PE32+ GUI x86-64。Windows 包未签名。
 - 两个平台均是 CI 构建并完成 runner 启动烟雾的候选包，不代表用户 Windows 设备安装验收、macOS Developer ID/公证、升级或正式 Release。macOS 安装版 CUA 可见“新手向导”按钮，但本轮键盘与点击交互未打开向导；Computer Use 专用运行时未启动，因此控件级功能仍未验收。
+
+## f3fa7e0 双平台 CI 与候选包终态（2026-10-17）
+
+- PR CI run `38931762696` 对 head `f3fa7e007fed239a02415246013d1011657568f4` 的 Windows/macOS 全套测试及静态、版本、页面和敏感值检查均 success；发布 job 按 PR 规则 skipped。
+- Desktop candidate run `38931762695` 的 Windows/macOS 构建、runner 启动 smoke 与候选 artifact 上传均 success。Windows artifact `12059805531` 外层 ZIP SHA-256 `efd2bd9a6bd2a0e373823f92ea2ff9dff00f4d06ec7ab2e94fc0fc454b749738` 与 Actions digest 一致且 CRC 通过；内层 EXE SHA-256 `a12686688b7d43a031ac9f4ac6aec9b14f820ea59d657c565ead5f61b75f5de3` 与 sidecar 一致，PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
+- macOS artifact `12059816085` 外层 ZIP SHA-256 `26509e239e3c9f4f612e607adbe14d21d3fc35e5ec0a171eb309317d64eb297f` 与 Actions digest 一致且 CRC 通过；内层 ZIP SHA-256 `f949e7ce3e7a6371b160213ba49dcaa8cc01be8767ca8574fdaee2a922036160` 与 sidecar 一致且 CRC 通过。`ditto` 解包后的 bundle `com.campusnettools.campusnetmanager` v5.5.0 通过 strict codesign，包含 62 个 symlink；签名为 adhoc、无 Team ID。
+- 本次回读补齐 `f3fa7e0` 的候选包内容证据。候选与 CI runner smoke 仍不代表用户 Windows 安装、macOS Developer ID/公证、升级或正式 Release；Android/iOS 真机与商店验收也未完成。
