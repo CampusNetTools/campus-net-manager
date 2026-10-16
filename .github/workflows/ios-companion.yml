@@ -63,8 +63,14 @@ jobs:
           bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
           xcrun simctl launch "$udid" "$bundle_id"
 
+      - name: Package simulator app with bundle directory intact
+        run: |
+          app="$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator/CampusNetCompanion.app"
+          ditto -c -k --sequesterRsrc --keepParent "$app" \
+            "$RUNNER_TEMP/CampusNetCompanion-Simulator.app.zip"
+
       - name: 上传 iOS 模拟器构建产物
         uses: actions/upload-artifact@v4
         with:
           name: campusnet-ios-simulator-unsigned
-          path: ${{ runner.temp }}/DerivedData/Build/Products/Debug-iphonesimulator/CampusNetCompanion.app
+          path: ${{ runner.temp }}/CampusNetCompanion-Simulator.app.zip
