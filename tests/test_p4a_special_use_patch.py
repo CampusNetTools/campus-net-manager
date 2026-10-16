@@ -15,7 +15,11 @@ from scripts.patch_p4a_special_use import (
 class P4aSpecialUsePatchTests(unittest.TestCase):
     def test_buildozer_uses_the_supported_services_setting(self):
         spec = configparser.ConfigParser()
-        spec.read(Path(__file__).parents[1] / "mobile" / "buildozer.spec")
+        spec.read_string(
+            (Path(__file__).parents[1] / "mobile" / "buildozer.spec").read_text(
+                encoding="utf-8"
+            )
+        )
         self.assertEqual(
             spec.get("app", "services"),
             "campusguard:services/campusguard.py:foreground:sticky:foregroundServiceType=specialUse",
