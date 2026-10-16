@@ -46,7 +46,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建曾失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。Buildozer 已改为 pin `kivy==2.3.1`；新 run `38852810567` 正在构建 API 36 debug APK，最后读取时尚未离开 APK 编译步骤，Manifest 检查与 artifact 上传尚未执行。
 - iOS `NEVPNManager` + `NEVPNProtocolIKEv2` 的 unsigned simulator workflow 已在 run `38852926224` 对提交 `38ccfef` 构建成功。该 run 验证 XcodeGen 生成和模拟器编译通过；没有验证签名、真机安装、证书信任、IKEv2 连通、双向流量或 App Store 发布。
 - 随后扩展 iOS workflow：run `38853483784` 的编译成功，但 Simulator 安装失败，日志指出 `.app` 的 `Info.plist` 缺少有效 `CFBundleExecutable`。补上 `$(EXECUTABLE_NAME)` 与 `$(PRODUCT_NAME)` 后，run `38853975796` 已在 iPhone Simulator 编译、安装、启动成功，并上传 unsigned `.app` artifact（ID `12026980614`，SHA-256 `e30d3d4bc9d5f7cbc426a1d068fca5c43583f6c0e025b20620e575be174afe32`）。模拟器启动不替代真机 VPN 与网络验收。
-- 新增 Android API 36 signed AAB 手动 workflow：复用固定 p4a/Kivy 依赖，要求 GitHub Actions secrets 提供 upload keystore 和 alias 信息，构建后验证签名并上传 artifact；它不会自动发布到 Google Play。由于当前还没有这些 secrets，此 workflow 尚未执行验证。
+- 新增 Android API 36 AAB 手动 workflow：unsigned 模式可用于验证 bundle 构建；signed 模式要求 GitHub Actions secrets 提供 upload keystore 和 alias 信息，构建后验证签名并上传 artifact。它不会自动发布到 Google Play；尚未执行 AAB 构建验证。
 
 ## 最新核验（2026-10-16）
 

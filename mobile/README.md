@@ -40,11 +40,11 @@ buildozer android debug   # 产物在 bin/*.apk
 
 ### 签名 AAB
 
-手动运行 `.github/workflows/android-release-aab.yml` 可构建并校验 API 36 signed AAB artifact；此工作流不会自动上传到 Google Play。运行前需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。
+手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用于检查打包结果，不能上传 Play；signed 模式会验证签名并产出可供 Play Console 上传的 bundle。此工作流不会自动发布到 Google Play。signed 模式需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。
 
 ## 已知限制
 
 - **运行时状态**：Android 前台服务由用户在 App 内启动/停止，要求通知权限；系统省电策略、厂商后台限制和网络状态仍需真机验收。
 - **凭据**：Android Keystore 实现已加入源码，但本机尚无 Android 构建工具链；最终 APK 中的加解密、升级迁移和密钥丢失恢复仍待验证。
-- **发布状态**：手动 debug APK 工作流与 signed AAB 构建工作流已配置；AAB 尚未运行验证（缺少上述 keystore secrets），商店内测/生产发布和审核尚未完成。
+- **发布状态**：手动 debug APK 工作流与 AAB 工作流已配置；unsigned AAB 构建尚待验证，signed 模式需要上述 keystore secrets；商店内测/生产发布和审核尚未完成。
 - iOS 系统 IKEv2 客户端与 Mac 端 enrollment 路线见 `../ios/CampusNetCompanion/README.md`；App Store build、签名、设备验收和上架尚未完成。

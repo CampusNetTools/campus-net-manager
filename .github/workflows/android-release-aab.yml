@@ -1,7 +1,14 @@
-name: Android signed release bundle
+name: Android release AAB
 
 on:
   workflow_dispatch:
+    inputs:
+      signing:
+        description: "Build an unsigned review bundle or a signed Play upload bundle"
+        type: choice
+        options: [unsigned, signed]
+        default: unsigned
+        required: true
 
 permissions:
   contents: read
@@ -11,6 +18,7 @@ jobs:
     name: Build and verify signed Android App Bundle
     runs-on: ubuntu-22.04
     env:
+      SIGNING_MODE: ${{ inputs.signing }}
       P4A_RELEASE_KEYSTORE: ${{ runner.temp }}/campusnet-upload.jks
       P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       P4A_RELEASE_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -60,12 +68,17 @@ jobs:
 
       - name: Prepare SDK, release artifact format, and upload key
         run: |
-          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Set ANDROID_KEYSTORE_BASE64 in repository secrets."; exit 1; }
-          test -n "$P4A_RELEASE_KEYSTORE_PASSWD" || { echo "::error::Set ANDROID_KEYSTORE_PASSWORD in repository secrets."; exit 1; }
-          test -n "$P4A_RELEASE_KEYALIAS" || { echo "::error::Set ANDROID_KEY_ALIAS in repository secrets."; exit 1; }
-          test -n "$P4A_RELEASE_KEYALIAS_PASSWD" || { echo "::error::Set ANDROID_KEY_PASSWORD in repository secrets."; exit 1; }
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$P4A_RELEASE_KEYSTORE"
-          chmod 600 "$P4A_RELEASE_KEYSTORE"
+          if [ "$SIGNING_MODE" = signed ]; then
+            test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Set ANDROID_KEYSTORE_BASE64 in repository secrets."; exit 1; }
+            test -n "$P4A_RELEASE_KEYSTORE_PASSWD" || { echo "::error::Set ANDROID_KEYSTORE_PASSWORD in repository secrets."; exit 1; }
+            test -n "$P4A_RELEASE_KEYALIAS" || { echo "::error::Set ANDROID_KEY_ALIAS in repository secrets."; exit 1; }
+            test -n "$P4A_RELEASE_KEYALIAS_PASSWD" || { echo "::error::Set ANDROID_KEY_PASSWORD in repository secrets."; exit 1; }
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$P4A_RELEASE_KEYSTORE"
+            chmod 600 "$P4A_RELEASE_KEYSTORE"
+          elif [ "$SIGNING_MODE" != unsigned ]; then
+            echo "::error::Unsupported signing mode: $SIGNING_MODE"
+            exit 1
+          fi
           python3 - <<'PY'
           import os
           path = 'build_mobile/buildozer.spec'
@@ -86,16 +99,28 @@ jobs:
         run: buildozer android release
 
       - name: Verify signed AAB
+        if: inputs.signing == 'signed'
         run: |
           mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
           test "${#bundles[@]}" -eq 1
           unzip -t "${bundles[0]}"
           jarsigner -verify "${bundles[0]}"
 
-      - name: Upload signed AAB for Play Console review
+      - name: Verify unsigned AAB is clearly unsigned
+        if: inputs.signing == 'unsigned'
+        run: |
+          mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1
+          unzip -t "${bundles[0]}"
+          if unzip -Z1 "${bundles[0]}" | grep -E '^META-INF/[^/]+\.(SF|RSA|DSA|EC)$'; then
+            echo "::error::Unsigned bundle unexpectedly contains signature entries."
+            exit 1
+          fi
+
+      - name: Upload AAB artifact for review
         uses: actions/upload-artifact@v4
         with:
-          name: campusnet-android-api36-signed-aab
+          name: campusnet-android-api36-${{ inputs.signing }}-aab
           path: build_mobile/bin/*.aab
           if-no-files-found: error
           retention-days: 30
