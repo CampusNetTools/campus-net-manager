@@ -145,3 +145,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - emulator evidence artifact `12057194250` ZIP CRC 通过，SHA-256 `d012fe0a8da7ddb1cdd984fb2afaf9cde4436c4ba303dc2a713535317a2ad36e`。截图显示中文标题、字段和登录/保活按钮已渲染，不再停在 `Loading...`；状态仍为“正在检测网络环境…”，runner 未连接校园网，故不代表校园网认证或流量成功。logcat 中 `FATAL EXCEPTION`、ANR、进程退出计数均为 0；仍有 Kivy 默认图标复制的非致命权限告警。
 - 对 PR #1 head `688a2fcf350b547083bf701c90132276f0ec40c0`，CI run `38927475080` 的 Windows/macOS 测试、静态检查和版本校验均 success，Release job 按 PR 规则 skipped；Desktop candidate run `38927475081` 两平台 build/launch smoke 与 artifact upload 均 success。Windows artifact `12056439965` PE32+ GUI x86-64，sidecar SHA-256 校验通过，文件 SHA-256 `cfda9408299e4acfa2118a70b6b5382942c005235cff9da735d1be5dfd53133c`。macOS artifact `12057247362` ZIP CRC/sidecar 校验通过，ZIP SHA-256 `b772c639a1f772476e207f2aea2c6da765c5ec555a1369457703ba41f39d8af6`；`ditto` 解包后 strict codesign 验证通过，bundle `com.campusnettools.campusnetmanager` v5.5.0 arm64，签名 adhoc、无 Team ID。两包均为候选包，不是安装验收或正式发行。
 - Android 真机锁屏/切网/Keystore、signed Play 测试与发布，iOS 真机签名/IKEv2 流量/App Store，Windows 本机安装和桌面逐功能、macOS Developer ID/公证/升级/正式 Release 回读仍待验证。
+
+## 最新 PR 与 macOS 安装界面复核（2026-10-17）
+
+- 当前分支和 PR #1 head 为 `1207f253800b16db06b76ef09f50c520074d7271`，PR 仍为 OPEN draft，工作树干净。桌面候选 run `38928543184` 成功；PR CI run `38928542680` 对该 head 的 Windows job 全部 511 项测试通过，macOS job 在完整测试步骤失败，随后静态检查被跳过。
+- macOS 失败栈落在 `tests/test_tunnel_default_no_key.py` 的两个 `WithKeyTests.setUp`：`SharedProxy.start()` 绑定监听端口时报 `OSError: [Errno 48] Address already in use`。该测试先用 `_free_port()` 绑定并关闭套接字，再让代理重新绑定，存在端口被其他进程抢占的竞争窗口；`SharedProxy.start()` 支持 `port=0` 并保存系统分配的端口。根因判断为测试端口分配竞态，仍需修复并在 macOS/Windows CI 验证。`gh-fix-ci` 工作流要求获得明确授权后再改动失败测试，目前修复未实施。
+- 本机 CUA 重新读取 `/Applications/校园网连接管家.app`：可见版本提示“当前已是最新版本 v5.5.0”；关闭提示后，主窗口可见，标题为 `校园网连接管家 v5.5.0`。界面显示“守护：运行中”“网络：VPN 与校园网在线”，这些是应用界面状态，未独立证明当前认证流量、公网连通或设备端行为。
+- 当前 CUA 可读取截图、关闭提示并通过 Tab 移动焦点；鼠标坐标输入返回窗口定位错误，因此没有完成主界面功能按钮的逐项操作验收。本次截图含已保存的档案信息，没有作为项目文件或记忆附件保存。
