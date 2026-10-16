@@ -172,8 +172,11 @@ class CampusNetMobile(App):
     # ---------- 状态检测 ----------
 
     def refresh_status(self):
+        # Kivy widgets belong to the UI thread. Snapshot values before starting
+        # the worker instead of reading TextInput/Spinner properties there.
+        auth_url = self._form_data()["auth_url"]
+
         def work():
-            auth_url = self._form_data()["auth_url"]
             reachable = auth.auth_reachable(auth_url)
             if not reachable:
                 self.root.set_status("非校园网环境（认证服务器不可达）", ok=None)
@@ -197,10 +200,11 @@ class CampusNetMobile(App):
             self.root.set_status("请先填写账号和密码", ok=False)
             return
         self._save_profile()
+        profile = self._profile()
         self.root.set_status("正在登录…", ok=None)
 
         def work():
-            ok = auth.ensure_login(self._profile(),
+            ok = auth.ensure_login(profile,
                                    on_log=lambda m: self.root.log(m))
             self.root.set_status("登录成功，校园网在线" if ok else "登录失败，请检查账号密码/名额",
                                  ok=ok)
@@ -328,15 +332,16 @@ class CampusNetMobile(App):
             self.root.btn_guard.text = "开启保活"
 
     def _guard_tick(self):
+        profile = self._profile()
+        auth_url = profile["auth_url"]
+
         def work():
-            data = self._form_data()
-            auth_url = data["auth_url"]
             if not auth.auth_reachable(auth_url):
                 self.root.set_status("非校园网环境，保活休眠", ok=None)
                 return
             if not auth.check_auth(auth_url) or not auth.check_internet():
                 self.root.log("检测到掉线，自动重登…")
-                ok = auth.ensure_login(self._profile(),
+                ok = auth.ensure_login(profile,
                                        on_log=lambda m: self.root.log(m))
                 self.root.set_status("掉线已自动恢复" if ok else "自动重登失败", ok=ok)
             else:
