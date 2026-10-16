@@ -122,3 +122,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 下载的屏幕截图显示 Kivy 中文文字为缺字方框；logcat 显示 Kivy 2.3.1 默认 Roboto 字体及 logo 复制的非致命权限错误。初次启动时档案文件不存在也被 `_load_profile()` 记成 `FileNotFoundError`；这是新安装路径而非档案损坏。模拟器未连接校园网，`http://192.168.16.3/` 的状态只能代表 runner 网络环境，不能代替校园网络测试。
 - 已修复：把 SIL OFL 1.1 的 Noto Sans SC 字体及许可证随 Android 包分发并用于状态、表单、按钮和 Spinner 控件；首次启动缺少档案改为空档案，已有损坏档案仍报错。完整测试现为 `511 passed, 3 skipped`；专项测试、Ruff（测试文件）、Python 编译与 diff check 通过。修复后的 APK 字形、安装和界面需由后续 Actions run 复核。
 - 更正故障归因：截图中的 `FileNotFoundError` 来自首次安装尚无 `profile.enc`，旧逻辑将其记为档案读取错误；不是认证服务器返回的异常。模拟器本身未接校园网，`http://192.168.16.3/` 的不可达状态是独立环境结果，不代表校园网真实登录测试。
+
+## macOS 安装版主窗口复核（2026-10-16）
+
+- 再次打开 `/Applications/校园网连接管家.app`；`CFBundleShortVersionString` 为 `5.5.0`，当前进程从安装目录的 `Contents/MacOS/校园网连接管家` 运行，`codesign --verify --deep --strict` 通过。
+- 本机屏幕截图可见安装版主窗口已渲染，中文标题、表单和按钮文字可读；状态区显示“守护：运行中”和“网络：VPN 与校园网在线”。这是界面显示观察，不代表逐个操作按钮，也不独立证明公网/VPN/认证流量当前可用。
+- Computer Use 插件仍报告运行时缺失；通过 CUA 窗口树只能读取窗口与菜单，改用本机截图完成只读观察。截图包含已保存档案字段，查看后删除，未写入仓库或记忆。
+- 桌面逐功能操作、升级安装、Developer ID 签名、公证和正式 Release 回读仍未验收。
