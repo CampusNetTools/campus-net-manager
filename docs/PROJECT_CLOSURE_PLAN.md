@@ -45,7 +45,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Android 档案现通过 Java Android Keystore AES-GCM helper 写入 `profile.enc`；旧版明文 `profile.json` 会在加密迁移成功后删除。文件仍原子写入并设置 POSIX `0600`，Android backup 关闭。Python 层有加解密边界测试，但 Android Java 编译、真实密钥生成/轮换/迁移仍待 APK 和真机验证。
 - GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建曾失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。Buildozer 已改为 pin `kivy==2.3.1`；新 run `38852810567` 正在构建 API 36 debug APK，最后读取时尚未离开 APK 编译步骤，Manifest 检查与 artifact 上传尚未执行。
 - iOS `NEVPNManager` + `NEVPNProtocolIKEv2` 的 unsigned simulator workflow 已在 run `38852926224` 对提交 `38ccfef` 构建成功。该 run 验证 XcodeGen 生成和模拟器编译通过；没有验证签名、真机安装、证书信任、IKEv2 连通、双向流量或 App Store 发布。
-- 随后扩展 iOS workflow：构建产物安装并启动到 CI iPhone Simulator，并上传 unsigned `.app` artifact；扩展后的 workflow 尚待运行结果。模拟器启动也不能替代真机 VPN 与网络验收。
+- 随后扩展 iOS workflow：run `38853483784` 的编译成功，但 Simulator 安装失败，日志指出 `.app` 的 `Info.plist` 缺少有效 `CFBundleExecutable`。已在 plist 加入 `$(EXECUTABLE_NAME)` 和 `$(PRODUCT_NAME)`；修复后的 Simulator 安装/启动与 artifact 上传等待下一次 CI 验证。模拟器启动也不能替代真机 VPN 与网络验收。
 
 ## 最新核验（2026-10-16）
 
