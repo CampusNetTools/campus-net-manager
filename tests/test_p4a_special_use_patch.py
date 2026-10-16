@@ -2,7 +2,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.patch_p4a_special_use import MARKER, patch_template
+from scripts.patch_p4a_special_use import (
+    MARKER,
+    OLD_VENV,
+    VENV_MARKER,
+    patch_build,
+    patch_template,
+)
 
 
 class P4aSpecialUsePatchTests(unittest.TestCase):
@@ -39,6 +45,21 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
             path.write_text("<manifest />", encoding="utf-8")
             with self.assertRaises(RuntimeError):
                 patch_template(path)
+
+    def test_p4a_venv_patch_clears_stale_pip_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "build.py"
+            path.write_text(OLD_VENV + "\n", encoding="utf-8")
+            self.assertTrue(patch_build(path))
+            self.assertEqual(path.read_text(encoding="utf-8"), VENV_MARKER + "\n")
+            self.assertFalse(patch_build(path))
+
+    def test_p4a_venv_patch_refuses_unknown_source(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "build.py"
+            path.write_text("def run(): pass\n", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                patch_build(path)
 
 
 if __name__ == "__main__":
