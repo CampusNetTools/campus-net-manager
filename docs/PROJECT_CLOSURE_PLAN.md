@@ -16,7 +16,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 |---|---|---|
 | Windows 桌面 | Python/Tkinter 主程序；GitHub 已发布 v5.5.0 exe | README 中的桌面功能逐项验收；当前源码通过测试；构建、签名/安全检查、安装、启动和升级验证；Release 资产及 SHA256 远端回读 |
 | macOS 桌面 | Apple Silicon 构建脚本；GitHub 已发布 v5.5.0 zip | 功能逐项验收；本机 `.app` 构建、安装、启动和升级验证；正式分发签名与公证状态明确；Release 资产回读 |
-| Android | Kivy 登录/环境检查/档案/前台保活原型；只有 debug APK 构建证据 | 后台保活通过系统前台服务实现，用户可见、可停止、可恢复；凭据存储与网络切换处理完成；Android API 36 构建；单元/打包/真实设备测试；signed AAB、Play 测试和正式发布 |
+| Android | Kivy 登录/环境检查/档案/前台保活；API 36 APK 与 unsigned AAB 正在 Actions 构建 | 后台保活通过系统前台服务实现，用户可见、可停止、可恢复；凭据存储与网络切换处理完成；Android API 36 构建；单元/打包/真实设备测试；signed AAB、Play 测试和正式发布 |
 | iOS | SwiftUI 系统 IKEv2 客户端源码已接入；Mac enrollment 输出与 unsigned simulator build workflow 已加入 | 编译/签名、真实证书安装、IKEv2 连接和双向流量、真机升级、App Store 资料与审核仍需验证 |
 
 ## 已核实基线
@@ -43,10 +43,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 当前完整 Python 测试 `500 passed, 3 skipped`；手机服务/Manifest patch 专项 14 项通过；Python 编译、版本同步、控制台 HTML lint（8/8）、secret scan 通用模式、workflow/YAML 解析及 `git diff --check` 通过。
 - 这些证据只覆盖源码与本地检查。API 36 APK 构建、合并后 manifest、手机安装、锁屏/切网持续运行均未验证。当前机器缺 Java Runtime、Android SDK/adb 和 Buildozer；`xcodebuild` 只有 CommandLineTools stub，完整 Xcode 不可用。
 - Android 档案现通过 Java Android Keystore AES-GCM helper 写入 `profile.enc`；旧版明文 `profile.json` 会在加密迁移成功后删除。文件仍原子写入并设置 POSIX `0600`，Android backup 关闭。Python 层有加解密边界测试，但 Android Java 编译、真实密钥生成/轮换/迁移仍待 APK 和真机验证。
-- GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建曾失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。Buildozer 已改为 pin `kivy==2.3.1`。随后 run `38852810567` 仍失败：p4a `v2026.05.09` 执行 `pip install -U pip` 时，日志为 `ImportError: cannot import name 'open_rich_spinner'`。根因推断是缓存 build venv 留下混杂 pip 文件（与 p4a 对同版本问题的记录一致）。现有固定 p4a patch 已加入创建 venv 时 `--clear` 的修复；修复后的 API 36 构建待重新触发和验证。
-- iOS `NEVPNManager` + `NEVPNProtocolIKEv2` 的 unsigned simulator workflow 已在 run `38852926224` 对提交 `38ccfef` 构建成功。该 run 验证 XcodeGen 生成和模拟器编译通过；没有验证签名、真机安装、证书信任、IKEv2 连通、双向流量或 App Store 发布。
+- GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建曾失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。Buildozer 已改为 pin `kivy==2.3.1`。随后 run `38852810567` 仍失败：p4a `v2026.05.09` 执行 `pip install -U pip` 时，日志为 `ImportError: cannot import name 'open_rich_spinner'`。根因推断是缓存 build venv 留下混杂 pip 文件（与 p4a 对同版本问题的记录一致）。固定 p4a patch 已加入创建 venv 时 `--clear` 的修复。APK run `38854900382`（head `4500e3f`）目前仍在构建步骤，AAB unsigned run `38854980739`（head `a349b8b`）也仍在构建步骤，尚未进入 manifest/签名和 artifact 检查。
+- iOS `NEVPNManager` + `NEVPNProtocolIKEv2` 的 unsigned simulator workflow 已在 run `38852926224` 对提交 `38ccfef` 构建成功。最新 head `a349b8b` 的 workflow_dispatch run `38855620015` 已完成编译，当前在 iPhone Simulator 安装/启动步骤；不验证签名、真机安装、证书信任、IKEv2 连通、双向流量或 App Store 发布。
 - 随后扩展 iOS workflow：run `38853483784` 的编译成功，但 Simulator 安装失败，日志指出 `.app` 的 `Info.plist` 缺少有效 `CFBundleExecutable`。补上 `$(EXECUTABLE_NAME)` 与 `$(PRODUCT_NAME)` 后，run `38853975796` 已在 iPhone Simulator 编译、安装、启动成功，并上传 unsigned `.app` artifact（ID `12026980614`，SHA-256 `e30d3d4bc9d5f7cbc426a1d068fca5c43583f6c0e025b20620e575be174afe32`）。模拟器启动不替代真机 VPN 与网络验收。
-- 新增 Android API 36 AAB 手动 workflow：unsigned 模式用于验证 bundle 构建；signed 模式要求 GitHub Actions secrets 提供 upload keystore 和 alias 信息，构建后验证签名并上传 artifact。它不会自动发布到 Google Play。run `38854446189` 是 push 事件且无 jobs，不构成构建证据。首次手动 dispatch 被 GitHub 以 job 级 `runner.temp` 表达式无效（HTTP 422）拒绝；现已改为在 preparation step 写入 `$GITHUB_ENV`，待修复提交推送后重新 dispatch unsigned 模式确认 AAB 产物。
+- 新增 Android API 36 AAB 手动 workflow：unsigned 模式用于验证 bundle 构建；signed 模式要求 GitHub Actions secrets 提供 upload keystore 和 alias 信息，构建后验证签名并上传 artifact。它不会自动发布到 Google Play。run `38854446189` 是 push 事件且无 jobs，不构成构建证据。首次手动 dispatch 因 job 级 `runner.temp` 表达式无效（HTTP 422）被拒；已修复并以 unsigned 模式启动 run `38854980739`，当前仍在 build 步骤。
+- 草稿 PR #1 的 run `38855212722` 对 head `a349b8b` 已完成，macOS 与 Windows 两个测试/静态检查 job 均通过；这不是 Windows 安装/运行或桌面逐功能验收。
 
 ## 最新核验（2026-10-16）
 
