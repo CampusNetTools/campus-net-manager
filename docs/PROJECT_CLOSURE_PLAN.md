@@ -178,3 +178,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 在本机安装的 v5.5.0 app 中打开“新手向导”，确认方式选择页展示直连、路由器中继和隧道三条路径；用键盘焦点与空格键进入路由器中继，并能切换至校园网上游检测。
 - 执行该页的只读检测后，界面显示识别到上游无线网络、路由器品牌未知、提供管理地址及通用设置步骤。未打开管理页面、未修改路由器配置、未连接或启动隧道；日志不记录具体网络名称或地址。
 - 此项证明安装版向导导航和一次本机只读检测可运行，不证明该路由器可配置成功、网络中继实际可用或认证流量双向通行。截图未保存；控件级完整功能、升级和正式分发验收仍待完成。
+
+## 471155b 双平台 CI 与桌面候选包回读（2026-10-17）
+
+- PR CI run `38933432185` 对 head `471155b1541b295f18022d0c9fdbd36dca3ff478` 的 Windows/macOS 测试、静态检查、版本、页面和敏感值检查均 success；release job 因 PR draft 规则 skipped。
+- Desktop candidate run `38933432209` 两个平台的构建、runner 启动 smoke 和候选 artifact 上传均 success。macOS artifact `12060375383` 外层 ZIP SHA-256 `09b048b9497f2d3cf4564453624ba3637e32c82b9712be4ed664b1b8b2d3efb6` 与 GitHub digest 一致且 CRC 通过；内层 ZIP SHA-256 `8a81968aace3a0e3e634b70c18a2ff7c07c36e8abc8a40e36b3c8da13b886c3b` 与 sidecar 一致、CRC 通过，含 62 个 symlink。`ditto` 解包后的 app bundle `com.campusnettools.campusnetmanager` v5.5.0 通过 `codesign --verify --deep --strict`；签名 adhoc、无 Team ID。
+- Windows artifact `12059088737` 外层 ZIP SHA-256 `b943f1f96c7b9ca9ab01e9234d8f7550acafb670ebf6c030e967aab79f57bb52` 与 GitHub digest 一致且 CRC 通过；内层 EXE SHA-256 `2ea390c5b388990f115d09d9323c99b41b353a1eceabc5ee51aad4b77236224d` 与 sidecar 一致，格式为 PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
+- 两者仍是 PR 候选包和 Actions runner smoke，不是用户 Windows 安装验收、macOS Developer ID/公证或正式 Release；不代表升级与真机/商店验收。
