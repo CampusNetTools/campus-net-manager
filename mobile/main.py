@@ -124,19 +124,27 @@ class CampusNetMobile(App):
 
     @property
     def _cfg_path(self):
-        return os.path.join(self.user_data_dir, "profile.json")
+        filename = "profile.enc" if self._is_android() else "profile.json"
+        return os.path.join(self.user_data_dir, filename)
 
     def _load_profile(self):
         try:
-            with open(self._cfg_path, encoding="utf-8") as f:
-                data = json.load(f)
+            from guard_service import load_profile_data, write_profile
+            legacy_path = os.path.join(self.user_data_dir, "profile.json")
+            source_path = self._cfg_path
+            if not os.path.exists(source_path) and self._is_android() and os.path.exists(legacy_path):
+                data = load_profile_data(legacy_path)
+                write_profile(source_path, data)
+                os.remove(legacy_path)
+            else:
+                data = load_profile_data(source_path)
             self.root.in_user.text = data.get("username", "")
             self.root.in_pass.text = data.get("password", "")
             self.root.in_auth.text = data.get("auth_url", auth.DEFAULT_AUTH_URL)
             name = dict(METHODS).get(data.get("method", "cmcc"), "移动")
             self.root.sp_method.text = name
-        except Exception:
-            pass
+        except Exception as exc:
+            self.root.log("本地档案未加载或迁移失败：%s" % type(exc).__name__)
 
     def _save_profile(self):
         try:

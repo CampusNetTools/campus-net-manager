@@ -5,7 +5,8 @@ import threading
 import unittest
 from unittest.mock import Mock
 
-from mobile.guard_service import check_once, read_profile, run_guard_service, state_is_fresh, write_profile
+from mobile.guard_service import (check_once, load_profile_data, read_profile,
+                                  run_guard_service, state_is_fresh, write_profile)
 
 
 class MobileGuardServiceTests(unittest.TestCase):
@@ -37,6 +38,31 @@ class MobileGuardServiceTests(unittest.TestCase):
         self.assertFalse(os.path.exists(self.profile_path + ".tmp"))
         if os.name == "posix":
             self.assertEqual(os.stat(self.profile_path).st_mode & 0o777, 0o600)
+
+    def test_android_profile_is_encrypted_before_atomic_write(self):
+        from unittest.mock import patch
+        encrypted_path = os.path.join(self.tmp.name, "profile.enc")
+        profile = {"username": "student@example", "password": "secret-value"}
+        serialized = json.dumps(profile, ensure_ascii=False)
+        with patch("mobile.guard_service._android_encrypt", return_value="v1:opaque-ciphertext") as encrypt:
+            write_profile(encrypted_path, profile)
+        encrypt.assert_called_once_with(serialized)
+        with open(encrypted_path, encoding="utf-8") as stream:
+            stored = stream.read()
+        self.assertEqual(stored, "v1:opaque-ciphertext")
+        self.assertNotIn("student@example", stored)
+        self.assertNotIn("secret-value", stored)
+
+    def test_android_profile_load_decrypts_before_json_parse(self):
+        from unittest.mock import patch
+        encrypted_path = os.path.join(self.tmp.name, "profile.enc")
+        with open(encrypted_path, "w", encoding="utf-8") as stream:
+            stream.write("v1:opaque-ciphertext")
+        plaintext = json.dumps({"username": "student@example", "password": "secret-value"})
+        with patch("mobile.guard_service._android_decrypt", return_value=plaintext) as decrypt:
+            profile = load_profile_data(encrypted_path)
+        decrypt.assert_called_once_with("v1:opaque-ciphertext")
+        self.assertEqual(profile["username"], "student@example")
 
     def test_online_status_does_not_write_credentials(self):
         client = Mock(auth_reachable=Mock(return_value=True),

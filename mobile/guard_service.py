@@ -11,6 +11,7 @@ from core import auth, config
 
 KEEPALIVE_INTERVAL = 60
 STATE_STALE_AFTER = 150
+ANDROID_CREDENTIAL_STORE = "org.campusnettools.campusnetmanager.CampusCredentialStore"
 
 
 def _timestamp(now=None):
@@ -24,13 +25,37 @@ def state_path_for(profile_path):
     return os.path.join(os.path.dirname(os.path.abspath(profile_path)), "guard-state.json")
 
 
+def _android_encrypt(plaintext):
+    from jnius import autoclass
+    return str(autoclass(ANDROID_CREDENTIAL_STORE).encrypt(plaintext))
+
+
+def _android_decrypt(ciphertext):
+    from jnius import autoclass
+    return str(autoclass(ANDROID_CREDENTIAL_STORE).decrypt(ciphertext))
+
+
+def load_profile_data(path):
+    with open(path, encoding="utf-8") as stream:
+        stored = stream.read()
+    if path.endswith(".enc"):
+        stored = _android_decrypt(stored)
+    data = json.loads(stored)
+    if not isinstance(data, dict):
+        raise ValueError("profile must be an object")
+    return data
+
+
 def write_profile(path, profile):
     """Atomically update the private profile so the service never reads half a file."""
     path = os.path.abspath(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     temp_path = path + ".tmp"
+    stored = json.dumps(profile, ensure_ascii=False)
+    if path.endswith(".enc"):
+        stored = _android_encrypt(stored)
     with open(temp_path, "w", encoding="utf-8") as stream:
-        json.dump(profile, stream, ensure_ascii=False)
+        stream.write(stored)
         stream.flush()
         os.fsync(stream.fileno())
     try:
@@ -60,10 +85,7 @@ def write_state(path, state):
 
 
 def read_profile(path):
-    with open(path, encoding="utf-8") as stream:
-        data = json.load(stream)
-    if not isinstance(data, dict):
-        raise ValueError("profile must be an object")
+    data = load_profile_data(path)
     profile = config.default_profile("手机档案")
     profile.update({
         "username": str(data.get("username", "")).strip(),

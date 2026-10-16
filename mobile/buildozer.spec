@@ -49,6 +49,7 @@ android.permissions = INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, FOREGRO
 # User-started, persistent campus authentication keepalive. Android 14+ requires
 # a declared service type and Play Console special-use justification.
 android.services = campusguard:services/campusguard.py:foreground:sticky:foregroundServiceType=specialUse
+android.add_src = java
 
 # (int) Android logcat filters to use
 #android.logcat_filters = *:S python:D

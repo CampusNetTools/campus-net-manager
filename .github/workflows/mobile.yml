@@ -20,6 +20,7 @@ jobs:
           cp mobile/main.py mobile/buildozer.spec build_mobile/
           cp mobile/guard_service.py build_mobile/
           cp -r mobile/services build_mobile/
+          cp -r mobile/java build_mobile/
           cp -r core build_mobile/
           ls build_mobile
 
