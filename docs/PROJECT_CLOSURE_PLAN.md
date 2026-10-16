@@ -45,6 +45,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Android 档案现通过 Java Android Keystore AES-GCM helper 写入 `profile.enc`；旧版明文 `profile.json` 会在加密迁移成功后删除。文件仍原子写入并设置 POSIX `0600`，Android backup 关闭。Python 层有加解密边界测试，但 Android Java 编译、真实密钥生成/轮换/迁移仍待 APK 和真机验证。
 - GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。p4a 固定 tag 的 Kivy recipe 已是 2.3.1；Buildozer spec 已改为显式 pin `kivy==2.3.1`，待新 run 验证。
 - iOS 已切到 `NEVPNManager` + `NEVPNProtocolIKEv2` 源码：Mac 为每设备输出私有 `.ikev2.json`、仅根证书 `.mobileconfig` 和服务端 EAP secret；App 将密码放入 Keychain，系统配置仅保存 persistent reference。新增 iOS Simulator unsigned build workflow；当前只有 Swift parser、Python profile tests 与 plist lint，完整 Xcode 类型检查/构建尚未通过。
+- 首个 iOS simulator build 对 `14b150b` 已完成 XcodeGen 项目生成并进入 Swift 编译，暴露 `TunnelManager` 三处 async continuation 未显式指定 `Void` 的类型推断错误；源码已补类型注解，待下一次 CI 复验。该失败不是 entitlements、XcodeGen 或 NetworkExtension API 构建问题。
 
 ## 外部发布门槛
 

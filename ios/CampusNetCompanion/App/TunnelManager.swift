@@ -161,7 +161,7 @@ final class TunnelManager: ObservableObject {
     }
 
     private func loadPreferences() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             manager.loadFromPreferences { error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume() }
@@ -170,7 +170,7 @@ final class TunnelManager: ObservableObject {
     }
 
     private func savePreferences() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             manager.saveToPreferences { error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume() }
@@ -179,7 +179,7 @@ final class TunnelManager: ObservableObject {
     }
 
     private func removePreferences() async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             manager.removeFromPreferences { error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume() }
