@@ -36,6 +36,17 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         archs = {item.strip() for item in spec.get("app", "android.archs").split(",")}
         self.assertEqual(archs, {"arm64-v8a", "armeabi-v7a", "x86_64"})
 
+    def test_android_emulator_workflow_enables_kvm_before_launch(self):
+        workflow = (Path(__file__).parents[1] / ".github" / "workflows" / "mobile.yml").read_text(
+            encoding="utf-8"
+        )
+        kvm_step = workflow.index("启用 GitHub runner 的 KVM 权限")
+        emulator_step = workflow.index("reactivecircus/android-emulator-runner@")
+        self.assertLess(kvm_step, emulator_step)
+        self.assertIn('GROUP="kvm", MODE="0666"', workflow[kvm_step:emulator_step])
+        self.assertIn("test -r /dev/kvm && test -w /dev/kvm", workflow[kvm_step:emulator_step])
+        self.assertIn("disable-linux-hw-accel: false", workflow[emulator_step:])
+
     def test_inserts_android_special_use_subtype_for_campusguard(self):
         template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"
                  {% if foreground_type %}

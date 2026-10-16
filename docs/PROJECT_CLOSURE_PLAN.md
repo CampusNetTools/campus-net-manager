@@ -95,3 +95,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 ## 验收记录模板
 
 每个功能记录：源码位置、自动测试、打包结果、安装设备和 OS、操作步骤、可观察结果、失败/恢复证据、版本/构建号。未覆盖的步骤写明“未验证”，不以推测补齐。
+
+## 最新 CI 候选与模拟器启动复核（2026-10-16）
+
+- PR #1 当前文档 head `2f7052198ccca806114f6bf04153b6d823cd1ca5` 的 macOS/Windows 测试与版本检查、两平台候选包启动 smoke 均通过；PR 发布 job 按配置跳过。
+- 从桌面候选 run `38894994317` 下载并检查当前 head artifacts。Windows artifact `12043856291` 含 PE32+ GUI x86-64 EXE，SHA-256 `6bd26d7bb6b85c519711ce0dde2bc44ff476a4557e99aa6959bc77bd081a6f07` 与 sidecar 一致。macOS artifact `12043636826` 的 ZIP SHA-256 `385902e6e302a2cad6795c81a02725f26cce36492d5fde6f3c62492a2f9e6dee` 与 sidecar 一致，CRC 检查通过，含 62 个符号链接；`ditto` 解包后 bundle `com.campusnettools.campusnetmanager` 版本 `5.5.0`、arm64，`codesign --verify --deep --strict` 通过。签名为 adhoc，无 Team ID；这仍是候选包，不是正式发布。
+- 当前安装的 macOS app 主窗口截图显示 v5.5.0 界面正常渲染，状态栏显示守护运行中、VPN 与校园网在线及最近检测时间。截图查看后删除；没有操作界面按钮，所以功能逐项验收仍未完成。
+- Android API36 run `38892862907`（head `ded3cfe`）成功构建 APK 并通过合并 Manifest gate，但 emulator step 失败，日志为 `Timeout waiting for emulator to boot.`。action 日志显示它因 KVM 不可用而以 `-accel off` 启动；现有 workflow 未设置 runner 的 `/dev/kvm` 权限。APK 上传因此跳过，运行证据上传步骤未找到文件。已在 `.github/workflows/mobile.yml` 增加 GitHub runner KVM udev 权限步骤并启用硬件加速；回归测试覆盖步骤顺序与配置。专项测试 `8 passed`，workflow YAML 解析和 `git diff --check` 通过。新配置仍待 Actions 构建与 API36 emulator 实跑验证。
+- 上述模拟器 timeout 不代表 APK 运行失败：模拟器未完成启动，APK 安装/启动步骤没有执行。也不代表实体 Android 设备已验收。
