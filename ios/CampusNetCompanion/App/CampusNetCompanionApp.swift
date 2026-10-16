@@ -1,5 +1,5 @@
 import SwiftUI
-import AVFoundation
+import UniformTypeIdentifiers
 
 @main
 struct CampusNetCompanionApp: App {
@@ -8,43 +8,55 @@ struct CampusNetCompanionApp: App {
 
 struct CompanionHome: View {
     @StateObject private var tunnel = TunnelManager()
-    @State private var showScanner = false
+    @State private var isImporting = false
     @State private var message = ""
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 22) {
+            VStack(spacing: 20) {
                 Image(systemName: "network.badge.shield.half.filled")
-                    .font(.system(size: 64)).foregroundStyle(.blue)
+                    .font(.system(size: 60)).foregroundStyle(.blue)
                 Text("校园网连接管家").font(.largeTitle.bold())
-                Text("手机 VPN 隧道配套端").foregroundStyle(.secondary)
+                Text("使用 iPhone 系统 IKEv2 VPN").foregroundStyle(.secondary)
                 statusCard
-                Button("扫描电脑配对码", systemImage: "qrcode.viewfinder") { showScanner = true }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
-                HStack {
-                    Button("连接") { tunnel.connect() }.buttonStyle(.borderedProminent)
-                        .disabled(tunnel.pairing == nil)
-                    Button("断开") { tunnel.disconnect() }.buttonStyle(.bordered)
+                Button("导入 Mac 设备配置", systemImage: "square.and.arrow.down") {
+                    isImporting = true
                 }
-                Button("移除此设备") { tunnel.forget() }.foregroundStyle(.red)
-                    .disabled(tunnel.pairing == nil)
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                HStack {
+                    Button("连接", systemImage: "network") { tunnel.connect() }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(tunnel.configuration == nil || tunnel.state == .connected)
+                    Button("断开", systemImage: "xmark") { tunnel.disconnect() }
+                        .buttonStyle(.bordered)
+                        .disabled(tunnel.configuration == nil)
+                }
+                Button("移除此设备", role: .destructive) { Task { await tunnel.forget() } }
+                    .disabled(tunnel.configuration == nil)
                 Spacer()
-                Text("首次连接时，iOS 会要求你确认添加 VPN 配置。\n不会读取聊天内容、浏览内容或校园网密码。")
+                Text("先在 iPhone 安装 Mac 提供的 IKEv2 根证书，再导入此设备的 .ikev2.json。配置文件含专用 VPN 密码，请仅用 AirDrop 或 USB 传输并在导入后删除。首次保存时，iOS 会要求确认添加 VPN 配置。")
                     .multilineTextAlignment(.center).font(.footnote).foregroundStyle(.secondary)
             }
             .padding()
-            .sheet(isPresented: $showScanner) {
-                QRScanner { result in
-                    showScanner = false
-                    switch result {
-                    case .success(let code):
-                        do { Task { await tunnel.importPairing(try PairingPayload.decodeQR(code)) } }
-                        catch { message = error.localizedDescription }
-                    case .failure(let error): message = error.localizedDescription
+            .fileImporter(isPresented: $isImporting,
+                          allowedContentTypes: [.json],
+                          allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    let didAccess = url.startAccessingSecurityScopedResource()
+                    defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+                    do {
+                        let data = try Data(contentsOf: url)
+                        Task { await tunnel.importConfiguration(data) }
+                    } catch {
+                        message = "无法读取配置文件：\(error.localizedDescription)"
                     }
+                case .failure(let error):
+                    message = "未能导入配置：\(error.localizedDescription)"
                 }
             }
-            .alert("无法配对", isPresented: .init(get: { !message.isEmpty }, set: { if !$0 { message = "" } })) {
+            .alert("设备配置", isPresented: .init(get: { !message.isEmpty }, set: { if !$0 { message = "" } })) {
                 Button("好", role: .cancel) {}
             } message: { Text(message) }
         }
@@ -54,28 +66,13 @@ struct CompanionHome: View {
         VStack(alignment: .leading, spacing: 10) {
             Label(tunnel.state.title, systemImage: "circle.fill")
                 .foregroundStyle(tunnel.state == .connected ? .green : .secondary)
-            if let pairing = tunnel.pairing {
-                Text("电脑：\(pairing.gatewayHost):\(pairing.gatewayPort)")
-                Text("配对有效期：\(pairing.expiresAt.formatted())").font(.caption).foregroundStyle(.secondary)
+            if let config = tunnel.configuration {
+                Text("设备：\(config.deviceName)")
+                Text("服务器：\(config.serverAddress)")
+                Text("账号：\(config.username)")
             }
-        }.frame(maxWidth: .infinity, alignment: .leading).padding().background(.thinMaterial).clipShape(.rect(cornerRadius: 16))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding().background(.thinMaterial).clipShape(.rect(cornerRadius: 16))
     }
-}
-
-struct QRScanner: UIViewControllerRepresentable {
-    let completion: (Result<String, Error>) -> Void
-    func makeUIViewController(context: Context) -> ScannerController { ScannerController(completion: completion) }
-    func updateUIViewController(_ uiViewController: ScannerController, context: Context) {}
-}
-
-final class ScannerController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
-    private let session = AVCaptureSession(); private let completion: (Result<String, Error>) -> Void
-    init(completion: @escaping (Result<String, Error>) -> Void) { self.completion = completion; super.init(nibName: nil, bundle: nil) }
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    override func viewDidLoad() { super.viewDidLoad()
-        guard let camera = AVCaptureDevice.default(for: .video), let input = try? AVCaptureDeviceInput(device: camera), session.canAddInput(input) else { completion(.failure(PairingError.invalidQRCode)); return }
-        session.addInput(input); let output = AVCaptureMetadataOutput(); session.addOutput(output); output.setMetadataObjectsDelegate(self, queue: .main); output.metadataObjectTypes = [.qr]
-        let preview = AVCaptureVideoPreviewLayer(session: session); preview.frame = view.bounds; preview.videoGravity = .resizeAspectFill; view.layer.addSublayer(preview); session.startRunning()
-    }
-    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput objects: [AVMetadataObject], from connection: AVCaptureConnection) { guard let text = (objects.first as? AVMetadataMachineReadableCodeObject)?.stringValue else { return }; session.stopRunning(); completion(.success(text)) }
 }

@@ -20,9 +20,9 @@
 
 ## 构建 APK
 
-当前配置目标 API 36，固定 python-for-android `v2026.05.09` 与 Python 3.11.8；构建会在固定源码模板上补入 Android `specialUse` 前台服务所需的 subtype 说明。CI 手动工作流会打包 debug APK 并检查合并后的 Android Manifest。
+当前配置目标 API 36，固定 python-for-android `v2026.05.09`、Python 3.11.8 和 Kivy 2.3.1；构建会在固定源码模板上补入 Android `specialUse` 前台服务所需的 subtype 说明。CI 手动工作流会打包 debug APK 并检查合并后的 Android Manifest。
 
-源码和单元测试仍不等于 APK 构建、手机安装或后台运行验收。当前没有 API 36 构建或真机验证结果；必须以 GitHub Actions 成功产物、Manifest 读取结果和 Android 真机锁屏/切网测试为准。
+源码和单元测试仍不等于 APK 构建、手机安装或后台运行验收。2026-10-16 run `38851368170` 在 Kivy 2.3.0 的 `cgl_gl.c` 编译时因 Clang 函数指针 const 限定不兼容而失败；spec 已改 pin Kivy 2.3.1，尚待新 run 验证。APK、Manifest 和 Android 真机锁屏/切网仍未验收。
 
 本地构建（需 Linux 或 macOS + buildozer 环境；macOS 本机因同样上游问题暂无法出包，
 建议用 Windows 的 WSL2/Linux 或 Docker 完成）：
@@ -43,4 +43,4 @@ buildozer android debug   # 产物在 bin/*.apk
 - **运行时状态**：Android 前台服务由用户在 App 内启动/停止，要求通知权限；系统省电策略、厂商后台限制和网络状态仍需真机验收。
 - **凭据**：Android Keystore 实现已加入源码，但本机尚无 Android 构建工具链；最终 APK 中的加解密、升级迁移和密钥丢失恢复仍待验证。
 - **发布状态**：当前只有手动 debug APK 工作流；签名 AAB、商店内测/生产发布和审核尚未完成。
-- iOS 原型与路线见 `../ios/`；App Store build、签名、设备验收和上架尚未完成。
+- iOS 系统 IKEv2 客户端与 Mac 端 enrollment 路线见 `../ios/CampusNetCompanion/README.md`；App Store build、签名、设备验收和上架尚未完成。

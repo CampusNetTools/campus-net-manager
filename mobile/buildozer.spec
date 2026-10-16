@@ -20,7 +20,7 @@ version = 1.0.0
 
 # (list) Application requirements
 # 纯 python 依赖; 显式 pin Python/Kivy 以固定 Android 可复现构建输入
-requirements = python3==3.11.8,hostpython3==3.11.8,kivy==2.3.0
+requirements = python3==3.11.8,hostpython3==3.11.8,kivy==2.3.1
 # API 36 与 Android 14+ 前台服务类型支持
 p4a.branch = v2026.05.09
 

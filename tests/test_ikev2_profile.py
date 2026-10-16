@@ -1,3 +1,4 @@
+import json
 import plistlib
 import unittest
 
@@ -23,14 +24,27 @@ class IKEv2ProfileTests(unittest.TestCase):
         self.assertEqual(vpn["VPNType"], "IKEv2")
         self.assertEqual(vpn["IKEv2"]["RemoteAddress"], "10.12.72.55")
         self.assertEqual(vpn["IKEv2"]["RemoteIdentifier"], "vpn.campusnet.local")
-        self.assertEqual(vpn["IKEv2"]["AuthenticationMethod"], "Certificate")
+        self.assertEqual(vpn["IKEv2"]["AuthenticationMethod"], "None")
         self.assertEqual(vpn["IKEv2"]["ExtendedAuthEnabled"], 1)
+        self.assertEqual(vpn["IKEv2"]["ServerCertificateCommonName"], "vpn.campusnet.local")
         self.assertEqual(vpn["IKEv2"]["AuthName"], profile.username)
         self.assertEqual(vpn["IKEv2"]["AuthPassword"], profile.password)
         self.assertEqual(vpn["IKEv2"]["IncludeAllNetworks"], 1)
         self.assertIn(profile.username, profile.swanctl_secret)
         self.assertIn(profile.password, profile.swanctl_secret)
         self.assertNotIn("校园网密码", profile.mobileconfig.decode("utf-8"))
+
+        ca_profile = plistlib.loads(profile.ca_mobileconfig)
+        self.assertEqual(len(ca_profile["PayloadContent"]), 1)
+        self.assertEqual(ca_profile["PayloadContent"][0]["PayloadType"], "com.apple.security.root")
+        self.assertNotIn("AuthPassword", repr(ca_profile))
+
+        app_configuration = json.loads(profile.app_configuration)
+        self.assertEqual(app_configuration["serverAddress"], "10.12.72.55")
+        self.assertEqual(app_configuration["serverIdentifier"], "vpn.campusnet.local")
+        self.assertEqual(app_configuration["username"], profile.username)
+        self.assertEqual(app_configuration["password"], profile.password)
+        self.assertNotIn(profile.password, repr(profile))
 
     def test_ca_certificate_is_required(self):
         controller = IKEv2ProfileController(

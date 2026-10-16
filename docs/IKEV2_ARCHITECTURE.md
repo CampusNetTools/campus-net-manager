@@ -1,10 +1,10 @@
 # 手机全流量共享：iPhone 内建 IKEv2
 
 ```text
-iPhone 系统 VPN（手动安装描述文件） -- IKEv2 --> Mac「校园网连接管家」 --> 校园网 / 用户已有 VPN
+iPhone Companion App / iOS 系统 VPN -- IKEv2 --> Mac「校园网连接管家」 --> 校园网 / 用户已有 VPN
 ```
 
-此路线不需要 iPhone App、App Store 下载、Xcode 或 Apple Developer 签名。iPhone 用户会在系统设置中看到并确认添加 VPN；删除该描述文件即可移除手机端配置。
+系统 `.mobileconfig` 仍是无需 App 的备用安装方式。iOS Companion App 使用 `NEVPNManager` 管理内建 IKEv2，首次配置由 iOS 显示授权提示；VPN 服务上架仍需组织开发者账号、隐私披露和 App Review。
 
 ## Mac 端职责
 
@@ -15,11 +15,13 @@ iPhone 系统 VPN（手动安装描述文件） -- IKEv2 --> Mac「校园网连�
 
 ## iPhone 描述文件
 
-项目生成的是标准 `com.apple.vpn.managed` / `IKEv2` 配置描述文件，内含网关 CA、服务器地址、远端标识和单机 EAP 凭据。IKE 层固定校验服务器 X.509 证书（`AuthenticationMethod=Certificate`），EAP 层使用该手机独立的随机账号密码；不会以 `None` 跳过服务器身份验证。描述文件本身包含认证密码，属于敏感文件：只可通过本地 AirDrop/USB 交给该手机，安装后立即从临时位置删除，不能上传网盘、发聊天或打印二维码。
+项目为每台设备生成：完整 `.mobileconfig` 备用配置、仅含 CA 根证书的 `-ca.mobileconfig`，以及给 App 导入的 `.ikev2.json`。App JSON 含单设备随机 EAP 凭据，权限设为 `0600`，只能通过本地 AirDrop/USB 交付，并在 App 导入后删除；不能上传网盘、发聊天或打印二维码。App 把密码写入 iOS Keychain，并把 persistent reference 交给系统 VPN 配置。安装并信任根 CA 后，IKEv2 使用 EAP-only（`AuthenticationMethod=None`、`ExtendedAuthEnabled=1`）并显式校验服务器证书名称；这不会跳过服务器身份验证。EAP 账号与校园网 Wi‑Fi 凭据相互独立。
+
+`.mobileconfig` 备用方式仍含 VPN EAP 凭据；该文件同样敏感，按本地一次性交付并在安装后删除。
 
 ## 验收
 
-1. iPhone 手动安装描述文件并确认系统 VPN 提示。
+1. 在 iPhone 安装/信任根证书，导入 App JSON 并确认系统 VPN 提示；或使用完整 `.mobileconfig` 备用路线。
 2. 同一局域网完成连接，Safari、微信图片和测速各验证一次。
-3. 断开、移除描述文件、撤销服务器端 EAP 凭据后，确认手机无法再连入。
+3. 在 App 中断开/移除配置并撤销服务端 EAP 凭据，确认手机无法再连入。
 4. 恢复 Mac 原网络设置，确认校园网和用户已有 VPN 不受残留规则影响。

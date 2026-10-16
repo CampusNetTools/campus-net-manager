@@ -17,7 +17,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 | Windows 桌面 | Python/Tkinter 主程序；GitHub 已发布 v5.5.0 exe | README 中的桌面功能逐项验收；当前源码通过测试；构建、签名/安全检查、安装、启动和升级验证；Release 资产及 SHA256 远端回读 |
 | macOS 桌面 | Apple Silicon 构建脚本；GitHub 已发布 v5.5.0 zip | 功能逐项验收；本机 `.app` 构建、安装、启动和升级验证；正式分发签名与公证状态明确；Release 资产回读 |
 | Android | Kivy 登录/环境检查/档案/前台保活原型；只有 debug APK 构建证据 | 后台保活通过系统前台服务实现，用户可见、可停止、可恢复；凭据存储与网络切换处理完成；Android API 36 构建；单元/打包/真实设备测试；signed AAB、Play 测试和正式发布 |
-| iOS | SwiftUI Packet Tunnel 原型；配对网关缺失。历史已选系统 IKEv2 | 改用 `NEVPNManager` + `NEVPNProtocolIKEv2`，连接现有 strongSwan 网关；配置、凭据、VPN 状态和错误处理可用；Xcode 编译、签名、真机验证；App Store 资料与审核完成 |
+| iOS | SwiftUI 系统 IKEv2 客户端源码已接入；Mac enrollment 输出与 unsigned simulator build workflow 已加入 | 编译/签名、真实证书安装、IKEv2 连接和双向流量、真机升级、App Store 资料与审核仍需验证 |
 
 ## 已核实基线
 
@@ -25,7 +25,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - `APP_VERSION` 为 `5.5.0`。已有 Python 测试 485 项通过、3 项跳过；这些测试不能证明 UI、打包、设备或商店验收。
 - 桌面端最新 Release 为 2026-09-17 的 v5.5.0；CI 最近一次主线运行在 2026-09-21 成功。
 - Android `mobile/buildozer.spec` 当前 `android.api=35`，此前只有 2026-09-06 的 debug APK Actions 成功记录。
-- iOS 自定义 Packet Tunnel 代码没有配套 Mac TLS/TUN 网关。项目已有 strongSwan IKEv2 生成/安装脚本，故 iOS App 优先走系统 IKEv2，而不是引入另一套 VPN 数据面。
+- iOS 原 Packet Tunnel 代码没有配套 Mac TLS/TUN 网关，已从正式 App target 移除；项目已有 strongSwan IKEv2 生成/安装脚本，iOS App 使用系统 IKEv2。
 - 当前 Mac 缺完整 Xcode、XcodeGen、Java、Android SDK/adb 和 Buildozer；没有 iOS provisioning profile 或已安装的 CampusNetManager.app。真机与商店发布需另行获得设备/账号证据。
 
 ## 阶段顺序
@@ -39,10 +39,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 ## 当前 Android 检查点（2026-10-16）
 
 - 已接入 `campusguard` sticky foreground service 源码：串行每分钟检测认证/互联网，掉线后重登并复检；服务状态文件不写账号或密码，UI 每 5 秒读取服务状态。用户可从 App 显式启动/停止，Android 13+ 先申请通知权限。
-- Buildozer 已切到 API 36、p4a `v2026.05.09`、Python/hostpython 3.11.8 和 Kivy 2.3.0；manifest 使用 `specialUse`，工作流固定 p4a 源码 tag 并注入 Google 要求的 subtype 说明，再对 APK manifest 作构建期校验。
-- 当前完整 Python 测试 `497 passed, 3 skipped`；手机服务/manifest patch 专项 12 项通过；Python 编译、版本同步、控制台 HTML lint（8/8）、secret scan 通用模式、workflow YAML 解析及 `git diff --check` 通过。
+- Buildozer 目标 API 36、p4a `v2026.05.09`、Python/hostpython 3.11.8 和 Kivy 2.3.1；manifest 使用 `specialUse`，工作流固定 p4a 源码 tag 并注入 subtype 说明，再对 APK manifest 作构建期校验。
+- 当前完整 Python 测试 `498 passed, 3 skipped`；手机服务/manifest patch 专项 12 项通过；Python 编译、版本同步、控制台 HTML lint（8/8）、secret scan 通用模式、workflow/YAML 解析及 `git diff --check` 通过。
 - 这些证据只覆盖源码与本地检查。API 36 APK 构建、合并后 manifest、手机安装、锁屏/切网持续运行均未验证。当前机器缺 Java Runtime、Android SDK/adb 和 Buildozer；`xcodebuild` 只有 CommandLineTools stub，完整 Xcode 不可用。
 - Android 档案现通过 Java Android Keystore AES-GCM helper 写入 `profile.enc`；旧版明文 `profile.json` 会在加密迁移成功后删除。文件仍原子写入并设置 POSIX `0600`，Android backup 关闭。Python 层有加解密边界测试，但 Android Java 编译、真实密钥生成/轮换/迁移仍待 APK 和真机验证。
+- GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。p4a 固定 tag 的 Kivy recipe 已是 2.3.1；Buildozer spec 已改为显式 pin `kivy==2.3.1`，待新 run 验证。
+- iOS 已切到 `NEVPNManager` + `NEVPNProtocolIKEv2` 源码：Mac 为每设备输出私有 `.ikev2.json`、仅根证书 `.mobileconfig` 和服务端 EAP secret；App 将密码放入 Keychain，系统配置仅保存 persistent reference。新增 iOS Simulator unsigned build workflow；当前只有 Swift parser、Python profile tests 与 plist lint，完整 Xcode 类型检查/构建尚未通过。
 
 ## 外部发布门槛
 

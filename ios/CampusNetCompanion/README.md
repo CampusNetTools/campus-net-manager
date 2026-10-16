@@ -1,25 +1,27 @@
 # CampusNet Companion for iPhone
 
-这是“校园网连接管家”的 iPhone 配套端，不是另一套校园网登录器。
+The app manages iOS Personal VPN through `NEVPNManager` and the built-in `NEVPNProtocolIKEv2`, connecting to the project's existing strongSwan gateway. It does not use the unfinished custom Packet Tunnel or claim that a Mac TUN/NAT gateway exists.
 
-它的目标是让手机扫描电脑显示的一次性配对码后，建立由 iOS 显式授权的 Packet Tunnel VPN；流量经过加密隧道到达电脑网关，再由电脑的校园网/VPN出口转发。
+## Local enrollment
 
-## 已包含的工程边界
+On a Mac with the authorized IKEv2 gateway installed, run `scripts/create_ikev2_device_profile.py`. It creates four private files under the gateway state directory:
 
-- SwiftUI 主 App：扫码导入配对信息、查看 VPN 状态、连接/断开。
-- `PacketTunnelProvider`：使用 iOS 系统 VPN 扩展接收 IP 数据包。
-- 一次性配对协议模型：二维码只含服务器地址、短期配对令牌与证书指纹，不含校园网账号、密码或 VPN 订阅。
-- Mac 网关协议说明：隧道建立、心跳、IP 数据帧、断开与错误码。
+- `<device>.mobileconfig`: the complete iOS system profile for users who prefer the Settings-based route.
+- `<device>-ca.mobileconfig`: the gateway root certificate only; install this before using the app so iOS can validate the IKEv2 server certificate.
+- `<device>.ikev2.json`: the app enrollment file containing this device's EAP username and password.
+- `devices/<device>.conf`: the matching server-side EAP credential fragment.
 
-## 仍不能宣称已完成的部分
+Transfer the CA profile and app enrollment file only by local AirDrop or USB. Install and trust the CA profile in iOS Settings, import the `.ikev2.json` from Files into this app, and delete the transferred JSON after import. The app stores the password in Keychain and passes its persistent reference to the system VPN configuration; the password is not logged or embedded in the app's QR code. The first save asks iOS to approve adding a VPN configuration.
 
-本机当前只有 Command Line Tools，未安装完整 Xcode，无法签名或部署到 iPhone。更重要的是，Packet Tunnel 必须配合 Mac 网关的 TUN/NAT 特权组件和有效 TLS 证书/证书指纹校验才可转发真实全流量。未接入这些组件前，本工程的连接按钮不会伪装成“已能上网”。
+Do not install both the complete `.mobileconfig` and the app-managed VPN at the same time. The complete profile is an alternative to using this app.
 
-## 开发前置条件
+## App behavior
 
-1. 安装完整 Xcode，并登录具有 Network Extension 能力的 Apple Developer 团队。
-2. 在 App ID 启用 `packet-tunnel-provider`，主 App 与扩展共享 Keychain Access Group。
-3. 用 XcodeGen 生成工程：`xcodegen generate`；或按 `project.yml` 手工建立同名 target。
-4. 真机安装后，首次连接必须由用户确认 iOS 的“添加 VPN 配置”提示。
+- Imports and validates a per-device enrollment file.
+- Stores the EAP password in Keychain and configures iOS IKEv2 with server-certificate name validation.
+- Loads the saved configuration after relaunch, reports system VPN status, and supports connect, disconnect, re-import, and removal.
+- Uses the IKEv2 server's normal routing and NAT. It does not depend on the old Packet Tunnel protocol or an unimplemented TLS/TUN service.
 
-详情见 [架构说明](docs/ARCHITECTURE.md)。
+## Verification boundary
+
+Source configuration is not an iOS build or device acceptance. This Mac currently lacks full Xcode and an Apple Developer provisioning profile. XcodeGen generation, signing, iPhone installation, certificate trust, IKEv2 negotiation, bidirectional traffic, upgrade, and App Store review remain unverified. VPN App Store distribution also requires an eligible organization developer account and Apple's review of the VPN service and privacy disclosures.
