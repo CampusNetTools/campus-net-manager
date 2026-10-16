@@ -12,3 +12,6 @@
 # Windows 脚本保持 CRLF
 *.cmd text eol=crlf
 *.bat text eol=crlf
+
+# README 保留历史 CRLF 行尾；允许 diff 检查将行尾 CR 视为行结束符。
+README.md whitespace=cr-at-eol

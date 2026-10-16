@@ -1,5 +1,15 @@
 # 更新记录
 
+## v5.6.0
+
+多端连接与移动端保活。
+
+- **Android 前台保活**：用户可主动启动校园网状态检测与掉线重登服务；认证档案使用 Android Keystore 加密，状态文件不含账号凭据。构建目标更新到 API 36，并加入模拟器启动与运行烟雾检查。
+- **iOS 系统 IKEv2 配套应用**：通过 Mac 生成单设备 enrollment，iPhone 将 VPN 凭据存入 Keychain，再由系统 `NEVPNManager` 管理 IKEv2 连接；移除未实现网关转发的 Packet Tunnel 原型。
+- **桌面更新包完整性**：macOS 发布 ZIP 保留 Python.framework 符号链接；更新器校验归档路径后使用系统 `ditto` 解压。
+- **移动端界面与线程修复**：Android 随包提供简体中文字体；首次启动缺少档案按空档案处理；后台任务在 UI 线程快照表单数据。
+- **发布检查**：增加 Windows/macOS 候选包构建和启动烟雾、API 36 APK Manifest/模拟器门禁及 iOS Simulator 构建工作流。
+
 ## v5.5.0
 
 「NAS 管家」：把路由器 NAS(alist) 的配置与日常使用全部搬进管家。
