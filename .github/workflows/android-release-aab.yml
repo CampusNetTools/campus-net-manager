@@ -76,6 +76,21 @@ jobs:
             test -n "$P4A_RELEASE_KEYALIAS_PASSWD" || { echo "::error::Set ANDROID_KEY_PASSWORD in repository secrets."; exit 1; }
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$P4A_RELEASE_KEYSTORE"
             chmod 600 "$P4A_RELEASE_KEYSTORE"
+          elif [ "$SIGNING_MODE" = unsigned ]; then
+            # Buildozer's AAB release path still asks Gradle to sign. Use a
+            # runner-only key, then strip its JAR signature files below.
+            temp_password=$(openssl rand -hex 24)
+            echo "::add-mask::$temp_password"
+            keytool -genkeypair -noprompt \
+              -keystore "$P4A_RELEASE_KEYSTORE" \
+              -storepass "$temp_password" -keypass "$temp_password" \
+              -alias campusnet-review -keyalg RSA -keysize 2048 -validity 1 \
+              -dname "CN=CampusNetManager Temporary Review"
+            {
+              echo "P4A_RELEASE_KEYSTORE_PASSWD=$temp_password"
+              echo "P4A_RELEASE_KEYALIAS=campusnet-review"
+              echo "P4A_RELEASE_KEYALIAS_PASSWD=$temp_password"
+            } >> "$GITHUB_ENV"
           elif [ "$SIGNING_MODE" != unsigned ]; then
             echo "::error::Unsupported signing mode: $SIGNING_MODE"
             exit 1
@@ -95,9 +110,43 @@ jobs:
           ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager" || true
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
 
-      - name: Build signed API 36 AAB
+      - name: Build API 36 AAB
         working-directory: build_mobile
         run: buildozer android release
+
+      - name: Remove temporary review signature
+        if: inputs.signing == 'unsigned'
+        run: |
+          mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1
+          python3 - "${bundles[0]}" <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          bundle = Path(sys.argv[1])
+          temporary = bundle.with_suffix(bundle.suffix + '.unsigned')
+          signatures = ('.SF', '.RSA', '.DSA', '.EC')
+          removed = []
+          with ZipFile(bundle) as source, ZipFile(temporary, 'w') as target:
+              for item in source.infolist():
+                  name = item.filename.upper()
+                  is_signature = (
+                      name.startswith('META-INF/')
+                      and '/' not in name[len('META-INF/'):]
+                      and name.endswith(signatures)
+                  )
+                  if is_signature:
+                      removed.append(item.filename)
+                      continue
+                  target.writestr(item, source.read(item.filename))
+          if not removed:
+              temporary.unlink(missing_ok=True)
+              raise SystemExit('Expected the temporary review signature, found none.')
+          os.replace(temporary, bundle)
+          print('Removed temporary review signatures: ' + ', '.join(removed))
+          PY
 
       - name: Verify signed AAB
         if: inputs.signing == 'signed'
