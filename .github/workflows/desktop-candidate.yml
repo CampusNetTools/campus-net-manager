@@ -1,0 +1,101 @@
+name: Desktop candidate packages
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-candidate:
+    name: Build and launch smoke (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: windows
+          - os: macos-latest
+            target: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Build Windows portable executable
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --windowed \
+            --name "校园网连接管家" --icon icon.ico --collect-all pystray \
+            --collect-submodules core --collect-submodules gui \
+            --distpath dist/windows --workpath build/pyinstaller-windows \
+            app_gui.py
+          mv dist/windows/校园网连接管家.exe dist/windows/CampusNetManager-windows.exe
+          python scripts/make_checksum.py dist/windows/CampusNetManager-windows.exe
+
+      - name: Launch smoke test for Windows executable
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD "dist/windows/CampusNetManager-windows.exe"
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 10
+          $process.Refresh()
+          if ($process.HasExited) {
+            throw "Windows app exited during startup (exit code $($process.ExitCode))."
+          }
+          Stop-Process -Id $process.Id -Force
+          Write-Output "Windows app remained running for 10 seconds after launch."
+
+      - name: Build, verify, and launch macOS app
+        if: matrix.target == 'macos'
+        shell: bash
+        run: |
+          PYTHON_BIN=python bash scripts/build_macos.sh
+          cd dist/macos
+          mv "校园网连接管家.app" CampusNetManager.app
+          codesign --verify --deep --strict CampusNetManager.app
+          ditto -c -k --sequesterRsrc --keepParent CampusNetManager.app \
+            "CampusNetManager-macOS-arm64-candidate.zip"
+          python ../../scripts/verify_macos_symlinks.py CampusNetManager.app \
+            CampusNetManager-macOS-arm64-candidate.zip
+          python ../../scripts/make_checksum.py CampusNetManager-macOS-arm64-candidate.zip
+          mkdir -p "$RUNNER_TEMP/campusnet-home"
+          HOME="$RUNNER_TEMP/campusnet-home" \
+            CampusNetManager.app/Contents/MacOS/校园网连接管家 \
+            > "$RUNNER_TEMP/campusnet-app-smoke.log" 2>&1 &
+          app_pid=$!
+          for _ in $(seq 1 10); do
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/campusnet-app-smoke.log"
+              exit 1
+            fi
+            sleep 1
+          done
+          kill "$app_pid"
+          wait "$app_pid" || true
+          echo "macOS app remained running for 10 seconds after launch."
+
+      - name: Upload Windows candidate
+        if: matrix.target == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: campusnetmanager-windows-candidate
+          path: |
+            dist/windows/CampusNetManager-windows.exe
+            dist/windows/CampusNetManager-windows.exe.sha256
+
+      - name: Upload macOS candidate
+        if: matrix.target == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: campusnetmanager-macos-candidate
+          path: |
+            dist/macos/CampusNetManager-macOS-arm64-candidate.zip
+            dist/macos/CampusNetManager-macOS-arm64-candidate.zip.sha256
