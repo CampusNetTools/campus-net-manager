@@ -6,7 +6,6 @@ import sys
 import tempfile
 import threading
 import webbrowser
-import zipfile
 import tkinter as tk
 from tkinter import ttk, messagebox
 
@@ -189,10 +188,8 @@ class UpdateUiMixin:
         win.destroy()
         try:
             if core.IS_MACOS:
-                import shutil
                 extract_dir = tempfile.mkdtemp(prefix="cnm_update_app_")
-                with zipfile.ZipFile(path) as zf:
-                    zf.extractall(extract_dir)
+                updater.extract_macos_zip(path, extract_dir)
                 apps = [d for d in os.listdir(extract_dir) if d.endswith(".app")]
                 if not apps:
                     raise RuntimeError("压缩包内未找到 .app")

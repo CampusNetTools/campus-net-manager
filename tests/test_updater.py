@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import updater  # noqa: E402
@@ -284,6 +285,55 @@ class ThrottleTests(unittest.TestCase):
             raise ValueError("not a lock")
         with self.assertRaises(ValueError):
             raise_value_error()
+
+
+class MacArchiveTests(unittest.TestCase):
+    def _archive(self, path, name="CampusNetManager.app/Contents/Info.plist"):
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr(name, "fixture")
+
+    def test_extract_macos_zip_uses_ditto_and_checks_bundle_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "app.zip")
+            self._archive(path)
+            calls = []
+
+            def runner(command, check):
+                calls.append((command, check))
+
+            updater.extract_macos_zip(path, td, runner=runner)
+            self.assertEqual(calls, [(["/usr/bin/ditto", "-x", "-k", path, td], True)])
+
+    def test_extract_macos_zip_rejects_parent_traversal(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "unsafe.zip")
+            self._archive(path, "CampusNetManager.app/../../outside")
+            with self.assertRaisesRegex(ValueError, "不安全路径"):
+                updater.extract_macos_zip(path, td, runner=lambda *a, **k: self.fail("ditto ran"))
+
+    @unittest.skipUnless(sys.platform == "darwin", "ditto symlink integration requires macOS")
+    def test_ditto_round_trip_preserves_framework_symlinks(self):
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as td:
+            app = os.path.join(td, "CampusNetManager.app")
+            versions = os.path.join(app, "Contents", "Frameworks", "Python.framework", "Versions")
+            os.makedirs(os.path.join(versions, "A", "Resources"))
+            with open(os.path.join(versions, "A", "Python"), "w", encoding="utf-8") as stream:
+                stream.write("python framework fixture")
+            os.symlink("A", os.path.join(versions, "Current"))
+            framework = os.path.dirname(versions)
+            os.symlink("Versions/Current/Python", os.path.join(framework, "Python"))
+            os.symlink("Versions/Current/Resources", os.path.join(framework, "Resources"))
+            archive = os.path.join(td, "app.zip")
+            subprocess.run(["/usr/bin/ditto", "-c", "-k", "--sequesterRsrc", "--keepParent",
+                            app, archive], check=True)
+            updater.extract_macos_zip(archive, os.path.join(td, "out"))
+            extracted = os.path.join(td, "out", "CampusNetManager.app", "Contents",
+                                      "Frameworks", "Python.framework")
+            self.assertTrue(os.path.islink(os.path.join(extracted, "Python")))
+            self.assertTrue(os.path.islink(os.path.join(extracted, "Resources")))
+            self.assertTrue(os.path.islink(os.path.join(extracted, "Versions", "Current")))
 
 
 if __name__ == "__main__":

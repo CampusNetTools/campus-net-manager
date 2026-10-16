@@ -18,11 +18,13 @@ import re
 import shutil
 import ssl
 import stat
+import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
 import urllib.error
+import zipfile
 
 try:
     import certifi
@@ -206,6 +208,30 @@ def sha256_of_file(path, chunk_size=1 << 20):
                 break
             h.update(block)
     return h.hexdigest()
+
+
+def extract_macos_zip(path, destination, runner=None):
+    """用 macOS ditto 解压 app archive，保留 framework/app 符号链接。
+
+    先拒绝绝对路径、上级目录和多个顶层项，避免把不可信成员解到目标目录外。
+    Release archive 在调用前还必须通过 GitHub SHA256 校验。
+    """
+    with zipfile.ZipFile(path) as archive:
+        names = [item.filename for item in archive.infolist()]
+    roots = set()
+    for name in names:
+        normalized = name.replace("\\", "/")
+        parts = normalized.split("/")
+        if (not normalized or normalized.startswith("/") or
+                any(part in ("", ".", "..") for part in parts[:-1]) or
+                ".." in parts or "\x00" in normalized):
+            raise ValueError("macOS 更新包包含不安全路径: %r" % name)
+        if parts[0] != "__MACOSX":
+            roots.add(parts[0])
+    if len(roots) != 1 or not next(iter(roots)).endswith(".app"):
+        raise ValueError("macOS 更新包必须只包含一个顶层 .app")
+    command = ["/usr/bin/ditto", "-x", "-k", path, destination]
+    (runner or subprocess.run)(command, check=True)
 
 
 def digest_to_hex(digest):

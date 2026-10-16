@@ -49,5 +49,5 @@ buildozer android debug   # 产物在 bin/*.apk
 
 - **运行时状态**：Android 前台服务由用户在 App 内启动/停止，要求通知权限；系统省电策略、厂商后台限制和网络状态仍需真机验收。
 - **凭据**：Android Keystore 实现已加入源码，但本机尚无 Android 构建工具链；最终 APK 中的加解密、升级迁移和密钥丢失恢复仍待验证。
-- **发布状态**：手动 debug APK 工作流与 AAB 工作流已配置；unsigned AAB 构建尚待验证，signed 模式需要上述 keystore secrets；商店内测/生产发布和审核尚未完成。
+- **发布状态**：API 36 debug APK run `38879167090` 已构建并通过合并 Manifest 校验，unsigned API 36 AAB run `38856949123` 已构建并通过 ZIP/未签名检查；两者均不代表真机验收或 Play 接收。signed 模式需要上述 keystore secrets；商店内测/生产发布和审核尚未完成。
 - iOS 系统 IKEv2 客户端与 Mac 端 enrollment 路线见 `../ios/CampusNetCompanion/README.md`；App Store build、签名、设备验收和上架尚未完成。

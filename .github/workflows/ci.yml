@@ -84,7 +84,10 @@ jobs:
           # 资产名/包内名都 ASCII: 中文经 actions/glob 上传被剥前导"-", 且 zip 中文条目名
           # 在部分解压器(python zipfile)会乱码
           mv "校园网连接管家.app" CampusNetManager.app
-          zip -rq "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip" CampusNetManager.app
+          ditto -c -k --sequesterRsrc --keepParent \
+            CampusNetManager.app "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip"
+          python ../../scripts/verify_macos_symlinks.py CampusNetManager.app \
+            "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip"
           mv CampusNetManager.app "校园网连接管家.app"
           # SHA256 校验和资产: 客户端下载后先校验再替换(updater.resolve_expected_sha256)
           python ../../scripts/make_checksum.py \
