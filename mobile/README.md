@@ -24,7 +24,7 @@
 
 源码和单元测试仍不等于 APK 构建、手机安装或后台运行验收。2026-10-16 run `38851368170` 在 Kivy 2.3.0 的 `cgl_gl.c` 编译时因 Clang 函数指针 const 限定不兼容而失败；spec 已改 pin Kivy 2.3.1。随后 run `38852810567` 又在 p4a 临时 Python venv 执行 `pip install -U pip` 时失败，日志为 `ImportError: cannot import name 'open_rich_spinner'`。根因推断是缓存的 build venv 残留混杂 pip 文件，与 p4a 对同版本问题的记录一致；已扩展固定 p4a patch，在创建临时 venv 时使用 `--clear`。修复后的 API 36 构建仍待重新运行和验证。Android 真机锁屏/切网也尚未验收。
 
-修复后的 APK run `38854900382`（head `4500e3f`）和 unsigned AAB run `38854980739`（head `a349b8b`）仍在 Actions 构建步骤，尚无可下载产物，Manifest、bundle 和设备行为均未验收。iOS run `38855620015`（head `a349b8b`）已成功完成 simulator 编译、安装和启动；artifact `12026888784` 下载检查确认 bundle id `com.campusnettools.companion`、版本 `0.2.0 (3)`、Simulator 架构 `x86_64/arm64`、adhoc/linker 签名且无 Team ID。首次 artifact 下载展平了 `.app` 顶层目录，工作流现改为上传保留 `.app` 目录结构的 ZIP，等待新 run 验证。iOS 真机、IKEv2 连通和 App Store 发布仍未验收。
+APK run `38854900382`（head `4500e3f`）已编译出 APK，但合并 Manifest 校验失败且未上传 artifact；失败项尚未由日志明确打印。校验脚本现允许 aapt 对 `0x400` 的补零格式，并会在缺项时打印相关属性，待新 API 36 run 验证。unsigned AAB run `38854980739`（head `a349b8b`）仍在构建步骤。iOS run `38855620015` 成功完成 simulator 编译、安装和启动，但首次 artifact 下载展平了 `.app` 顶层目录；修复后的 run `38856309857`（head `a15e83d`）已成功完成编译、安装、启动和 ZIP 打包。artifact `12027332700` 下载检查确认 ZIP 内含完整 `CampusNetCompanion.app/` 目录，bundle id `com.campusnettools.companion`、版本 `0.2.0 (3)`、Simulator 架构 `x86_64/arm64`、adhoc/linker 签名且无 Team ID。iOS 真机、IKEv2 连通和 App Store 发布仍未验收。
 
 本地构建（需 Linux 或 macOS + buildozer 环境；macOS 本机因同样上游问题暂无法出包，
 建议用 Windows 的 WSL2/Linux 或 Docker 完成）：

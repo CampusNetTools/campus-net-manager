@@ -87,11 +87,25 @@ jobs:
           test -n "$apk"
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           "$build_tools/aapt" dump xmltree "$apk" AndroidManifest.xml > /tmp/campusnet-manifest.txt
-          grep -q 'FOREGROUND_SERVICE_SPECIAL_USE' /tmp/campusnet-manifest.txt
-          grep -q 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE' /tmp/campusnet-manifest.txt
-          grep -q 'campusnetmanager.ServiceCampusguard' /tmp/campusnet-manifest.txt
-          grep -q 'foregroundServiceType' /tmp/campusnet-manifest.txt
-          grep -q '0x400' /tmp/campusnet-manifest.txt
+          require_manifest_value() {
+            local value="$1"
+            if ! grep -q "$value" /tmp/campusnet-manifest.txt; then
+              echo "::error::APK manifest is missing: $value"
+              grep -E 'FOREGROUND_SERVICE|SPECIAL_USE|ServiceCampusguard|foregroundServiceType' \
+                /tmp/campusnet-manifest.txt || true
+              exit 1
+            fi
+          }
+          require_manifest_value 'FOREGROUND_SERVICE_SPECIAL_USE'
+          require_manifest_value 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE'
+          require_manifest_value 'campusnetmanager.ServiceCampusguard'
+          require_manifest_value 'foregroundServiceType'
+          # aapt prints this enum as 0x00000400 on current build tools.
+          if ! grep -Eq '0x0*400' /tmp/campusnet-manifest.txt; then
+            echo '::error::APK manifest does not contain the specialUse foreground-service flag (0x400).'
+            grep -n -A3 -B3 'foregroundServiceType' /tmp/campusnet-manifest.txt || true
+            exit 1
+          fi
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
