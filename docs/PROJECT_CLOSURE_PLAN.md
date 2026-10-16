@@ -185,3 +185,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Desktop candidate run `38933432209` 两个平台的构建、runner 启动 smoke 和候选 artifact 上传均 success。macOS artifact `12060375383` 外层 ZIP SHA-256 `09b048b9497f2d3cf4564453624ba3637e32c82b9712be4ed664b1b8b2d3efb6` 与 GitHub digest 一致且 CRC 通过；内层 ZIP SHA-256 `8a81968aace3a0e3e634b70c18a2ff7c07c36e8abc8a40e36b3c8da13b886c3b` 与 sidecar 一致、CRC 通过，含 62 个 symlink。`ditto` 解包后的 app bundle `com.campusnettools.campusnetmanager` v5.5.0 通过 `codesign --verify --deep --strict`；签名 adhoc、无 Team ID。
 - Windows artifact `12059088737` 外层 ZIP SHA-256 `b943f1f96c7b9ca9ab01e9234d8f7550acafb670ebf6c030e967aab79f57bb52` 与 GitHub digest 一致且 CRC 通过；内层 EXE SHA-256 `2ea390c5b388990f115d09d9323c99b41b353a1eceabc5ee51aad4b77236224d` 与 sidecar 一致，格式为 PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
 - 两者仍是 PR 候选包和 Actions runner smoke，不是用户 Windows 安装验收、macOS Developer ID/公证或正式 Release；不代表升级与真机/商店验收。
+
+## v5.6.0 桌面候选版本准备（2026-10-17）
+
+- GitHub 当前最新正式 Release 经现场查询仍为 `v5.5.0`（2026-09-17）。本分支相对正式版包含 Android 前台服务/Keystore、iOS 系统 IKEv2 配套应用和 macOS 更新 ZIP 符号链接修复，因此按项目新增功能版本约定准备 `v5.6.0`。`APP_VERSION`、README 下载徽章和 CHANGELOG 已同步；`scripts/sync_version.py --check` 通过。
+- 提交 `0e22be081d6ec20752b8a84f7014f27d470b238b` 的 PR CI run `38954069132` Windows/macOS 测试与静态、版本、页面、敏感值检查全部 success，发布 job 按 draft PR 规则 skipped。Desktop candidate run `38954069061` 两平台构建、10 秒 runner 启动 smoke 和 artifact 上传均 success。
+- macOS artifact `12069981509` 外层 SHA-256 `dd64fcc65ca9d86f198f7ae94e913f94d527c568b3d4f84c63bec18e6cab844e` 与 GitHub digest 一致、CRC 通过；内层候选 ZIP SHA-256 `7f1edb33d7c5ee8b387369c9467bf3a8062ebb62c3f61ca1ba526db4d1c90807` 与 sidecar 一致、CRC 通过，含 62 个 symlink。解包 bundle `com.campusnettools.campusnetmanager` 版本 `5.6.0` 通过 strict codesign，签名 adhoc、无 Team ID。
+- Windows artifact `12070110950` 外层 SHA-256 `2dee5556852d87548e2acedd1bdaf0b785721376b27a74fd204a3dc634ae128f` 与 GitHub digest 一致、CRC 通过；EXE SHA-256 `e873102ea916a635018c99ca78b8ce98e378b5823d4f6cb0c1289716c7754d62` 与 sidecar 一致，PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
+- `v5.6.0` 目前只是候选版本准备和 runner 构建验证，不是正式 Release。仍需 Windows 用户设备安装、macOS Developer ID/公证/升级、Android/iOS 真机签名与测试及商店审核；当前没有任何商店提交或审核通过证据。
