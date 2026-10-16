@@ -79,6 +79,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 新回归与服务专项共 10 项通过；完整 Python 测试 `505 passed, 3 skipped`，CI 同规则 Ruff 检查及 `py_compile` 通过。
 - 当前电脑没有 `adb`、完整 Xcode 或 iOS provisioning profile；上述结论是源码与自动测试证据，不代表 Android/iOS 真机行为。
 
+## 桌面候选包构建与产物复核（2026-10-16）
+
+- 提交 `2d38e3bbb7ffe8c08e0e87532d34a529624595dc` 的 PR 候选包 workflow run `38891904445`（PR #1）在 macOS 与 Windows runner 均成功。两个平台都完成打包、启动烟雾步骤并上传候选 artifact；配套 PR CI run `38891904288` 的 Windows/macOS 测试与静态检查通过，发布 job 因 PR 事件跳过。
+- Windows artifact `12042510841`（`campusnetmanager-windows-candidate`）包含 x86-64 PE GUI 可执行文件 `CampusNetManager-windows.exe` 与 SHA-256 sidecar。下载复核值一致：`34eca07cd2281fa49bf1699fdee33695ee3a7925132f33b6df520511b8c3674b`。Actions 启动烟雾步骤通过；尚未在用户 Windows 设备安装，也未逐项验收桌面功能。
+- macOS artifact `12041594097`（`campusnetmanager-macos-candidate`）包含 `CampusNetManager-macOS-arm64-candidate.zip` 与 sidecar。SHA-256 `ede14350d9ef20998ed77963b589e8f5e32b15b93dee0958550191f23b4896a0`，ZIP CRC 检查通过；`ditto` 解包后发现 62 个符号链接，app 元数据为版本 `5.5.0`、bundle id `com.campusnettools.campusnetmanager`，Mach-O 为 arm64。`codesign --verify --deep --strict` 通过，但签名是 adhoc 且没有 Team ID；Actions 启动烟雾步骤通过。
+- 这些是当前源码的 CI 候选产物，不是 GitHub Release。macOS Developer ID 签名、公证、Windows 正式签名、跨版本升级、真实 Windows/macOS 控件级功能验收及 Release 资产远端回读仍未完成。
+
 ## 外部发布门槛
 
 - Google Play 新应用和更新当前要求 target API 36；若开发者是 2023-11-13 后创建的个人账号，申请生产发布前需 12 名测试者连续参加封闭测试 14 天。
