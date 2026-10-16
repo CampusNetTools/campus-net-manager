@@ -1,0 +1,101 @@
+name: Android signed release bundle
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-aab:
+    name: Build and verify signed Android App Bundle
+    runs-on: ubuntu-22.04
+    env:
+      P4A_RELEASE_KEYSTORE: ${{ runner.temp }}/campusnet-upload.jks
+      P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      P4A_RELEASE_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Assemble mobile package
+        run: |
+          mkdir -p build_mobile
+          cp mobile/main.py mobile/buildozer.spec build_mobile/
+          cp mobile/guard_service.py build_mobile/
+          cp -r mobile/services build_mobile/
+          cp -r mobile/java build_mobile/
+          cp -r core build_mobile/
+
+      - name: Prepare pinned python-for-android source
+        run: |
+          git clone --depth 1 --branch v2026.05.09 \
+            https://github.com/kivy/python-for-android.git "$GITHUB_WORKSPACE/python-for-android"
+          python scripts/patch_p4a_special_use.py "$GITHUB_WORKSPACE/python-for-android"
+
+      - name: Cache Android build dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('mobile/buildozer.spec') }}
+          restore-keys: buildozer-${{ runner.os }}-
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential zip unzip autoconf automake libtool pkg-config \
+            autoconf-archive gettext autopoint
+          python -m pip install buildozer==1.6.0 cython==0.29.36
+
+      - name: Prepare SDK, release artifact format, and upload key
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Set ANDROID_KEYSTORE_BASE64 in repository secrets."; exit 1; }
+          test -n "$P4A_RELEASE_KEYSTORE_PASSWD" || { echo "::error::Set ANDROID_KEYSTORE_PASSWORD in repository secrets."; exit 1; }
+          test -n "$P4A_RELEASE_KEYALIAS" || { echo "::error::Set ANDROID_KEY_ALIAS in repository secrets."; exit 1; }
+          test -n "$P4A_RELEASE_KEYALIAS_PASSWD" || { echo "::error::Set ANDROID_KEY_PASSWORD in repository secrets."; exit 1; }
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$P4A_RELEASE_KEYSTORE"
+          chmod 600 "$P4A_RELEASE_KEYSTORE"
+          python3 - <<'PY'
+          import os
+          path = 'build_mobile/buildozer.spec'
+          text = open(path, encoding='utf-8').read()
+          assert 'android.sdk_path' not in text
+          text = text.replace('[app]', '[app]\nandroid.release_artifact = aab', 1)
+          text = text.replace('[app]', '[app]\nandroid.sdk_path = ' + os.environ['ANDROID_HOME']
+                            + '\np4a.source_dir = ' + os.path.join(os.environ['GITHUB_WORKSPACE'], 'python-for-android'), 1)
+          open(path, 'w', encoding='utf-8').write(text)
+          PY
+          mkdir -p "$ANDROID_HOME/tools/bin"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager" || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+
+      - name: Build signed API 36 AAB
+        working-directory: build_mobile
+        run: buildozer android release
+
+      - name: Verify signed AAB
+        run: |
+          mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1
+          unzip -t "${bundles[0]}"
+          jarsigner -verify "${bundles[0]}"
+
+      - name: Upload signed AAB for Play Console review
+        uses: actions/upload-artifact@v4
+        with:
+          name: campusnet-android-api36-signed-aab
+          path: build_mobile/bin/*.aab
+          if-no-files-found: error
+          retention-days: 30
