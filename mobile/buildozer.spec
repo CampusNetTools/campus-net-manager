@@ -43,6 +43,10 @@ android.minapi = 24
 #private_storage = True
 android.allow_backup = False
 
+# Include x86_64 so CI can install and launch the same APK in an API 36 emulator.
+# Keep both ARM ABIs for physical Android devices.
+android.archs = arm64-v8a, armeabi-v7a, x86_64
+
 # (list) Permissions
 android.permissions = INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, FOREGROUND_SERVICE, FOREGROUND_SERVICE_SPECIAL_USE, POST_NOTIFICATIONS
 

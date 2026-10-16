@@ -107,8 +107,60 @@ jobs:
             exit 1
           fi
 
+      - name: 在 Android API 36 模拟器安装并启动 APK
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            apk=$(find build_mobile/bin -maxdepth 1 -name '*.apk' -print -quit)
+            test -n "$apk"
+            adb install "$apk"
+            adb shell monkey -p org.campusnettools.campusnetmanager 1
+            for attempt in $(seq 1 30); do
+              pid=$(adb shell pidof org.campusnettools.campusnetmanager | tr -d '\r' || true)
+              if [ -n "$pid" ]; then
+                echo "CampusNetManager emulator process started: $pid"
+                break
+              fi
+              sleep 1
+            done
+            if [ -z "$pid" ]; then
+              adb logcat -d > build_mobile/emulator-logcat.txt
+              echo '::error::CampusNetManager did not start in the Android emulator.'
+              exit 1
+            fi
+            sleep 10
+            adb logcat --pid="$pid" -d > build_mobile/emulator-logcat.txt
+            if grep -q 'FATAL EXCEPTION' build_mobile/emulator-logcat.txt; then
+              echo '::error::Android emulator reported a fatal application exception.'
+              grep -n -A12 -B4 'FATAL EXCEPTION' build_mobile/emulator-logcat.txt
+              exit 1
+            fi
+            pid=$(adb shell pidof org.campusnettools.campusnetmanager | tr -d '\r' || true)
+            if [ -z "$pid" ]; then
+              echo '::error::CampusNetManager exited during the emulator smoke period.'
+              exit 1
+            fi
+            adb shell screencap -p /sdcard/campusnetmanager.png
+            adb pull /sdcard/campusnetmanager.png build_mobile/emulator-screen.png
+
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
         with:
           name: 校园网连接管家-android-api36-debug-apk
           path: build_mobile/bin/*.apk
+
+      - name: 上传 Android 模拟器运行证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 校园网连接管家-android-api36-emulator-evidence
+          path: |
+            build_mobile/emulator-logcat.txt
+            build_mobile/emulator-screen.png
+          if-no-files-found: ignore

@@ -26,6 +26,16 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         )
         self.assertFalse(spec.has_option("app", "android.services"))
 
+    def test_buildozer_packages_device_and_emulator_abis(self):
+        spec = configparser.ConfigParser()
+        spec.read_string(
+            (Path(__file__).parents[1] / "mobile" / "buildozer.spec").read_text(
+                encoding="utf-8"
+            )
+        )
+        archs = {item.strip() for item in spec.get("app", "android.archs").split(",")}
+        self.assertEqual(archs, {"arm64-v8a", "armeabi-v7a", "x86_64"})
+
     def test_inserts_android_special_use_subtype_for_campusguard(self):
         template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"
                  {% if foreground_type %}
