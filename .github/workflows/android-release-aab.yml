@@ -15,11 +15,10 @@ permissions:
 
 jobs:
   build-aab:
-    name: Build and verify signed Android App Bundle
+    name: Build and verify Android App Bundle
     runs-on: ubuntu-22.04
     env:
       SIGNING_MODE: ${{ inputs.signing }}
-      P4A_RELEASE_KEYSTORE: ${{ runner.temp }}/campusnet-upload.jks
       P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       P4A_RELEASE_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -68,6 +67,8 @@ jobs:
 
       - name: Prepare SDK, release artifact format, and upload key
         run: |
+          P4A_RELEASE_KEYSTORE="$RUNNER_TEMP/campusnet-upload.jks"
+          echo "P4A_RELEASE_KEYSTORE=$P4A_RELEASE_KEYSTORE" >> "$GITHUB_ENV"
           if [ "$SIGNING_MODE" = signed ]; then
             test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Set ANDROID_KEYSTORE_BASE64 in repository secrets."; exit 1; }
             test -n "$P4A_RELEASE_KEYSTORE_PASSWD" || { echo "::error::Set ANDROID_KEYSTORE_PASSWORD in repository secrets."; exit 1; }

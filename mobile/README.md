@@ -40,7 +40,7 @@ buildozer android debug   # 产物在 bin/*.apk
 
 ### 签名 AAB
 
-手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用于检查打包结果，不能上传 Play；signed 模式会验证签名并产出可供 Play Console 上传的 bundle。此工作流不会自动发布到 Google Play。signed 模式需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。当前还没有任何 AAB 构建产物；`38854446189` 是 push 事件且无 jobs，不构成构建验证。
+手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用于检查打包结果，不能上传 Play；signed 模式会验证签名并产出可供 Play Console 上传的 bundle。此工作流不会自动发布到 Google Play。signed 模式需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。当前还没有任何 AAB 构建产物；`38854446189` 是无 jobs 的 push 事件，不构成构建验证。首次手动派发被 job 级 `runner.temp` 表达式拒绝，已改为步骤内设置临时 keystore 路径，待重新派发确认。
 
 ## 已知限制
 
