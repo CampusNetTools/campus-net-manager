@@ -43,9 +43,16 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 当前完整 Python 测试 `498 passed, 3 skipped`；手机服务/manifest patch 专项 12 项通过；Python 编译、版本同步、控制台 HTML lint（8/8）、secret scan 通用模式、workflow/YAML 解析及 `git diff --check` 通过。
 - 这些证据只覆盖源码与本地检查。API 36 APK 构建、合并后 manifest、手机安装、锁屏/切网持续运行均未验证。当前机器缺 Java Runtime、Android SDK/adb 和 Buildozer；`xcodebuild` 只有 CommandLineTools stub，完整 Xcode 不可用。
 - Android 档案现通过 Java Android Keystore AES-GCM helper 写入 `profile.enc`；旧版明文 `profile.json` 会在加密迁移成功后删除。文件仍原子写入并设置 POSIX `0600`，Android backup 关闭。Python 层有加解密边界测试，但 Android Java 编译、真实密钥生成/轮换/迁移仍待 APK 和真机验证。
-- GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。p4a 固定 tag 的 Kivy recipe 已是 2.3.1；Buildozer spec 已改为显式 pin `kivy==2.3.1`，待新 run 验证。
-- iOS 已切到 `NEVPNManager` + `NEVPNProtocolIKEv2` 源码：Mac 为每设备输出私有 `.ikev2.json`、仅根证书 `.mobileconfig` 和服务端 EAP secret；App 将密码放入 Keychain，系统配置仅保存 persistent reference。新增 iOS Simulator unsigned build workflow；当前只有 Swift parser、Python profile tests 与 plist lint，完整 Xcode 类型检查/构建尚未通过。
-- 首个 iOS simulator build 对 `14b150b` 已完成 XcodeGen 项目生成并进入 Swift 编译，暴露 `TunnelManager` 三处 async continuation 未显式指定 `Void` 的类型推断错误；源码已补类型注解，待下一次 CI 复验。该失败不是 entitlements、XcodeGen 或 NetworkExtension API 构建问题。
+- GitHub Actions run `38851368170` 对提交 `28c55dd` 的 API 36 构建曾失败：Kivy 2.3.0 生成的 `cgl_gl.c` 在 NDK r28c Clang 下因 `glShaderSource` 函数指针 const 限定不匹配而终止。Buildozer 已改为 pin `kivy==2.3.1`；新 run `38852810567` 正在构建 API 36 debug APK，最后读取时尚未离开 APK 编译步骤，Manifest 检查与 artifact 上传尚未执行。
+- iOS `NEVPNManager` + `NEVPNProtocolIKEv2` 的 unsigned simulator workflow 已在 run `38852926224` 对提交 `38ccfef` 构建成功。该 run 验证 XcodeGen 生成和模拟器编译通过；没有验证签名、真机安装、证书信任、IKEv2 连通、双向流量或 App Store 发布。
+- 随后扩展 iOS workflow：构建产物安装并启动到 CI iPhone Simulator，并上传 unsigned `.app` artifact；扩展后的 workflow 尚待运行结果。模拟器启动也不能替代真机 VPN 与网络验收。
+
+## 最新核验（2026-10-16）
+
+- 当前分支 `codex/full-project-closure` 的 HEAD 为 `38ccfef7efe7aa6586d2bcd3cd1aefcad0057ca2`，工作树在本次 macOS 安装验证开始前干净；完整 Python 测试为 `498 passed, 3 skipped`。
+- 本机以项目 `.venv` 的 Python 3.13.12 / PyInstaller 6.22.2 成功构建 Apple Silicon `.app`，并安装到 `/Applications/校园网连接管家.app`。安装前 5.0.15 包已备份至 `archives/installed-macos-5.0.15-2026-10-16/`，恢复说明随包保留。
+- 安装包 `CFBundleShortVersionString` 和 `CFBundleVersion` 均为 5.5.0；`codesign --verify --deep --strict` 通过，Mach-O 为 arm64，应用已成功启动，进程路径位于 `/Applications/校园网连接管家.app/Contents/MacOS/校园网连接管家`，窗口显示 v5.5.0。
+- 该本机构建使用 ad-hoc 签名，未进行 Apple Developer 分发签名或公证。桌面全功能逐项验收、Windows 端当前版本重新构建/安装、macOS 跨版本升级和 Release 资产回读仍待完成。
 
 ## 外部发布门槛
 

@@ -22,7 +22,7 @@
 
 当前配置目标 API 36，固定 python-for-android `v2026.05.09`、Python 3.11.8 和 Kivy 2.3.1；构建会在固定源码模板上补入 Android `specialUse` 前台服务所需的 subtype 说明。CI 手动工作流会打包 debug APK 并检查合并后的 Android Manifest。
 
-源码和单元测试仍不等于 APK 构建、手机安装或后台运行验收。2026-10-16 run `38851368170` 在 Kivy 2.3.0 的 `cgl_gl.c` 编译时因 Clang 函数指针 const 限定不兼容而失败；spec 已改 pin Kivy 2.3.1，尚待新 run 验证。APK、Manifest 和 Android 真机锁屏/切网仍未验收。
+源码和单元测试仍不等于 APK 构建、手机安装或后台运行验收。2026-10-16 run `38851368170` 在 Kivy 2.3.0 的 `cgl_gl.c` 编译时因 Clang 函数指针 const 限定不兼容而失败；spec 已改 pin Kivy 2.3.1。新 run `38852810567` 正在进行 API 36 debug APK 编译；该 run 的合并 Manifest 检查和 APK artifact 仍待完成，Android 真机锁屏/切网尚未验收。
 
 本地构建（需 Linux 或 macOS + buildozer 环境；macOS 本机因同样上游问题暂无法出包，
 建议用 Windows 的 WSL2/Linux 或 Docker 完成）：
