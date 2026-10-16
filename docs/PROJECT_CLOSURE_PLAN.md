@@ -152,3 +152,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS 失败栈落在 `tests/test_tunnel_default_no_key.py` 的两个 `WithKeyTests.setUp`：`SharedProxy.start()` 绑定监听端口时报 `OSError: [Errno 48] Address already in use`。该测试先用 `_free_port()` 绑定并关闭套接字，再让代理重新绑定，存在端口被其他进程抢占的竞争窗口；`SharedProxy.start()` 支持 `port=0` 并保存系统分配的端口。根因判断为测试端口分配竞态，仍需修复并在 macOS/Windows CI 验证。`gh-fix-ci` 工作流要求获得明确授权后再改动失败测试，目前修复未实施。
 - 本机 CUA 重新读取 `/Applications/校园网连接管家.app`：可见版本提示“当前已是最新版本 v5.5.0”；关闭提示后，主窗口可见，标题为 `校园网连接管家 v5.5.0`。界面显示“守护：运行中”“网络：VPN 与校园网在线”，这些是应用界面状态，未独立证明当前认证流量、公网连通或设备端行为。
 - 当前 CUA 可读取截图、关闭提示并通过 Tab 移动焦点；鼠标坐标输入返回窗口定位错误，因此没有完成主界面功能按钮的逐项操作验收。本次截图含已保存的档案信息，没有作为项目文件或记忆附件保存。
+
+## b53f925 CI 与桌面候选包回读（2026-10-17）
+
+- `b53f92575c51cfd2391552fdf31b1e57418173ab` 的 PR CI run `38929815980` 已完成 success：Windows 与 macOS 的 511 项测试和静态/版本/页面/敏感值检查均通过。前一个 head `1207f25` 的 macOS 端口冲突在此次未重现；这表明失败可能是间歇性的，但不证明竞争窗口已消除。
+- Desktop candidate run `38929815974` 的 Windows 与 macOS 构建、runner 启动烟雾和 artifact 上传均 success。Windows artifact `12058620960` 外层 ZIP CRC 通过且 SHA-256 与 Actions artifact digest 一致（`f12745f45d0339dac9d56428916a9f505392239cfb72dd5a8ae793aa2b5491e7`）；内含 PE32+ GUI x86-64 EXE，SHA-256 `815af5c75352d7de5e452f037a3204af34edf860a505ecbfb89e86080ed4fc9a`，sidecar 校验通过。EXE 未签名，runner smoke 不等于用户 Windows 安装/升级验收。
+- macOS artifact `12058277383` 外层 ZIP CRC 通过且 SHA-256 与 Actions artifact digest 一致（`45176a03cef82757a4af37719f8ed3d104575138aa68111a35ad720f17fcf9df`）；内含候选 ZIP，SHA-256 `7a527d8fa68daa1d5a6e59630a863698299493cbf29c7d3f389853178fe15127`，sidecar 值一致。`ditto` 解压后 `codesign --verify --deep --strict` 通过，app 为 arm64，bundle id `com.campusnettools.campusnetmanager`、版本 `5.5.0`，包含 62 个符号链接；签名为 adhoc，无 Team ID。该包仍是候选包，未公证或发布。
