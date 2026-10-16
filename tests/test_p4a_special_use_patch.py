@@ -40,6 +40,9 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         workflow = (Path(__file__).parents[1] / ".github" / "workflows" / "mobile.yml").read_text(
             encoding="utf-8"
         )
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertIn("branches: [codex/full-project-closure]", workflow)
+        self.assertIn("- mobile/**", workflow)
         kvm_step = workflow.index("启用 GitHub runner 的 KVM 权限")
         emulator_step = workflow.index("reactivecircus/android-emulator-runner@")
         self.assertLess(kvm_step, emulator_step)

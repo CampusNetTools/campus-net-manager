@@ -1,9 +1,17 @@
 name: 手机版 APK
 
-# APK CI (手动触发). Uses a pinned p4a release with API 36 service-type support
+# APK CI (相关改动推送时和手动触发). Uses a pinned p4a release with API 36 service-type support
 # and explicitly pins the Python recipe to 3.11.8.
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/full-project-closure]
+    paths:
+      - .github/workflows/mobile.yml
+      - mobile/**
+      - core/**
+      - scripts/patch_p4a_special_use.py
+      - tests/test_p4a_special_use_patch.py
 
 jobs:
   build-apk:
