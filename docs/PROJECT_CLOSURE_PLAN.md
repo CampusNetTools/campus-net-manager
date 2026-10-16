@@ -4,6 +4,8 @@
 基线提交：`57f9640e322a7525f4eb0f99967051e6256ba9bd`  
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
+Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
+
 ## 目标
 
 按平台完成现有功能的开发、自动检测、构建、部署、真实设备验收和正式发布。源码、单元测试、CI 构建、安装包、已安装运行和商店上线分别记录，不能互相替代。
