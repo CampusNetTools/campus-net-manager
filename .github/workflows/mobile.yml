@@ -29,6 +29,7 @@ jobs:
           cp mobile/main.py mobile/buildozer.spec build_mobile/
           cp mobile/guard_service.py build_mobile/
           cp -r mobile/services build_mobile/
+          cp -r mobile/assets build_mobile/
           cp -r mobile/java build_mobile/
           cp -r core build_mobile/
           ls build_mobile
@@ -94,6 +95,14 @@ jobs:
         run: |
           apk=$(find build_mobile/bin -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$apk"
+          unzip -p "$apk" assets/private.tar > /tmp/campusnet-private.tar
+          if ! tar -tf /tmp/campusnet-private.tar | grep -Fxq 'assets/NotoSansSC.ttf'; then
+            echo '::error::APK private payload is missing assets/NotoSansSC.ttf.'
+            tar -tf /tmp/campusnet-private.tar | grep -E '(^|/)assets/|NotoSans' || true
+            exit 1
+          fi
+          tar -xOf /tmp/campusnet-private.tar assets/NotoSansSC.ttf \
+            | sha256sum | grep -q '^a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da  -$'
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           "$build_tools/aapt" dump xmltree "$apk" AndroidManifest.xml > /tmp/campusnet-manifest.txt
           require_manifest_value() {

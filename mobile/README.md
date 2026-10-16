@@ -30,6 +30,8 @@
 APK run `38856748022`（head `cf794ed`）曾成功编译 APK，但合并 Manifest 缺少服务声明。日志中的 Buildozer 命令未带 `--service`，根因是配置键误写为 `android.services`；现已修正为 Buildozer 读取的 `[app] services` 并加入回归测试。修复后的 run `38879167090`（head `7934fb1`）成功构建 API 36 debug APK，`aapt` Manifest 校验通过：服务类 `ServiceCampusguard`、`foregroundServiceType=specialUse`、subtype property 与 `0x400` flag 均符合工作流检查。artifact `12037616953` 下载后 ZIP CRC 检查通过，含 arm64-v8a 与 armeabi-v7a；APK SHA-256 为 `0a49e56c35b734843ef2e0f3dcc2e0142afcd8252c44efab1aa637059f1822df`。该证据不代表手机安装、锁屏/切网运行、Play Console 接收或商店发布。unsigned AAB run `38856949123`（head `2c83f6b`）已完成 API 36 构建、剥除临时签名和 unsigned 校验并上传 artifact `12028181480`；ZIP CRC 检查通过、47 个条目、没有 JAR 签名文件，SHA-256 为 `45b5d9579a47bc3c6f81662f8f76044300f3e1383b0115ec54dabcb245d80dc9`。iOS run `38856309857`（head `a15e83d`）已成功完成 simulator 编译、安装、启动和 ZIP 打包；artifact `12027332700` 下载检查确认 ZIP 内含完整 `CampusNetCompanion.app/` 目录，bundle id `com.campusnettools.companion`、版本 `0.2.0 (3)`、Simulator 架构 `x86_64/arm64`、adhoc/linker 签名且无 Team ID。iOS 真机、IKEv2 连通和 App Store 发布仍未验收。
 PR CI run `38879156449` 的 Windows job 因新回归测试按 Windows 默认 cp1252 解码 UTF-8 spec 而失败（`UnicodeDecodeError`）；测试现显式以 UTF-8 读取，再解析配置。修复后的 run `38879597002`（head `077a4c6`）macOS 与 Windows 测试和静态检查均通过。
 
+Android run `38919046038`（head `f84145e`）构建、Manifest gate、KVM、API 36 模拟器安装/启动步骤和 artifact 上传均成功；PR CI `38919056780` 与桌面候选 `38919056811` 成功。回读 APK artifact `12055816564` 后发现 `assets/private.tar` 未包含 `assets/NotoSansSC.ttf`，所以此前字体改动没有进入 APK。模拟器证据 artifact `12055746790` 的截图停留在 Kivy `Loading...`，不能算界面显示验收。原因是 workflow 组装打包目录漏拷贝 `mobile/assets`。workflow 现复制该目录，并在 APK 校验中检查字体条目和 SHA-256；需要新 Android run 验证。该 run 的模拟器进程检查只证明进程存活，不证明主界面已绘制或真实手机行为。
+
 本地构建（需 Linux 或 macOS + buildozer 环境；macOS 本机因同样上游问题暂无法出包，
 建议用 Windows 的 WSL2/Linux 或 Docker 完成）：
 
@@ -38,6 +40,7 @@ mkdir -p build_mobile
 cp mobile/main.py mobile/buildozer.spec build_mobile/
 cp mobile/guard_service.py build_mobile/
 cp -r mobile/services build_mobile/
+cp -r mobile/assets build_mobile/
 cp -r mobile/java build_mobile/
 cp -r core build_mobile/
 cd build_mobile
