@@ -1,3 +1,4 @@
+import configparser
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,6 +13,15 @@ from scripts.patch_p4a_special_use import (
 
 
 class P4aSpecialUsePatchTests(unittest.TestCase):
+    def test_buildozer_uses_the_supported_services_setting(self):
+        spec = configparser.ConfigParser()
+        spec.read(Path(__file__).parents[1] / "mobile" / "buildozer.spec")
+        self.assertEqual(
+            spec.get("app", "services"),
+            "campusguard:services/campusguard.py:foreground:sticky:foregroundServiceType=specialUse",
+        )
+        self.assertFalse(spec.has_option("app", "android.services"))
+
     def test_inserts_android_special_use_subtype_for_campusguard(self):
         template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"
                  {% if foreground_type %}
