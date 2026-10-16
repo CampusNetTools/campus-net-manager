@@ -109,3 +109,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - run `38898518619`（head `18be81d3f88cb7fb592077f713cf26f9068c1119`）完成 API 36 APK 构建和合并 Manifest 校验；随后“启用 GitHub runner 的 KVM 权限”步骤失败，模拟器安装/启动与 APK 上传跳过，因此没有该 run 的 APK artifact。GitHub 页面显示整次 job 24m 1s。
 - 目前可读的 Actions job 元数据只指出 KVM 步骤退出码 1；日志下载 API 返回 `Transport closed`，GitHub 页面要求登录查看日志，故无法确认步骤内具体哪条命令失败。不能把它归因为 `/dev/kvm` 缺失或权限错误中的任何一个。
 - 工作流现在在 `codex/full-project-closure` 上相关 Android 源码/构建文件变更推送时自动运行，也保留手动入口。KVM shell 启用命令跟踪和严格模式，列出 `/dev/kvm` 状态、确认设备节点类型，并在 udev 规则后直接设置节点读写权限；回归测试锁定触发范围、诊断与权限操作。该修复提交后的 API 36 job 仍需重新构建、Manifest 校验和模拟器真实启动验证。
+
+## Android 模拟器 APK 查找失败复核（2026-10-16）
+
+- run `38901859963`（head `8f6b354d8b5bbbe8486ec17d9c47adab9321d745`）完成 APK 编译、合并 Manifest 检查和 KVM 权限步骤；API 36 x86_64 模拟器也成功启动。
+- 安装步骤的实际日志显示 runner 将 `apk=$(find build_mobile/bin ...)` 与下一行 `test -n "$apk"` 分别交给独立的 `/usr/bin/sh -c` 执行，第二个 shell 中变量未设置，因而在 APK 安装前退出 1。旧 run 未上传 APK；always 上传步骤也没有找到日志/截图。
+- 修复改为单独的 `scripts/android_emulator_smoke.sh`，由模拟器 action 用单条 `bash` 命令启动，使 APK 路径、PID 和循环变量在一个 shell 中有效；EXIT trap 尽力保存应用 logcat 与模拟器截图。新增回归测试锁定调用方式和证据收集。修复后的下一次 Actions run 尚待验证。

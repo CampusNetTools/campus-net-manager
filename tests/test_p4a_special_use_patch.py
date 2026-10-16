@@ -43,6 +43,7 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn("branches: [codex/full-project-closure]", workflow)
         self.assertIn("- mobile/**", workflow)
+        self.assertIn("- scripts/android_emulator_smoke.sh", workflow)
         kvm_step = workflow.index("启用 GitHub runner 的 KVM 权限")
         emulator_step = workflow.index("reactivecircus/android-emulator-runner@")
         self.assertLess(kvm_step, emulator_step)
@@ -52,6 +53,20 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn("sudo chmod a+rw /dev/kvm", workflow[kvm_step:emulator_step])
         self.assertIn("test -r /dev/kvm && test -w /dev/kvm", workflow[kvm_step:emulator_step])
         self.assertIn("disable-linux-hw-accel: false", workflow[emulator_step:])
+
+    def test_emulator_smoke_runs_as_one_shell_script(self):
+        root = Path(__file__).parents[1]
+        workflow = (root / ".github" / "workflows" / "mobile.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("script: bash scripts/android_emulator_smoke.sh", workflow)
+        smoke = (root / "scripts" / "android_emulator_smoke.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("set -euo pipefail", smoke)
+        self.assertIn('apk="$(find "$artifact_dir/bin"', smoke)
+        self.assertIn('pid="$(adb shell pidof "$package_name"', smoke)
+        self.assertIn("trap capture_evidence EXIT", smoke)
 
     def test_inserts_android_special_use_subtype_for_campusguard(self):
         template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"
