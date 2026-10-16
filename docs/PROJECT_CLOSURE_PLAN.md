@@ -130,3 +130,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 本机屏幕截图可见安装版主窗口已渲染，中文标题、表单和按钮文字可读；状态区显示“守护：运行中”和“网络：VPN 与校园网在线”。这是界面显示观察，不代表逐个操作按钮，也不独立证明公网/VPN/认证流量当前可用。
 - Computer Use 插件仍报告运行时缺失；通过 CUA 窗口树只能读取窗口与菜单，改用本机截图完成只读观察。截图包含已保存档案字段，查看后删除，未写入仓库或记忆。
 - 桌面逐功能操作、升级安装、Developer ID 签名、公证和正式 Release 回读仍未验收。
+
+## 桌面候选包回读（2026-10-16）
+
+- PR #1 head `9b3fae0c9de919bcaeb0de34ae2eed7875f8e2eb` 的 Desktop candidate run `38926389230` 中，Windows 与 macOS 构建、runner 启动 smoke、候选 artifact 上传均成功。Windows artifact `12056967604` 为 PE32+ GUI x86-64，sidecar SHA-256 校验通过，文件哈希 `4b965f7437bbb5244a44dcb3703bb7ac0be06753516e3fa9c43fbe2031e424fe`。它只在 Windows runner 完成启动 smoke，未在本机 Windows 安装验收。
+- macOS artifact `12056373010` 的 ZIP CRC 和 sidecar SHA-256 校验通过，ZIP 哈希 `652499f8cb0f3260f8384d1bfda35d9445af9e1c14461ca1eceaf376d52bbd11`。`ditto` 解包后 `codesign --verify --deep --strict` 通过；bundle id `com.campusnettools.campusnetmanager`、版本 `5.5.0`，架构 arm64。签名为 adhoc、无 Team ID；候选包未做 Developer ID 公证、用户机器升级或正式 Release 回读。
+- 本轮当前安装版仍从 `/Applications/校园网连接管家.app/Contents/MacOS/校园网连接管家` 运行，版本 `5.5.0`，签名严格校验通过。屏幕可见主界面和状态栏，但 Computer Use 插件仍报告运行时缺失；本轮 CUA 对“检查更新”“设备管理”“新手向导”的点击未观察到页面变化，不能据此判断功能失败，也没有形成控件操作验收证据。
+- Android API 36 APK run `38923633508`（head `ddfe838118edf4e6936e8d7c4d7c6ad3c726504e`）复核时仍停在 APK 编译步骤；只继续轮询该既有 run，不重启。APK 包内 CJK 字体哈希、Manifest、模拟器和 artifact 尚待该 run 后续步骤验证。
