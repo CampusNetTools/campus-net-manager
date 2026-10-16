@@ -1,0 +1,45 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from scripts.patch_p4a_special_use import MARKER, patch_template
+
+
+class P4aSpecialUsePatchTests(unittest.TestCase):
+    def test_inserts_android_special_use_subtype_for_campusguard(self):
+        template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"
+                 {% if foreground_type %}
+                 android:foregroundServiceType="{{ foreground_type }}"
+                 {% endif %}
+                 android:process=":service_{{ name }}" />'''
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "AndroidManifest.tmpl.xml"
+            path.write_text(template, encoding="utf-8")
+            self.assertTrue(patch_template(path))
+            patched = path.read_text(encoding="utf-8")
+            self.assertIn('{% if name == "campusguard" %}', patched)
+            self.assertIn(MARKER, patched)
+            self.assertIn('android:value="User-enabled periodic campus-network authentication keepalive."', patched)
+
+    def test_patch_is_idempotent(self):
+        template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"
+                 {% if foreground_type %}
+                 android:foregroundServiceType="{{ foreground_type }}"
+                 {% endif %}
+                 android:process=":service_{{ name }}" />'''
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "AndroidManifest.tmpl.xml"
+            path.write_text(template, encoding="utf-8")
+            patch_template(path)
+            self.assertFalse(patch_template(path))
+
+    def test_refuses_unrecognized_template(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "AndroidManifest.tmpl.xml"
+            path.write_text("<manifest />", encoding="utf-8")
+            with self.assertRaises(RuntimeError):
+                patch_template(path)
+
+
+if __name__ == "__main__":
+    unittest.main()

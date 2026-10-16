@@ -1,8 +1,7 @@
 name: 手机版 APK
 
-# APK CI (手动触发, 构建约 18 分钟): python-for-android 必须 pin 到旧稳定版
-# (buildozer.spec: p4a.branch = v2024.01.21), master/v2026.05.09 卡在 Python 3.14 迁移
-# (纯 python 依赖 android wheel 装不上)。产物: Actions 页 Artifacts 下载 debug APK。
+# APK CI (手动触发). Uses a pinned p4a release with API 36 service-type support
+# and explicitly pins the Python recipe to 3.11.8.
 on:
   workflow_dispatch:
 
@@ -15,12 +14,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 组装打包目录 (main.py + core/ + buildozer.spec)
+      - name: 组装打包目录 (UI + foreground service + core)
         run: |
           mkdir -p build_mobile
           cp mobile/main.py mobile/buildozer.spec build_mobile/
+          cp mobile/guard_service.py build_mobile/
+          cp -r mobile/services build_mobile/
           cp -r core build_mobile/
           ls build_mobile
+
+      - name: 准备固定版本 python-for-android 并补充 special-use 说明
+        run: |
+          git clone --depth 1 --branch v2026.05.09 \
+            https://github.com/kivy/python-for-android.git "$GITHUB_WORKSPACE/python-for-android"
+          python scripts/patch_p4a_special_use.py "$GITHUB_WORKSPACE/python-for-android"
 
       - uses: actions/setup-java@v4
         with:
@@ -57,7 +64,8 @@ jobs:
           p = 'build_mobile/buildozer.spec'
           s = open(p).read()
           assert 'android.sdk_path' not in s
-          s = s.replace('[app]', '[app]\nandroid.sdk_path = ' + os.environ['ANDROID_HOME'], 1)
+          s = s.replace('[app]', '[app]\nandroid.sdk_path = ' + os.environ['ANDROID_HOME']
+                       + '\np4a.source_dir = ' + os.path.join(os.environ['GITHUB_WORKSPACE'], 'python-for-android'), 1)
           open(p, 'w').write(s)
           print([ln for ln in s.splitlines() if 'sdk_path' in ln])
           "
@@ -68,12 +76,24 @@ jobs:
           ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager" || true
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
 
-      - name: 构建 debug APK
+      - name: 构建 Android API 36 debug APK
         working-directory: build_mobile
         run: buildozer android debug
+
+      - name: 校验 APK 中的前台服务声明
+        run: |
+          apk=$(find build_mobile/bin -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$apk"
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$build_tools/aapt" dump xmltree "$apk" AndroidManifest.xml > /tmp/campusnet-manifest.txt
+          grep -q 'FOREGROUND_SERVICE_SPECIAL_USE' /tmp/campusnet-manifest.txt
+          grep -q 'PROPERTY_SPECIAL_USE_FGS_SUBTYPE' /tmp/campusnet-manifest.txt
+          grep -q 'campusnetmanager.ServiceCampusguard' /tmp/campusnet-manifest.txt
+          grep -q 'foregroundServiceType' /tmp/campusnet-manifest.txt
+          grep -q '0x400' /tmp/campusnet-manifest.txt
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
         with:
-          name: 校园网连接管家-android-debug-apk
+          name: 校园网连接管家-android-api36-debug-apk
           path: build_mobile/bin/*.apk

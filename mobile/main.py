@@ -6,8 +6,7 @@
 - 前台保活: App 打开期间定时检测认证/外网, 掉线自动重登
 - 档案保存: 账号/运营商/认证服务器存应用私有目录
 
-注意: Android 后台保活需要前台服务, 当前版本 App 在前台时保活生效;
-锁屏/切后台后系统可能挂起定时器 (后续版本接 foreground service)。
+Android 使用独立前台服务运行保活循环；桌面开发环境保留 Kivy 前台定时器回退。
 """
 import json
 import os
@@ -39,6 +38,8 @@ RED = (0.941, 0.392, 0.471, 1)
 MUTED = (0.561, 0.631, 0.729, 1)
 
 KEEPALIVE_INTERVAL = 60  # 秒
+GUARD_STATE_POLL_INTERVAL = 5
+ANDROID_SERVICE_CLASS = "org.campusnettools.campusnetmanager.ServiceCampusguard"
 
 
 class Root(BoxLayout):
@@ -105,9 +106,19 @@ class CampusNetMobile(App):
         self.title = APP_TITLE
         self.root = Root(self)
         self._guard_event = None
+        self._guard_poll_event = None
+        self._android_guard_requested = False
         self._load_profile()
         Clock.schedule_once(lambda _dt: self.refresh_status(), 0.5)
+        if self._is_android():
+            self._guard_poll_event = Clock.schedule_interval(
+                lambda _dt: self._refresh_guard_state(), GUARD_STATE_POLL_INTERVAL)
+            Clock.schedule_once(lambda _dt: self._refresh_guard_state(), 0.7)
         return self.root
+
+    @staticmethod
+    def _is_android():
+        return bool(os.environ.get("ANDROID_ARGUMENT"))
 
     # ---------- 档案 ----------
 
@@ -129,9 +140,8 @@ class CampusNetMobile(App):
 
     def _save_profile(self):
         try:
-            os.makedirs(self.user_data_dir, exist_ok=True)
-            with open(self._cfg_path, "w", encoding="utf-8") as f:
-                json.dump(self._form_data(), f, ensure_ascii=False)
+            from guard_service import write_profile
+            write_profile(self._cfg_path, self._form_data())
         except Exception:
             self.root.log("档案保存失败:\n" + traceback.format_exc(limit=1))
 
@@ -190,6 +200,17 @@ class CampusNetMobile(App):
         threading.Thread(target=work, daemon=True).start()
 
     def toggle_guard(self):
+        if self._is_android():
+            if self._android_guard_requested:
+                self._stop_android_guard()
+            else:
+                data = self._form_data()
+                if not data["username"] or not data["password"]:
+                    self.root.set_status("请先填写账号和密码", ok=False)
+                    return
+                self._save_profile()
+                self._request_notification_permission(self._start_android_guard)
+            return
         if self._guard_event:
             self._guard_event.cancel()
             self._guard_event = None
@@ -202,6 +223,101 @@ class CampusNetMobile(App):
         self.root.btn_guard.text = "停止保活"
         self.root.log("保活已开启（每 %d 秒检测，前台有效）" % KEEPALIVE_INTERVAL)
         self._guard_tick()
+
+    def _request_notification_permission(self, continuation):
+        """Request the notification permission before starting a user-visible FGS."""
+        try:
+            from jnius import autoclass
+            sdk = int(autoclass("android.os.Build$VERSION").SDK_INT)
+            if sdk < 33:
+                continuation(True)
+                return
+            from android.permissions import check_permission, request_permissions
+            permission = "android.permission.POST_NOTIFICATIONS"
+            if check_permission(permission):
+                continuation(True)
+                return
+
+            def completed(_permissions, grants):
+                granted = bool(grants and int(grants[0]) == 0)
+                Clock.schedule_once(lambda _dt: continuation(granted))
+
+            request_permissions([permission], completed)
+        except Exception as exc:
+            self.root.log("无法检查通知权限：%s" % type(exc).__name__)
+            self.root.set_status("需要允许通知，才能开启后台保活", ok=False)
+
+    def _start_android_guard(self, permission_granted):
+        if not permission_granted:
+            self.root.set_status("未允许通知，后台保活未开启", ok=False)
+            return
+        try:
+            from jnius import autoclass
+            activity = autoclass("org.kivy.android.PythonActivity").mActivity
+            service = autoclass(ANDROID_SERVICE_CLASS)
+            argument = json.dumps({"profile_path": self._cfg_path,
+                                   "state_path": self._guard_state_path},
+                                  ensure_ascii=False)
+            service.start(activity, "icon", "校园网连接管家",
+                          "校园网保活正在运行", argument)
+            self._android_guard_requested = True
+            self.root.btn_guard.text = "停止保活"
+            self.root.set_status("后台保活服务正在启动…", ok=None)
+            self.root.log("已启动 Android 前台保活服务")
+            Clock.schedule_once(lambda _dt: self._refresh_guard_state(), 1)
+        except Exception as exc:
+            self._android_guard_requested = False
+            self.root.set_status("后台保活启动失败：%s" % type(exc).__name__, ok=False)
+            self.root.log("请检查通知权限和 Android 前台服务配置")
+
+    def _stop_android_guard(self):
+        try:
+            from jnius import autoclass
+            activity = autoclass("org.kivy.android.PythonActivity").mActivity
+            service = autoclass(ANDROID_SERVICE_CLASS)
+            service.stop(activity)
+        except Exception as exc:
+            self.root.log("停止后台保活时出现问题：%s" % type(exc).__name__)
+        self._android_guard_requested = False
+        self.root.btn_guard.text = "开启保活"
+        self.root.set_status("正在停止后台保活…", ok=None)
+
+        def mark_stopped(_dt):
+            try:
+                from guard_service import write_state
+                write_state(self._guard_state_path, {
+                    "enabled": False, "status": "stopped",
+                    "message": "校园网保活已停止。"})
+            except Exception:
+                pass
+            self._refresh_guard_state()
+
+        Clock.schedule_once(mark_stopped, 0.8)
+
+    @property
+    def _guard_state_path(self):
+        return os.path.join(self.user_data_dir, "guard-state.json")
+
+    def _refresh_guard_state(self):
+        if not self._is_android():
+            return
+        try:
+            from guard_service import state_is_fresh
+            with open(self._guard_state_path, encoding="utf-8") as stream:
+                state = json.load(stream)
+            active = state_is_fresh(state)
+            self._android_guard_requested = active
+            self.root.btn_guard.text = "停止保活" if active else "开启保活"
+            if active:
+                self.root.set_status(state.get("message", "后台保活运行中"),
+                                     ok=state.get("status") == "online")
+            elif state.get("status") == "stopped":
+                self.root.set_status("校园网保活已停止", ok=None)
+            else:
+                self.root.set_status("后台保活状态未知或服务已停止", ok=False)
+        except (OSError, ValueError):
+            self._android_guard_requested = False
+            self.root.btn_guard.text = "开启保活"
 
     def _guard_tick(self):
         def work():

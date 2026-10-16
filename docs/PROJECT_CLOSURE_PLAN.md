@@ -36,6 +36,14 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 4. Android/iOS 真机验收，处理商店签名、隐私、测试轨道和审核要求。
 5. 更新 `HANDOFF.md`、README、版本记录与 release workflow；完成桌面和手机商店发布回读。
 
+## 当前 Android 检查点（2026-10-16）
+
+- 已接入 `campusguard` sticky foreground service 源码：串行每分钟检测认证/互联网，掉线后重登并复检；服务状态文件不写账号或密码，UI 每 5 秒读取服务状态。用户可从 App 显式启动/停止，Android 13+ 先申请通知权限。
+- Buildozer 已切到 API 36、p4a `v2026.05.09`、Python/hostpython 3.11.8 和 Kivy 2.3.0；manifest 使用 `specialUse`，工作流固定 p4a 源码 tag 并注入 Google 要求的 subtype 说明，再对 APK manifest 作构建期校验。
+- 本轮完整 Python 测试 `495 passed, 3 skipped`；手机服务/manifest patch 专项 10 项通过；Python 编译、版本同步、控制台 HTML lint（8/8）、secret scan 通用模式、workflow YAML 解析及 `git diff --check` 通过。
+- 这些证据只覆盖源码与本地检查。API 36 APK 构建、合并后 manifest、手机安装、锁屏/切网持续运行均未验证。当前机器缺 Java Runtime、Android SDK/adb 和 Buildozer；`xcodebuild` 只有 CommandLineTools stub，完整 Xcode 不可用。
+- Android 凭据仍以明文 JSON 保存在 App 私有目录（已改为原子写入并设置 POSIX `0600`，并关闭 Android backup），Keystore 加密仍是未完成的安全交付项。
+
 ## 外部发布门槛
 
 - Google Play 新应用和更新当前要求 target API 36；若开发者是 2023-11-13 后创建的个人账号，申请生产发布前需 12 名测试者连续参加封闭测试 14 天。
