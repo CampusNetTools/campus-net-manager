@@ -115,3 +115,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - run `38901859963`（head `8f6b354d8b5bbbe8486ec17d9c47adab9321d745`）完成 APK 编译、合并 Manifest 检查和 KVM 权限步骤；API 36 x86_64 模拟器也成功启动。
 - 安装步骤的实际日志显示 runner 将 `apk=$(find build_mobile/bin ...)` 与下一行 `test -n "$apk"` 分别交给独立的 `/usr/bin/sh -c` 执行，第二个 shell 中变量未设置，因而在 APK 安装前退出 1。旧 run 未上传 APK；always 上传步骤也没有找到日志/截图。
 - 修复改为单独的 `scripts/android_emulator_smoke.sh`，由模拟器 action 用单条 `bash` 命令启动，使 APK 路径、PID 和循环变量在一个 shell 中有效；EXIT trap 尽力保存应用 logcat 与模拟器截图。新增回归测试锁定调用方式和证据收集。修复后的下一次 Actions run 尚待验证。
+
+## Android 模拟器首次界面观察（2026-10-16）
+
+- run `38915018182`（head `7e10c11a1738d981804d062d918a7922ee0905ca`）现已完成 API 36 debug APK 编译、Manifest gate、KVM 权限、模拟器启动、APK 安装、进程存活和无 `FATAL EXCEPTION` 检查，并上传 APK 与 emulator evidence artifact。
+- 下载的屏幕截图显示 Kivy 中文文字为缺字方框；logcat 显示 Kivy 2.3.1 默认 Roboto 字体及 logo 复制的非致命权限错误。初次启动时档案文件不存在也被 `_load_profile()` 记成 `FileNotFoundError`；这是新安装路径而非档案损坏。模拟器未连接校园网，`http://192.168.16.3/` 的状态只能代表 runner 网络环境，不能代替校园网络测试。
+- 已修复：把 SIL OFL 1.1 的 Noto Sans SC 字体及许可证随 Android 包分发并用于状态、表单、按钮和 Spinner 控件；首次启动缺少档案改为空档案，已有损坏档案仍报错。完整测试现为 `511 passed, 3 skipped`；专项测试、Ruff（测试文件）、Python 编译与 diff check 通过。修复后的 APK 字形、安装和界面需由后续 Actions run 复核。
+- 更正故障归因：截图中的 `FileNotFoundError` 来自首次安装尚无 `profile.enc`，旧逻辑将其记为档案读取错误；不是认证服务器返回的异常。模拟器本身未接校园网，`http://192.168.16.3/` 的不可达状态是独立环境结果，不代表校园网真实登录测试。

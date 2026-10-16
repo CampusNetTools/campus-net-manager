@@ -46,6 +46,14 @@ def load_profile_data(path):
     return data
 
 
+def load_profile_data_if_present(path):
+    """Return an empty profile on first launch; preserve errors for corrupt files."""
+    try:
+        return load_profile_data(path)
+    except FileNotFoundError:
+        return {}
+
+
 def write_profile(path, profile):
     """Atomically update the private profile so the service never reads half a file."""
     path = os.path.abspath(path)

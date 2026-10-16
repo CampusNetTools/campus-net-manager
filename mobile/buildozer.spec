@@ -13,7 +13,7 @@ package.domain = org.campusnettools
 source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
-source.include_exts = py,png,jpg,kv,atlas,json
+source.include_exts = py,png,jpg,kv,atlas,json,ttf,txt
 
 # (str) Application versioning (method 1)
 version = 1.0.0

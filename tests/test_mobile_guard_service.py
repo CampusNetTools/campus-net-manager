@@ -5,8 +5,15 @@ import threading
 import unittest
 from unittest.mock import Mock
 
-from mobile.guard_service import (check_once, load_profile_data, read_profile,
-                                  run_guard_service, state_is_fresh, write_profile)
+from mobile.guard_service import (
+    check_once,
+    load_profile_data,
+    load_profile_data_if_present,
+    read_profile,
+    run_guard_service,
+    state_is_fresh,
+    write_profile,
+)
 
 
 class MobileGuardServiceTests(unittest.TestCase):
@@ -29,6 +36,17 @@ class MobileGuardServiceTests(unittest.TestCase):
         profile = read_profile(self.profile_path)
         self.assertEqual(profile["login_type"], "cmcc")
         self.assertEqual(profile["username"], "student@example")
+
+    def test_missing_profile_is_an_empty_first_launch_state(self):
+        missing = os.path.join(self.tmp.name, "first-launch-profile.json")
+        self.assertEqual(load_profile_data_if_present(missing), {})
+
+    def test_corrupt_existing_profile_is_not_hidden_as_first_launch(self):
+        corrupt = os.path.join(self.tmp.name, "corrupt-profile.json")
+        with open(corrupt, "w", encoding="utf-8") as stream:
+            stream.write("not-json")
+        with self.assertRaises(json.JSONDecodeError):
+            load_profile_data_if_present(corrupt)
 
     def test_profile_write_is_atomic_and_private(self):
         os.unlink(self.profile_path)

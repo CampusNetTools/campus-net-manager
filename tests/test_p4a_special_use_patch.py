@@ -36,6 +36,20 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         archs = {item.strip() for item in spec.get("app", "android.archs").split(",")}
         self.assertEqual(archs, {"arm64-v8a", "armeabi-v7a", "x86_64"})
 
+    def test_android_package_includes_simplified_chinese_font_and_license(self):
+        root = Path(__file__).parents[1]
+        spec = configparser.ConfigParser()
+        spec.read_string((root / "mobile" / "buildozer.spec").read_text(encoding="utf-8"))
+        included = {item.strip() for item in spec.get("app", "source.include_exts").split(",")}
+        self.assertIn("ttf", included)
+        self.assertIn("txt", included)
+        self.assertGreater((root / "mobile" / "assets" / "NotoSansSC.ttf").stat().st_size, 10_000_000)
+        license_text = (root / "mobile" / "assets" / "OFL-NotoSansSC.txt").read_text(encoding="utf-8")
+        self.assertIn("SIL OPEN FONT LICENSE Version 1.1", license_text)
+        app_source = (root / "mobile" / "main.py").read_text(encoding="utf-8")
+        self.assertIn('"assets", "NotoSansSC.ttf"', app_source)
+        self.assertGreaterEqual(app_source.count("font_name=_FONT_NAME"), 6)
+
     def test_android_emulator_workflow_enables_kvm_before_launch(self):
         workflow = (Path(__file__).parents[1] / ".github" / "workflows" / "mobile.yml").read_text(
             encoding="utf-8"

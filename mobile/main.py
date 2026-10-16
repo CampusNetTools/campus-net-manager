@@ -19,7 +19,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
-from kivy.uix.spinner import Spinner
+from kivy.uix.spinner import Spinner, SpinnerOption
 from kivy.uix.textinput import TextInput
 
 import sys
@@ -27,6 +27,9 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                       # 打包后 core/ 与 main.py 同目录
 sys.path.insert(0, os.path.dirname(_HERE))      # 开发时 core/ 在仓库根
 from core import auth, config  # noqa: E402
+
+_FONT_PATH = os.path.join(_HERE, "assets", "NotoSansSC.ttf")
+_FONT_NAME = _FONT_PATH if os.path.isfile(_FONT_PATH) else "Roboto"
 
 APP_TITLE = "校园网连接管家"
 METHODS = [("cmcc", "移动"), ("unicom", "联通"), ("teacher", "教师")]
@@ -42,39 +45,50 @@ GUARD_STATE_POLL_INTERVAL = 5
 ANDROID_SERVICE_CLASS = "org.campusnettools.campusnetmanager.ServiceCampusguard"
 
 
+class CjkSpinnerOption(SpinnerOption):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("font_name", _FONT_NAME)
+        super().__init__(**kwargs)
+
+
 class Root(BoxLayout):
     def __init__(self, app, **kwargs):
         super().__init__(orientation="vertical", padding=14, spacing=8, **kwargs)
         self.app = app
 
         self.lbl_status = Label(text="正在检测网络环境…", size_hint_y=None, height=64,
-                                color=GREEN, font_size="16sp")
+                                color=GREEN, font_size="16sp", font_name=_FONT_NAME)
         self.add_widget(self.lbl_status)
         self.lbl_env = Label(text="", size_hint_y=None, height=28, color=MUTED,
-                             font_size="12sp")
+                             font_size="12sp", font_name=_FONT_NAME)
         self.add_widget(self.lbl_env)
 
         form = BoxLayout(orientation="vertical", spacing=6, size_hint_y=None, height=300)
         self.in_user = self._field(form, "账号（学号）")
         self.in_pass = self._field(form, "密码", password=True)
         form.add_widget(Label(text="运营商", size_hint_y=None, height=24,
-                              color=MUTED, halign="left", text_size=(None, None)))
+                              color=MUTED, halign="left", text_size=(None, None),
+                              font_name=_FONT_NAME))
         self.sp_method = Spinner(text="移动", values=[name for _, name in METHODS],
-                                 size_hint_y=None, height=44)
+                                 size_hint_y=None, height=44,
+                                 font_name=_FONT_NAME, option_cls=CjkSpinnerOption)
         form.add_widget(self.sp_method)
         self.in_auth = self._field(form, "认证服务器", text=auth.DEFAULT_AUTH_URL)
         self.add_widget(form)
 
         row = BoxLayout(size_hint_y=None, height=48, spacing=8)
-        self.btn_login = Button(text="立即登录", background_color=ACCENT)
+        self.btn_login = Button(text="立即登录", background_color=ACCENT,
+                                font_name=_FONT_NAME)
         self.btn_login.bind(on_release=lambda *_a: self.app.manual_login())
-        self.btn_guard = Button(text="开启保活", background_color=GREEN)
+        self.btn_guard = Button(text="开启保活", background_color=GREEN,
+                                font_name=_FONT_NAME)
         self.btn_guard.bind(on_release=lambda *_a: self.app.toggle_guard())
         row.add_widget(self.btn_login)
         row.add_widget(self.btn_guard)
         self.add_widget(row)
 
         self.lbl_log = Label(text="", color=MUTED, font_size="11sp",
+                             font_name=_FONT_NAME,
                              halign="left", valign="top")
         scroll = ScrollView()
         scroll.add_widget(self.lbl_log)
@@ -84,7 +98,8 @@ class Root(BoxLayout):
 
     def _field(self, parent, hint, password=False, text=""):
         ti = TextInput(hint_text=hint, multiline=False, password=password,
-                       size_hint_y=None, height=44, text=text)
+                       size_hint_y=None, height=44, text=text,
+                       font_name=_FONT_NAME)
         parent.add_widget(ti)
         return ti
 
@@ -129,7 +144,8 @@ class CampusNetMobile(App):
 
     def _load_profile(self):
         try:
-            from guard_service import load_profile_data, write_profile
+            from guard_service import (load_profile_data_if_present,
+                                       load_profile_data, write_profile)
             legacy_path = os.path.join(self.user_data_dir, "profile.json")
             source_path = self._cfg_path
             if not os.path.exists(source_path) and self._is_android() and os.path.exists(legacy_path):
@@ -137,7 +153,7 @@ class CampusNetMobile(App):
                 write_profile(source_path, data)
                 os.remove(legacy_path)
             else:
-                data = load_profile_data(source_path)
+                data = load_profile_data_if_present(source_path)
             self.root.in_user.text = data.get("username", "")
             self.root.in_pass.text = data.get("password", "")
             self.root.in_auth.text = data.get("auth_url", auth.DEFAULT_AUTH_URL)
