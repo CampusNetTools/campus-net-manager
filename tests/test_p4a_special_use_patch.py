@@ -44,6 +44,9 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         emulator_step = workflow.index("reactivecircus/android-emulator-runner@")
         self.assertLess(kvm_step, emulator_step)
         self.assertIn('GROUP="kvm", MODE="0666"', workflow[kvm_step:emulator_step])
+        self.assertIn("set -euxo pipefail", workflow[kvm_step:emulator_step])
+        self.assertIn("test -c /dev/kvm", workflow[kvm_step:emulator_step])
+        self.assertIn("sudo chmod a+rw /dev/kvm", workflow[kvm_step:emulator_step])
         self.assertIn("test -r /dev/kvm && test -w /dev/kvm", workflow[kvm_step:emulator_step])
         self.assertIn("disable-linux-hw-accel: false", workflow[emulator_step:])
 

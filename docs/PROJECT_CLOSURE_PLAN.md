@@ -103,3 +103,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 当前安装的 macOS app 主窗口截图显示 v5.5.0 界面正常渲染，状态栏显示守护运行中、VPN 与校园网在线及最近检测时间。截图查看后删除；没有操作界面按钮，所以功能逐项验收仍未完成。
 - Android API36 run `38892862907`（head `ded3cfe`）成功构建 APK 并通过合并 Manifest gate，但 emulator step 失败，日志为 `Timeout waiting for emulator to boot.`。action 日志显示它因 KVM 不可用而以 `-accel off` 启动；现有 workflow 未设置 runner 的 `/dev/kvm` 权限。APK 上传因此跳过，运行证据上传步骤未找到文件。已在 `.github/workflows/mobile.yml` 增加 GitHub runner KVM udev 权限步骤并启用硬件加速；回归测试覆盖步骤顺序与配置。专项测试 `8 passed`，workflow YAML 解析和 `git diff --check` 通过。新配置仍待 Actions 构建与 API36 emulator 实跑验证。
 - 上述模拟器 timeout 不代表 APK 运行失败：模拟器未完成启动，APK 安装/启动步骤没有执行。也不代表实体 Android 设备已验收。
+
+## Android KVM 权限步骤复核（2026-10-16）
+
+- run `38898518619`（head `18be81d3f88cb7fb592077f713cf26f9068c1119`）完成 API 36 APK 构建和合并 Manifest 校验；随后“启用 GitHub runner 的 KVM 权限”步骤失败，模拟器安装/启动与 APK 上传跳过，因此没有该 run 的 APK artifact。GitHub 页面显示整次 job 24m 1s。
+- 目前可读的 Actions job 元数据只指出 KVM 步骤退出码 1；日志下载 API 返回 `Transport closed`，GitHub 页面要求登录查看日志，故无法确认步骤内具体哪条命令失败。不能把它归因为 `/dev/kvm` 缺失或权限错误中的任何一个。
+- 工作流现在为 KVM shell 启用命令跟踪和严格模式，列出 `/dev/kvm` 状态、确认设备节点类型，并在 udev 规则后直接设置节点读写权限；回归测试锁定这些诊断与权限操作。该修复提交后的 API 36 job 仍需重新构建、Manifest 校验和模拟器真实启动验证。

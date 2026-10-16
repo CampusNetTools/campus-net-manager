@@ -109,10 +109,17 @@ jobs:
 
       - name: 启用 GitHub runner 的 KVM 权限
         run: |
+          set -euxo pipefail
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          # The hosted runner may already have created /dev/kvm before the
+          # udev rule was installed. Set its permissions directly as well.
+          ls -l /dev/kvm
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
 
       - name: 在 Android API 36 模拟器安装并启动 APK
