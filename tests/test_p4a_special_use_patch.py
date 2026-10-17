@@ -111,6 +111,7 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn("Signer #1 certificate SHA-256 digest: a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613", mobile_workflow)
         self.assertIn("needs: [test, release]", release_workflow)
         self.assertIn("uses: ./.github/workflows/mobile.yml", release_workflow)
+        self.assertIn("secrets: inherit", release_workflow)
 
     def test_emulator_smoke_runs_as_one_shell_script(self):
         root = Path(__file__).parents[1]
