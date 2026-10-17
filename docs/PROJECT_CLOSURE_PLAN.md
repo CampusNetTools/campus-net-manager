@@ -2,7 +2,7 @@
 
 更新时间：2026-10-17
 
-当前 PR head：`927c142f1eb88013b02b5ebe42a8e8a57e7ac2c1`（`codex/full-project-closure`）
+本摘要核验时 PR head：`c6b6a0fc0e1beed1d1d0231595832a431a205bd8`（`codex/full-project-closure`）
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
 Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
@@ -22,12 +22,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 当前状态摘要（2026-10-17）
 
-- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft；最新功能提交为 `927c142`，其后文档提交 `58d0e3d` 的 PR CI 已通过。
-- 功能提交 `927c142` 的 PR CI run `39015993367` Windows/macOS 全套测试和静态检查 success；发布 job 因 draft skipped。Desktop candidate run `39015993366` 两平台 build、runner launch smoke 和 artifact upload success；本轮未回读桌面包体。
-- Android API36 run `39013104353` 对 head `32c9a9e` 全步骤 success，包括前台服务 Manifest gate、模拟器安装启动和 APK/运行证据上传。APK 三 ABI；模拟器截图显示非校园网状态，不能证明真机锁屏、切网、Keystore 或真实校园认证。
+- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0，仍 OPEN draft。本地、origin 和 PR head 为 `c6b6a0f`；最新产品功能提交 `f9c6d73` 保留显式 HTTPS 登录并阻断 HTTPS→HTTP 降级，后续 `c6b6a0f` 只更新闭环证据。
+- `f9c6d73` 的 PR CI run `39033219351` Windows/macOS 全套检查 success；Desktop candidate run `39033219343` 两平台 build、runner launch smoke 和 artifact upload success。候选包 artifact 下载在本机遇 `SSL_ERROR_SYSCALL`，内容未回读。
+- 当前文档 head `c6b6a0f` 的 PR CI run `39033728151` success，Desktop candidate run `39033728168` detector success；因 docs-only 变更，桌面打包 job skipped。
+- Android API36 APK run `39033215828`（head `f9c6d73`）前置步骤 1–10 success；最近核验仍在 APK 编译步骤 11，Manifest/KVM/模拟器/上传 gate 尚未运行。只轮询该原 run，不重启。
 - iOS Simulator run `39015990577` 对 head `927c142` 全步骤 success：8 项 enrollment XCTest（0 failures）、unsigned Simulator build、模拟器安装启动及 app bundle artifact 上传。artifact `12095062191` 的 Actions digest 与外层下载 ZIP SHA-256 一致，为 `a0a78aedd68c57a759df29b135436cea2085c9cb66e82348eea9f80acad50742`；外层 ZIP CRC 通过，内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `3c94533bd5f0a9b24e2b6d616470ef3b298111e75e838dd8a05d42b39a74cf90`、CRC 通过。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，Simulator 二进制 x86_64/arm64，adhoc/linker 签名且无 Team ID。不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
 - 本机当前开发目录是 `/Library/Developer/CommandLineTools`；`xcodebuild` 提示需要完整 Xcode，`simctl` 与 `adb` 不可用。无法在本机完成实体 iPhone/Android 的 USB 验收；Windows 用户设备验收也没有本机证据。
-- 仍未闭环：Android 实体手机锁屏/切网/Keystore与 Play signed AAB/测试轨道；iOS 真机签名、IKEv2 双向流量与 App Store；Windows 用户设备安装与逐功能；macOS Developer ID/公证、升级、逐功能和正式 Release 回读。当前候选与模拟器证据均不替代上述验收。
+- 仍未闭环：Android 实体手机锁屏/切网/Keystore 与 Play signed AAB/测试轨道；iOS 真机签名、IKEv2 双向流量与 App Store；Windows 用户设备安装与逐功能；macOS Developer ID/公证、升级、逐功能和正式 Release 回读。当前候选与模拟器证据均不替代上述验收。
 
 ## 初始核验基线（2026-10-16，历史记录）
 
