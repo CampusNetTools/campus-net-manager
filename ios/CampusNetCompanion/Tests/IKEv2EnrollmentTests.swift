@@ -48,6 +48,21 @@ final class IKEv2EnrollmentTests: XCTestCase {
         XCTAssertThrowsError(try IKEv2Enrollment.decode(payload(version: 2)))
     }
 
+    func testAcceptsPayloadAtMaximumSize() throws {
+        var data = payload()
+        data.append(Data(repeating: 0x20,
+                         count: IKEv2Enrollment.maximumPayloadBytes - data.count))
+
+        XCTAssertEqual(try IKEv2Enrollment.decode(data).deviceName, "iphone-1")
+    }
+
+    func testRejectsPayloadAboveMaximumSize() {
+        let data = Data(repeating: 0x20,
+                        count: IKEv2Enrollment.maximumPayloadBytes + 1)
+
+        XCTAssertThrowsError(try IKEv2Enrollment.decode(data))
+    }
+
     private func payload(
         version: Int = 1,
         serverAddress: String = "10.12.72.55",

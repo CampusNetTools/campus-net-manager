@@ -47,7 +47,20 @@ struct CompanionHome: View {
                     let didAccess = url.startAccessingSecurityScopedResource()
                     defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
                     do {
-                        let data = try Data(contentsOf: url)
+                        let handle = try FileHandle(forReadingFrom: url)
+                        defer { try? handle.close() }
+                        let limit = IKEv2Enrollment.maximumPayloadBytes
+                        var data = Data()
+                        while data.count <= limit {
+                            let count = limit + 1 - data.count
+                            guard let chunk = try handle.read(upToCount: count),
+                                  !chunk.isEmpty else { break }
+                            data.append(chunk)
+                        }
+                        guard data.count <= IKEv2Enrollment.maximumPayloadBytes else {
+                            message = "配置文件超过 64 KB 安全限制。"
+                            return
+                        }
                         Task { await tunnel.importConfiguration(data) }
                     } catch {
                         message = "无法读取配置文件：\(error.localizedDescription)"

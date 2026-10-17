@@ -18,6 +18,7 @@ Do not install both the complete `.mobileconfig` and the app-managed VPN at the 
 ## App behavior
 
 - Imports and validates a per-device enrollment file.
+- Rejects enrollment files larger than 64 KiB before parsing to keep imported input bounded.
 - Stores the EAP password in Keychain and configures iOS IKEv2 with server-certificate name validation.
 - Loads the saved configuration after relaunch, reports system VPN status, and supports connect, disconnect, re-import, and removal.
 - Uses the IKEv2 server's normal routing and NAT. It does not depend on the old Packet Tunnel protocol or an unimplemented TLS/TUN service.
