@@ -486,6 +486,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12093059485`（17,993,841 bytes）下载 SHA-256 与 Actions digest 一致：`16acfcedcea766ebfa182bc85cdb8452d2e1fa7ec258487b0ea72695d3d17fb0`，外层 ZIP CRC 通过。内层候选 ZIP SHA-256 `aeebc646b3a7ca493adbc5029add69a644e63bff7d3f363a17b62f58ca9e87eb` 与 sidecar 相符；ZIP CRC 通过，554 项、62 个 symlink。用 `ditto` 解包后 strict codesign 通过；bundle id `com.campusnettools.campusnetmanager`、v5.6.0、arm64；adhoc 签名、无 Team ID。
 - 该提交只改文档。候选包及 CI runner smoke 不证明用户设备安装、逐功能验收、Windows Authenticode、macOS Developer ID/公证、升级或正式 Release。
 
+## fd22a47 Android API36 模拟器验证登录风险提示（2026-10-17）
+
+- Android run `39010889130`（head `fd22a47ec2ad8de2b61f9b72d593766f5cf5119b`）completed/success；APK build、合并 Manifest gate、KVM、API36 模拟器安装启动与 APK/evidence artifact 上传均 success。
+- APK artifact `12093492574`（67,968,669 bytes）下载 SHA-256 与 Actions digest 一致：`2fb780e4ea518bcba222b01bdfd00bbe23c5faf8f6a098f536fec68daac3ee77`，外层 ZIP CRC 通过。内含 APK SHA-256 `0d54f4d66ff9c07465bacaf428cf8571523b4395929d2a6d1915449d74803933`，APK ZIP CRC 通过，共 56 项，含 `arm64-v8a`、`armeabi-v7a` 与 `x86_64` ABI。
+- Emulator evidence artifact `12093412586`（97,249 bytes）下载 SHA-256 与 Actions digest 一致：`d1d00393dc70cb3e49eb587f601d6616145a850843222b2e1ec272c020873828`，ZIP CRC 通过。logcat 有 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，无 `FATAL EXCEPTION`/`ANR in`；smoke 脚本确认状态就绪后应用进程仍在运行。1080×2400 截图显示登录页中的 HTTP 明文账号/密码风险提示和空凭据框。
+- 该 run 证明登录页风险提示已进入此次模拟器包并渲染；模拟器不连学校认证服务器，因此不证明 HTTP 门户兼容、真机网络/锁屏切网/Keystore 或 Play 验收。当前分支 PR #1 仍为 open draft；后续 desktop-only 文档提交的 CI 与候选包流程另行跟踪。
+
 ## 20f58f5 Android API36 模拟器运行完成（2026-10-17）
 
 - 修正前文当时状态：run `39010565663`（head `20f58f54f4789fd8d633bb812d32e054489ef25c`）最终 completed/success。APK 构建、合并 Manifest 前台服务声明校验、KVM 权限、API36 模拟器安装启动、APK artifact 上传与模拟器证据上传步骤均 success。
