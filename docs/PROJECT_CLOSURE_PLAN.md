@@ -470,3 +470,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12093455787`（17,995,260 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`2f5add5f38fbe170faa27597c2ac40b12d298b23b2300632908b588b8d4eda70`，外层 ZIP CRC 通过；候选 ZIP SHA-256 `7fb69f44f22549a557a708451ea88fa62d271897f932289c01d8d46632cb557e` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64，adhoc 签名、无 Team ID。
 - Android APK runs `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）查询时仍为 in progress，活动步骤为 API 36 APK 编译；Actions job log 工具返回 `Transport closed`，GitHub CLI 查询返回 API `EOF`。这些下载错误不代表构建失败，未重启原 run。
 - Android/iPhone 真机、签名商店、Windows 用户设备安装、macOS Developer ID/公证和正式 Release 仍待验收；以上两项桌面产物仍是 PR 候选包与 runner smoke 证据。
+
+## 47fb1a4 双平台 CI 与桌面候选回读、Android 进入模拟器阶段（2026-10-17）
+
+- PR CI run `39012174284` 对 head `47fb1a4d792d69518f769169bdac874396f5d5d4` 的 Windows/macOS 全套检查均 success，release job 因 PR 为 draft skipped。Desktop candidate run `39012174407` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。
+- Windows artifact `12093580736`（20,535,332 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`7cd477327fe82229a32397062f5ab2b1151c67ebc7fad5c52470c2a3a0bea5d5`，ZIP CRC 通过；EXE SHA-256 `abc477639c5760f631be911e4e88a77969da787bbc9de7f49a6c4232d4f645ac` 与 sidecar 一致，PE32+ GUI x86-64，Security Directory offset/size 均为 0，未签名。
+- macOS artifact `12093755258`（17,995,586 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`3f42c28102d8debd53361fdd8346c5921643152efd5be58b0f78330a7e889418`，外层 ZIP CRC 通过；候选 ZIP SHA-256 `537c3848c5a0f92a38cff47344e4d2334d4d3a4f7610d8c1d0de2cc43476823d` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64，adhoc 签名、无 Team ID。
+- Android run `39010565663`（head `20f58f5`）已成功完成 API36 APK build、前台服务 Manifest 校验与 KVM 权限步骤，当前进入模拟器安装/启动步骤 14，尚无 APK/运行证据 artifact；步骤日志仍不可下载。另一个 run `39010889130`（head `fd22a47`）仍在 APK 编译步骤 11。Actions metadata 将两者标为 in progress；日志工具返回 `Transport closed`、CLI 查询提示 in progress 时日志暂不可用。只轮询原 run，不重启。
+- 桌面候选与 runner smoke 不证明真实 Windows 安装、macOS Developer ID/公证、升级或正式 Release；Android 模拟器也不代表实体手机、校园网连接或商店验收。
