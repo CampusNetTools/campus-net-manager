@@ -392,3 +392,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - APK artifact `12091811318`（67,968,031 bytes）在 Actions artifact 元数据中 digest 为 `8226705462e9ab061948388ff0e7d8760aecbc7e1874dc8c3cb0635336b28cc7`。本轮用 `gh api` 下载返回 EOF；改用连接器获取临时下载引用后，本机 TLS 下载返回 `SSL_ERROR_SYSCALL`。因此只确认 Actions 上传成功和元数据 digest，未取得 APK 包体做本机 CRC、Manifest、ABI 或内层哈希回读。
 - Emulator evidence artifact `12091323267`（69,120 bytes）元数据 digest 为 `a7abd8afc4539024331979f94d3e3a7d4e8f7dc04f61046ac14410b0be8d5cc8`；本地证据 ZIP SHA-256 与该 digest 相符且 ZIP CRC 通过。logcat 报告 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，无 `FATAL EXCEPTION`、`ANR in` 或进程死亡记录；1080×2400 模拟器截图显示登录表单和上述状态，账号/密码框为空。该结果是 runner 上模拟器启动证据，不是校园认证服务器、实体手机或网络流量验收。
 - 该 head 的 PR CI run `39008182645` Windows/macOS 检查均 success，发布 job 因 PR 为 draft skipped；Desktop candidate run `39008182648` 的双平台 build、runner smoke 和 artifact upload success。该两项桌面候选包不属于本节 Android APK 包体回读，也不构成用户设备安装或正式发布。
+
+## c251e32 双平台 CI 与桌面候选包回读（2026-10-17）
+
+- PR CI run `39008571202` 对 head `c251e32a7cf62549c4fa7614a6637e4f9cc3f573` 的 Windows/macOS 全套检查均 success，发布 job 因 PR 为 draft skipped。Desktop candidate run `39008571404` Windows/macOS build、runner launch smoke 与 artifact upload 均 success。
+- macOS artifact `12091827800`（17,995,078 bytes）外层 SHA-256 与 Actions digest 一致：`d40cf6384f61790f82a3adc8dc70afb84ed274ab4de4b5c4b629c0207801bdb7`，ZIP CRC 通过。内层候选 ZIP SHA-256 `79c0bee4bd288fba945d7fb586c9a791c984817f92c8bdc244b672071624af97` 与 sidecar 匹配，ZIP CRC 通过；ditto 解包后 strict codesign 通过，app bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、62 个 symlink、adhoc 签名、无 Team ID。
+- Windows artifact `12091698073`（20,534,303 bytes）外层 SHA-256 与 Actions digest 一致：`1bd0f323dfb30d0662d9821c7e6d96cbd03234014c4e338af0ac8e46b6a8a6c3`，ZIP CRC 通过。EXE SHA-256 `f5c0a67a90699b2d47766535a314cf8ac6788e2a80b91177bd8cf704a22557ec` 与 sidecar 匹配，文件为 PE32+ GUI x86-64；PE Security Directory offset/size 均为 0，未签名。
+- 两份为 draft PR 候选，构建和 runner smoke 不证明真实 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 release。Android APK artifact 在同一轮仍未能下载回读，参见上一节。
