@@ -421,3 +421,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 桌面连接档案的校园网表单和 Android 登录页现在在认证地址附近提示：当前 Dr.COM 登录通过 HTTP 发送账号和密码，校园网络可见，建议只在可信校园网登录。README、Android README 与用户手册同步说明。
 - 新增 3 项文案回归检查。完整 unittest 为 `534 passed, 3 skipped`；Ruff F/E9、Python 编译与 `git diff --check` 通过。
 - 本地 UI 控件级渲染/小屏适配以及用户确认未完成；HTTP 明文传输风险仍存在。当前 Android run `39010565663` 对前一提交仍处于 API 36 APK 编译步骤，未重启；本次 UI 改动提交后的构建与模拟器验证待新 Actions run。
+
+## fd22a47 登录风险披露提交的 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39010893823` 对提交 `fd22a47ec2ad8de2b61f9b72d593766f5cf5119b` 的 Windows/macOS 检查均 completed/success；Desktop candidate run `39010893890` 两平台构建、runner launch smoke 和 artifact 上传均 success。发布仍受 PR draft 规则约束。
+- macOS artifact `12092399515` 的 Actions digest 与下载 ZIP SHA-256 均为 `c9147225818293fb49e8a67424189b02e86c9cd1e5512d5efad5692c985365fc`，ZIP CRC 通过。内层候选 ZIP SHA-256 `d5671f8b9b4c75d4f5c469063e98786f969eda8b818b18e0b12cd1172e96a6dd` 与 sidecar 一致、CRC 通过；ditto 解包后 bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个 symlink，strict codesign 通过，签名 adhoc、无 Team ID。
+- Windows artifact `12092439261` 的 Actions digest 为 `e8cb846e6fc790a0d26797e461e42e3052d0bdb357d7dc7ab244df0ec45bbdeb`。本机 artifact 下载遭 GitHub API EOF 和 `SSL_ERROR_SYSCALL`；达到重试上限后停止，未独立回读 Windows ZIP/sidecar/EXE。不得据此推断产物损坏或已通过本机哈希复核。
+- Android run `39010565663`（head `20f58f5`）和新 UI 提示提交 run `39010889130`（head `fd22a47`）在最近检查时仍处于 API 36 APK 编译步骤 11。两者仅轮询，不重启；新 head 的 APK、Manifest、模拟器首屏与运行 artifact 尚待终态验证。
+- 桌面候选包与 runner smoke 不代表 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 Release；Android API36 runner 也不代表实体手机、锁屏/切网、Keystore 或商店验收。
