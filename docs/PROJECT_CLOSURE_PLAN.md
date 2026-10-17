@@ -389,7 +389,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 ## dae0f8e Android API 36 模拟器运行完成（2026-10-17）
 
 - 修正前文当时状态：Android API 36 debug APK run `39006870412`（head `dae0f8ede3f97cd00d71cf7e1d8a9f6e514f565b`）最终 completed/success。APK 构建、合并 Manifest 前台服务声明、KVM 权限、API 36 模拟器安装启动、APK artifact 上传和 emulator evidence 上传步骤均 success；模拟器进程保持 10 秒并通过启动/崩溃日志门禁。
-- APK artifact `12091811318`（67,968,031 bytes）在 Actions artifact 元数据中 digest 为 `8226705462e9ab061948388ff0e7d8760aecbc7e1874dc8c3cb0635336b28cc7`。本轮用 `gh api` 下载返回 EOF；改用连接器获取临时下载引用后，本机 TLS 下载返回 `SSL_ERROR_SYSCALL`。因此只确认 Actions 上传成功和元数据 digest，未取得 APK 包体做本机 CRC、Manifest、ABI 或内层哈希回读。
+- APK artifact `12091811318`（67,968,031 bytes）Actions digest 与后续通过 GitHub connector + Node fetch 取回文件的外层 SHA-256 一致：`8226705462e9ab061948388ff0e7d8760aecbc7e1874dc8c3cb0635336b28cc7`，外层 ZIP CRC 通过。内含 APK SHA-256 `376e11f42ec94b613ed3b90b55c7b918d39ab16dd380fbc94a742233c1d4490c`，APK ZIP CRC 通过，共 56 entries，含 `AndroidManifest.xml` 及 `arm64-v8a`、`armeabi-v7a`、`x86_64` 三个 ABI。run 的 Manifest gate 对合并 APK 的前台服务声明检查 success；本机未安装 aapt，未独立解码 Manifest 属性。
 - Emulator evidence artifact `12091323267`（69,120 bytes）元数据 digest 为 `a7abd8afc4539024331979f94d3e3a7d4e8f7dc04f61046ac14410b0be8d5cc8`；本地证据 ZIP SHA-256 与该 digest 相符且 ZIP CRC 通过。logcat 报告 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，无 `FATAL EXCEPTION`、`ANR in` 或进程死亡记录；1080×2400 模拟器截图显示登录表单和上述状态，账号/密码框为空。该结果是 runner 上模拟器启动证据，不是校园认证服务器、实体手机或网络流量验收。
 - 该 head 的 PR CI run `39008182645` Windows/macOS 检查均 success，发布 job 因 PR 为 draft skipped；Desktop candidate run `39008182648` 的双平台 build、runner smoke 和 artifact upload success。该两项桌面候选包不属于本节 Android APK 包体回读，也不构成用户设备安装或正式发布。
 
