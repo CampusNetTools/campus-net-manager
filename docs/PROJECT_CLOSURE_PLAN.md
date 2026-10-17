@@ -647,3 +647,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - PR CI run `39035668964` 对 head `1b56c24ca91a62e3a9e72a4db44df25e7a7d2b5c` 的 Windows/macOS 全套测试、静态、版本、路由器工作台页面和敏感值检查均 success；发布 job 因 PR #1 仍为 OPEN draft skipped。
 - Desktop candidate run `39035668921` detector success；本次只改闭环 Markdown 文档，Windows/macOS 打包和 runner smoke jobs 按检测规则 skipped。
 - 上述 checks 验证文档提交未破坏 CI；不改变 `f9c6d73` 候选包与 runner smoke 的证据范围，也不构成用户设备安装或正式发布验证。
+
+## Android Kivy writable-home 修复候选（2026-10-17）
+
+- 前一 API36 模拟器 logcat 报告 Kivy 2.3.1 在 p4a 解包源码目录 `ANDROID_APP_PATH/.kivy/icon` 复制图标时 permission denied。Kivy 2.3.1 初始化源码确认：未设置 `KIVY_HOME` 时 Android 默认将 `ANDROID_APP_PATH` 当 home 并在其下创建 `.kivy`；该路径与本次 logcat 中的不可写目标一致。
+- `mobile/main.py` 现在在首次导入 Kivy 前，如果 Android 提供 `ANDROID_APP_PATH` 且未由部署环境显式设置 `KIVY_HOME`，将 Kivy home 设为其父级 app-private `files/.kivy`；桌面环境和用户/打包器预设的 `KIVY_HOME` 不变。参考 [Kivy 2.3.1 初始化源码](https://raw.githubusercontent.com/kivy/kivy/2.3.1/kivy/__init__.py)。
+- 新增 `tests/test_mobile_kivy_home.py` 4 项回归；专项 4 项通过，全套 unittest `544 passed, 3 skipped`；Ruff F/E9、版本一致性、路由器页面检查、敏感值扫描、Android emulator smoke bash 语法和 `git diff --check` 通过。本地 standalone pyflakes 命令仍输出项目 star-import 架构的既有诊断，须以 CI 中过滤后的未定义名 gate 为准。
+- 以上仅证明源码逻辑与本机测试。尚未通过新的 APK/API36 模拟器 logcat 证明 permission denied 消失，不能视为 Android 运行期修复验收；HIDAPI receiver 错误与 `<android>` provider 警告仍未定位，也不能归因于 Kivy home 路径。

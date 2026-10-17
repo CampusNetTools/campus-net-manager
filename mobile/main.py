@@ -13,6 +13,20 @@ import os
 import threading
 import traceback
 
+
+def _configure_kivy_home(environ=None):
+    """Keep Kivy's writable cache/config outside p4a's extracted source tree."""
+    environ = os.environ if environ is None else environ
+    app_path = environ.get("ANDROID_APP_PATH")
+    if app_path and not environ.get("KIVY_HOME"):
+        # p4a extracts bundled Python sources under files/app, which is not a
+        # writable home for Kivy's default .kivy/icon copy. The parent files/
+        # directory is app-private and writable by this package.
+        environ["KIVY_HOME"] = os.path.join(os.path.dirname(app_path), ".kivy")
+
+
+_configure_kivy_home()
+
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.uix.boxlayout import BoxLayout
