@@ -43,7 +43,14 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         included = {item.strip() for item in spec.get("app", "source.include_exts").split(",")}
         self.assertIn("ttf", included)
         self.assertIn("txt", included)
-        self.assertGreater((root / "mobile" / "assets" / "NotoSansSC.ttf").stat().st_size, 10_000_000)
+        font_path = root / "mobile" / "assets" / "NotoSansSC.ttf"
+        self.assertGreater(font_path.stat().st_size, 8_000_000)
+        font_data = font_path.read_bytes()
+        table_count = int.from_bytes(font_data[4:6], "big")
+        table_tags = {font_data[12 + index * 16:16 + index * 16].decode("ascii")
+                      for index in range(table_count)}
+        self.assertNotIn("fvar", table_tags)
+        self.assertNotIn("gvar", table_tags)
         license_text = (root / "mobile" / "assets" / "OFL-NotoSansSC.txt").read_text(encoding="utf-8")
         self.assertIn("SIL OPEN FONT LICENSE Version 1.1", license_text)
         app_source = (root / "mobile" / "main.py").read_text(encoding="utf-8")
@@ -84,6 +91,8 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn('apk="$(find "$artifact_dir/bin"', smoke)
         self.assertIn('pid="$(adb shell pidof "$package_name"', smoke)
         self.assertIn("trap capture_evidence EXIT", smoke)
+        self.assertIn("scripts/check_android_screenshot.py", smoke)
+        self.assertIn("seq 1 10", smoke)
 
     def test_inserts_android_special_use_subtype_for_campusguard(self):
         template = '''<service android:name="{{ args.package }}.Service{{ name|capitalize }}"

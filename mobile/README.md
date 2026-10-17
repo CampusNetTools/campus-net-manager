@@ -10,7 +10,7 @@
 - **档案保存**：Android 使用 Keystore AES-GCM 加密后的 `profile.enc`；旧版明文档案在迁移成功后删除。桌面开发回退仍写 `profile.json`
 - **中文界面**：APK 随包包含 Noto Sans SC 与 SIL OFL 许可证，避免 Kivy 默认字体缺少中文字形
 
-字体来自 Google Fonts `Noto Sans SC`，按 SIL Open Font License 1.1 原样分发；许可证位于 `assets/OFL-NotoSansSC.txt`，字体 SHA-256 为 `a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da`。
+字体由 Google Fonts `Noto Sans SC` 静态化为 Regular 字重后按 SIL Open Font License 1.1 分发，避免在 Android 首屏加载可变字体；许可证位于 `assets/OFL-NotoSansSC.txt`，字体 SHA-256 为 `36af0f6b574d759242c117bb88bf673c0e5b5c74932877d2a2031240e383dd4d`。
 
 ## 与桌面版的关系
 

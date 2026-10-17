@@ -11,6 +11,7 @@ on:
       - mobile/**
       - core/**
       - scripts/android_emulator_smoke.sh
+      - scripts/check_android_screenshot.py
       - scripts/patch_p4a_special_use.py
       - tests/test_p4a_special_use_patch.py
 
@@ -102,7 +103,7 @@ jobs:
             exit 1
           fi
           tar -xOf /tmp/campusnet-private.tar assets/NotoSansSC.ttf \
-            | sha256sum | grep -q '^a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da  -$'
+            | sha256sum | grep -q '^36af0f6b574d759242c117bb88bf673c0e5b5c74932877d2a2031240e383dd4d  -$'
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           "$build_tools/aapt" dump xmltree "$apk" AndroidManifest.xml > /tmp/campusnet-manifest.txt
           require_manifest_value() {

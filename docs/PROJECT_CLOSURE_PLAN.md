@@ -216,4 +216,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 新增 [`PRIVACY_DATA_INVENTORY.md`](PRIVACY_DATA_INVENTORY.md)，按桌面、Android 和 iOS 源码列出本地存储、登录凭据、联网探测、测速、更新、用户自选订阅/路由器/NAS 与 iOS IKEv2 网关的数据流，并标注商店申报前待确认事项。
 - 本次源码检索未发现常见分析、广告或崩溃上报 SDK/接口；这不是对最终依赖、构建二进制或实际网络流量的完整证明。Dr.COM 登录源码将用户名和密码放入 HTTP URL 查询参数，是需要在上架前评估并向用户清楚披露的传输风险。
 - PR #1 仍为 OPEN draft，head `dee232b4ddf813fb00f3376af25069f342c43676`；Android run `38998932605` 针对其前一源码 head `19cb82f`，APK 编译、Manifest 与 KVM 步骤通过，模拟器安装/启动仍在进行，artifact 尚未上传。本轮未重启该 run。
+
+## Android 模拟器首屏黑屏修复候选（2026-10-17）
+
+- 回读 run `38998932605` 的模拟器运行证据后发现：APK 安装、进程保持和无 `FATAL EXCEPTION` 均通过，但截图主体区域为黑屏。因此这次只能证明进程存活，不能证明主界面完成绘制；此前将该 run 记为模拟器启动成功的描述不应被解释为 UI 验收。
+- 为降低首屏字体处理负担，`mobile/assets/NotoSansSC.ttf` 改为 Noto Sans SC Regular 静态字体子集，保留 SIL OFL 1.1 许可证。新字体 SHA-256 为 `36af0f6b574d759242c117bb88bf673c0e5b5c74932877d2a2031240e383dd4d`，包含 28,193 个映射字形且不含可变字体 `fvar`/`gvar` 表。此改动是待模拟器验证的修复候选，尚未证明它是黑屏根因或已解决问题。
+- 新增标准库 PNG 检查器，在启动后最多重取 10 次截图；若屏幕主体采样像素仍无可见内容，模拟器 smoke 失败。新增黑屏/有色画面单测，并把模拟器截图证据保留为 artifact，失败时也会上传。
+- 当前本地专项测试 12 项通过，`bash -n`、workflow YAML 解析、字体 SHA/表结构检查和 `git diff --check` 均通过。新的 Actions APK 构建、安装、首屏截图门禁及 artifact 回读仍待执行；即使通过，也只证明 API 36 模拟器显示，不代表实体手机、校园网认证流量或商店验收。
 - Google Play Data safety 申报需覆盖应用及 SDK 离开设备的数据；iOS VPN App 的组织账号资格、使用前披露和隐私承诺仍待发布主体核实。数据流底稿不是最终隐私政策、Data safety 表单、Privacy Labels 或商店审核证据。

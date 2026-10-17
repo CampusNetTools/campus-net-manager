@@ -65,5 +65,13 @@ if [[ -z "$pid" ]]; then
   exit 1
 fi
 
-adb shell screencap -p /sdcard/campusnetmanager.png
-adb pull /sdcard/campusnetmanager.png "$screen_file"
+for attempt in $(seq 1 10); do
+  adb shell screencap -p /sdcard/campusnetmanager.png
+  adb pull /sdcard/campusnetmanager.png "$screen_file"
+  if python "$workspace/scripts/check_android_screenshot.py" "$screen_file"; then
+    exit 0
+  fi
+  sleep 2
+done
+echo "::error::Android app stayed alive but never rendered visible UI content."
+exit 1
