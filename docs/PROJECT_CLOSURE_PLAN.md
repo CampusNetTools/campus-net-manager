@@ -681,3 +681,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 当前 Mac 未安装 `adb`，仅有 Command Line Tools、没有完整 Xcode 的 `simctl`。iPhone 镜像当时显示影序手机协作台，未切换或操作该手机；不能据此宣称校园助手已在 iPhone 真机验收。
 - 分发签名需与商店签名区分：Android 可安装 APK 必须有包签名，iOS 真机安装需要代码签名；若“完全不签名”也包括平台本地/开发签名，则 iOS 真机直装目标无法实现。待用户确认是否只排除商店签名；不索取密码、验证码或私钥。
 - 后续需完成 Android 真机锁屏/切网/Keystore、iPhone 校园助手界面与 IKEv2 双向流量、Windows 用户设备安装/逐项验收，以及发布可直接下载的当前桌面和 Android 包。任何模拟器、Actions runner、候选包或应用自己的在线日志都不能替代这些验收。
+
+## f8230eb 直下载范围文档提交 CI 终态
+
+- PR CI run `39046430189` 对提交 `f8230ebf52b9d21ca46833a57b04ebf673e4c290` 的 Windows/macOS 测试与版本检查均 success；release jobs 因 PR #1 仍为 OPEN draft skipped。
+- Desktop candidate run `39046430201` 变更检测 success；该提交仅更新闭环文档，Windows/macOS build 与 runner launch smoke jobs skipped。
+- 这些检查只验证该文档提交的 CI 状态，不扩大本机 GUI 操作、真实手机/Windows 设备或当前公开下载包的验收证据。
