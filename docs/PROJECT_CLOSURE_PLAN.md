@@ -223,4 +223,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 为降低首屏字体处理负担，`mobile/assets/NotoSansSC.ttf` 改为 Noto Sans SC Regular 静态字体子集，保留 SIL OFL 1.1 许可证。新字体 SHA-256 为 `36af0f6b574d759242c117bb88bf673c0e5b5c74932877d2a2031240e383dd4d`，包含 28,193 个映射字形且不含可变字体 `fvar`/`gvar` 表。此改动是待模拟器验证的修复候选，尚未证明它是黑屏根因或已解决问题。
 - 新增标准库 PNG 检查器，在启动后最多重取 10 次截图；若屏幕主体采样像素仍无可见内容，模拟器 smoke 失败。新增黑屏/有色画面单测，并把模拟器截图证据保留为 artifact，失败时也会上传。
 - 当前本地专项测试 12 项通过，`bash -n`、workflow YAML 解析、字体 SHA/表结构检查和 `git diff --check` 均通过。新的 Actions APK 构建、安装、首屏截图门禁及 artifact 回读仍待执行；即使通过，也只证明 API 36 模拟器显示，不代表实体手机、校园网认证流量或商店验收。
+
+## c56b2c1 桌面 CI 与候选包回读（2026-10-17）
+
+- PR CI run `39001312912` 对 head `c56b2c1bf77738c28e3e7521217ac17b41f106e2` 的 Windows/macOS 测试、静态、版本、路由器页面和敏感值检查全部 success；发布 job 按 draft PR 规则 skipped。Desktop candidate run `39001312928` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。
+- Windows artifact `12089227597` 外层 SHA-256 `b63c9e15dcff83c56e51b2f94b85145669740b24c15a3e902a1a743051769b10` 与 Actions digest 一致，ZIP CRC 通过。EXE SHA-256 `084cc8c6eefaf2e0bb1a879655ae4c559d1298de9f8888e4ad3c8f947c200cbe` 与 sidecar 一致；文件为 PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
+- macOS artifact `12089136867` 外层 SHA-256 `b687f6363036f0cd789d322eafe765a0b2b70919ddbae3d4fc1dcb961e6b5ac0` 与 Actions digest 一致，ZIP CRC 通过。内层候选 ZIP SHA-256 `1d654ec8df61f417e2d4c2115b07be487b4cd031d4285d1ef79e8cef33debab8` 与 sidecar 一致且 CRC 通过；ditto 解包后的 bundle `com.campusnettools.campusnetmanager` v5.6.0 通过 strict codesign，arm64、62 个 symlink、adhoc 签名、无 Team ID。
+- 以上仍是 draft PR 候选与 GitHub runner smoke，不代表 Windows 用户设备安装、macOS Developer ID/公证/升级或正式 Release。
 - Google Play Data safety 申报需覆盖应用及 SDK 离开设备的数据；iOS VPN App 的组织账号资格、使用前披露和隐私承诺仍待发布主体核实。数据流底稿不是最终隐私政策、Data safety 表单、Privacy Labels 或商店审核证据。
