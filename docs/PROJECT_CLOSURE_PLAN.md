@@ -322,3 +322,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - APK artifact `12091360109` 外层 SHA-256 与 Actions digest 一致，为 `a4a5d369e858c30a57af37092a081e84a2bf33d041a58ceb0cb870bc04b00183`，外层 ZIP CRC 通过。内含 `campusnetmanager-1.0.0-arm64-v8a_armeabi-v7a_x86_64-debug.apk`，APK SHA-256 `dfedbbcbc19584a4367f83f6a8fbbf4f0266c9147a0b4958bd5792e206fd8210`；APK ZIP CRC 通过、含 `AndroidManifest.xml` 与 arm64-v8a/armeabi-v7a/x86_64 三个 ABI。
 - 模拟器证据 artifact `12091380038` 外层 SHA-256 与 Actions digest 一致，为 `17b0417c1472bf27e419b35b966de51f0c4ca1f5d832519792dc59c4722a1dd0`，ZIP CRC 通过，含截图和 logcat。logcat 有 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未见 `FATAL EXCEPTION`、`ANR in` 或进程死亡记录。截图显示登录表单已渲染并呈现上述非校园网状态；账号/密码为空，说明页未停留在“正在检测网络环境”。
 - 这是 Android API 36 x86_64 模拟器的启动/首屏状态证据；状态为模拟环境下认证服务器不可达。它不验证真实校园网络、真实手机、锁屏/切网、Keystore、VPN 双向流量、Play 签名或商店接收。
+
+## 5db73fd 双平台 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39005626159` 对 head `5db73fd310dbf7b5783e589657cdb03affa262b9` 的 Windows/macOS 测试、静态、版本、页面与敏感值检查均 success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39005626160` 两平台构建、runner launch smoke 和 artifact 上传成功。
+- macOS artifact `12090294691` 外层 SHA-256 与 Actions digest 一致：`7d891b3c321c28277bdd3ef811641a9922c581ae847d01db48446cc00751130b`，ZIP CRC 通过；内层候选 ZIP SHA-256 `aed15794413d29f483188e6ea27860846334924a2051347749307b4143149385` 与 sidecar 一致且 CRC 通过。`ditto` 解包后 strict codesign 通过，bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个符号链接；签名 adhoc、无 Team ID。
+- Windows artifact `12091196471` 外层 SHA-256 与 Actions digest 一致：`2a6af8f56ed5a35982693de8a9dd8406af4fc1181cc06a8fcc1f17bc470eb044`，ZIP CRC 通过；EXE SHA-256 `e016c33913a2441bbf2a8fa51795c377a27fa6afc394ffe1844ef14880c845a1` 与 sidecar 一致，PE32+ GUI x86-64，证书表大小为 0（未签名）。
+- 这些包仍是 PR 候选；runner smoke 不证明用户设备安装/逐功能验收，macOS adhoc 签名也不是 Developer ID/公证。Android API36 模拟器 run `39003633514` 的首屏门禁已通过，但不代替实体设备与商店验收。
