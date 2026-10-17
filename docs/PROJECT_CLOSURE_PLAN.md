@@ -478,3 +478,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12093755258`（17,995,586 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`3f42c28102d8debd53361fdd8346c5921643152efd5be58b0f78330a7e889418`，外层 ZIP CRC 通过；候选 ZIP SHA-256 `537c3848c5a0f92a38cff47344e4d2334d4d3a4f7610d8c1d0de2cc43476823d` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64，adhoc 签名、无 Team ID。
 - Android run `39010565663`（head `20f58f5`）已成功完成 API36 APK build、前台服务 Manifest 校验与 KVM 权限步骤，当前进入模拟器安装/启动步骤 14，尚无 APK/运行证据 artifact；步骤日志仍不可下载。另一个 run `39010889130`（head `fd22a47`）仍在 APK 编译步骤 11。Actions metadata 将两者标为 in progress；日志工具返回 `Transport closed`、CLI 查询提示 in progress 时日志暂不可用。只轮询原 run，不重启。
 - 桌面候选与 runner smoke 不证明真实 Windows 安装、macOS Developer ID/公证、升级或正式 Release；Android 模拟器也不代表实体手机、校园网连接或商店验收。
+
+## 20f58f5 Android API36 模拟器运行完成（2026-10-17）
+
+- 修正前文当时状态：run `39010565663`（head `20f58f54f4789fd8d633bb812d32e054489ef25c`）最终 completed/success。APK 构建、合并 Manifest 前台服务声明校验、KVM 权限、API36 模拟器安装启动、APK artifact 上传与模拟器证据上传步骤均 success。
+- APK artifact `12092969670`（67,967,582 bytes）Actions digest 和下载 ZIP SHA-256 相同：`047ce25d7e919d5f0cb8e6385562ee3285acbc921a8413d6213b07f5166fac09`；外层 ZIP CRC 通过。内含 APK SHA-256 `bc1d57d56779f610cadba8b03e51bd305dd7c3052712dbf8540a5cdf97ef11fb`，APK ZIP CRC 通过，共 56 项，包含 `arm64-v8a`、`armeabi-v7a` 与 `x86_64` ABI。Manifest 由该 run 的 gate 验证；本机未独立解码合并 Manifest。
+- Emulator evidence artifact `12092934772`（70,125 bytes）Actions digest 与下载 ZIP SHA-256 相同：`88db6102172bbc4599bde86cf16bf81c172177085e83edfbf2a39adb01d6fb46`；外层 ZIP CRC 通过。logcat 有 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未发现 `FATAL EXCEPTION`、`ANR in` 或 app process death 记录；截图显示登录页、该环境状态和空账号/密码框。run 的模拟器步骤成功，但不证明校园网认证、真实手机锁屏/切网、Keystore 或网络流量。
+- 同分支另一个 Android run `39010889130`（head `fd22a47ec2ad8de2b61f9b72d593766f5cf5119b`）查询时仍在 API36 APK 编译步骤 11；仅轮询原 run，不重启。`39010565663` 验证的是较早 head，不包含 `fd22a47` 的登录风险提示改动。
