@@ -22,7 +22,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 当前状态摘要（2026-10-17）
 
-- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft；`927c142` 为最新功能提交，紧随的文档证据更新提交会在推送后成为 head。
+- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft；最新功能提交为 `927c142`，其后文档提交 `58d0e3d` 的 PR CI 已通过。
 - 功能提交 `927c142` 的 PR CI run `39015993367` Windows/macOS 全套测试和静态检查 success；发布 job 因 draft skipped。Desktop candidate run `39015993366` 两平台 build、runner launch smoke 和 artifact upload success；本轮未回读桌面包体。
 - Android API36 run `39013104353` 对 head `32c9a9e` 全步骤 success，包括前台服务 Manifest gate、模拟器安装启动和 APK/运行证据上传。APK 三 ABI；模拟器截图显示非校园网状态，不能证明真机锁屏、切网、Keystore 或真实校园认证。
 - iOS Simulator run `39015990577` 对 head `927c142` 全步骤 success：8 项 enrollment XCTest（0 failures）、unsigned Simulator build、模拟器安装启动及 app bundle artifact 上传。artifact `12095062191` 的 Actions digest 与外层下载 ZIP SHA-256 一致，为 `a0a78aedd68c57a759df29b135436cea2085c9cb66e82348eea9f80acad50742`；外层 ZIP CRC 通过，内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `3c94533bd5f0a9b24e2b6d616470ef3b298111e75e838dd8a05d42b39a74cf90`、CRC 通过。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，Simulator 二进制 x86_64/arm64，adhoc/linker 签名且无 Team ID。不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
@@ -563,3 +563,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - artifact `12095062191`（5,162,667 bytes）的 Actions digest 与外层 ZIP SHA-256 一致：`a0a78aedd68c57a759df29b135436cea2085c9cb66e82348eea9f80acad50742`；外层 ZIP CRC 通过。内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `3c94533bd5f0a9b24e2b6d616470ef3b298111e75e838dd8a05d42b39a74cf90`，CRC 通过并含完整 `.app` 目录。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，Simulator 二进制 x86_64/arm64，adhoc/linker 签名，无 Team ID。
 - 同 head 的 PR CI run `39015993367` Windows/macOS 测试与静态检查均 success，发布 job 因 PR 为 draft skipped。Desktop candidate run `39015993366` 两平台构建、runner launch smoke 与 artifact 上传均 success；本节未回读这轮桌面 artifact 内容。
 - Actions 证据仅覆盖自动测试和模拟器。iPhone 真机安装、VPN 授权、Keychain 生命周期、IKEv2 双向流量、签名分发及 App Store 仍待验；以上结果不代表真机或商店验收。
+
+## 58d0e3d 文档证据提交检查终态（2026-10-17）
+
+- PR CI run `39025924271` 对文档 head `58d0e3d7af9e26b76500d8ba6184df6f3c702aba` 的 Windows/macOS 测试、静态、版本、页面和敏感值检查均 completed/success；发布 job 因 PR 为 draft skipped。
+- Desktop candidate run `39025924223` 的变更检测 success；提交只修改闭环 Markdown 文档，因此两个平台打包和 runner smoke jobs skipped。
+- 本次结果不改变 `927c142` 的 iOS 功能与模拟器证据；PR #1 仍 open draft，真机、签名商店和正式桌面发布仍待验。
