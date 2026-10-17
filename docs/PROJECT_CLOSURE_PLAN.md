@@ -279,3 +279,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 截图显示 UI 仍为“正在检测网络环境…”且其余大部分内容为空；旧图片门禁只要求 0.1% 采样像素非黑，报告实际 2.524% 后即通过，因此旧 run 的 launch smoke 是误绿，不能作为首屏就绪证据。logcat 有 SDL2/OpenGL 初始化和 `Start application main loop`，未见 `FATAL EXCEPTION`；另有 Kivy 图标目录复制 Permission denied 与 HIDAPI receiver 异常，尚无证据把它们认定为首屏停滞根因。
 - 修复候选把纯网络状态决策提取至 `mobile/startup_status.py`，网络探测异常会产生可见失败状态；网络状态更新后发出不含凭据的 `CNM_NETWORK_STATUS_READY` 信号。模拟器脚本新增最多 30 秒的该信号门禁，必须先观察到网络检查终态，再执行截图像素门禁；APK 与 AAB 组装步骤同步复制该模块。16 项相关单测通过，全套 unittest `527 passed, 3 skipped`，CI 同款 Ruff F/E9、`py_compile`、bash 语法、工作流 YAML 解析和 `git diff --check` 通过。
 - 该修复尚未由新 Actions API 36 run 验证；需确认新截图已离开加载态且状态标记出现。模拟器证据不等于实体设备、真实校园网、锁屏/切网、Keystore 或 Play 上架验收。
+
+## macOS v5.6.0 新手向导只读复核（2026-10-17）
+
+- 当前安装版窗口标题显示 v5.6.0。使用键盘焦点导航进入“方式 B：路由器中继”，再选择“校园网”上游；向导画面显示已检测到副路由器，但品牌未知，并呈现通用中继步骤。
+- 该流程只执行应用内的路由器发现并显示说明；没有打开路由器管理页面、修改设置、保存档案或启动隧道。随后关闭向导并回到主窗口。
+- 这是本机当前安装版的控件级只读界面证据，不证明 BE6500 Pro 型号识别、路由器中继配置成功、手机/电脑流量经过中继，或真实校园网双向连通。Windows 用户设备验收、macOS Developer ID/公证、升级和正式 Release 仍未完成。
