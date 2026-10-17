@@ -64,7 +64,7 @@ buildozer android debug   # 产物在 bin/*.apk
 
 ### 签名 AAB
 
-手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用 runner 上的一次性临时密钥满足 Gradle release 构建，随后移除签名块并校验 bundle 未签名。signed 模式使用 GitHub Actions Secrets 中的免费项目 APK 签名密钥生成签名 AAB；工作流仅上传 Actions artifact，不会提交或发布到 Google Play。若用户选择直接 APK 下载，应使用 tag Release 附带的 APK 与 SHA-256，而不是 AAB。未签名 AAB run `38856949123` 已成功构建并验证未签名状态；本轮新加入的 tag APK 签名和 GitHub Release 发布链仍待实际 Actions run 验证。
+手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用 runner 上的一次性临时密钥满足 Gradle release 构建，随后移除签名块并校验 bundle 未签名。此任务以可直装 APK 为目标，不使用 AAB 发布，也不提交 Google Play。若后续需要 Play 流程，需另行验证上传密钥格式和 Play Console 接收。若用户选择直接 APK 下载，应使用 tag Release 附带的 APK 与 SHA-256，而不是 AAB。未签名 AAB run `38856949123` 已成功构建并验证未签名状态；本轮新加入的 tag APK 签名和 GitHub Release 发布链仍待实际 Actions run 验证。
 
 ## 已知限制
 
