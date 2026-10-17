@@ -629,6 +629,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 模拟器证据 artifact `12102928334`（108,165 bytes）外层 digest/下载 SHA-256 一致：`528e5b0daaa12f951325a490663d852a6da6b01f2ef49606bc5ff1ea21db85d2`，CRC 通过。logcat 输出 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未检出 `FATAL EXCEPTION`、`ANR in` 或应用进程死亡标记；截图显示已退出加载态的登录页、HTTP 凭据风险提示和空账号/密码字段。logcat 还记录 Kivy logo 目录复制因权限被拒绝、HIDAPI receiver 未指定导出标志以及 `Unknown <android> provider`；随后主循环和网络状态更新均继续。它们在本次首屏 smoke 中未阻断启动，但相关图标目录和 HID/外设能力尚未单独验收，不能记作已修复。
 - 以上均是 PR 候选、runner smoke 和 API 36 模拟器证据；不证明实体 Android 设备锁屏/切网/Keystore、校园网认证流量、signed Play、用户 Windows 安装、macOS Developer ID/公证/升级或正式 Release。
 
+## ea843cf 文档证据提交检查终态（2026-10-17）
+
+- PR CI run `39038840087` 对 `ea843cf71ed25664154ca42e2bf6dfa8569d8d4f` 的 Windows/macOS 测试、静态、版本、路由器页面和敏感值检查均 success；Release job 因 PR #1 仍为 OPEN draft skipped。
+- Desktop candidate run `39038840089` 的变更检测 success；该提交只更新闭环 Markdown 文档，因此 Windows/macOS 打包和 runner smoke jobs skipped。
+- 此 CI 终态仅确认文档提交检查通过，不扩展 `3da4e8f` 模拟器和候选包证据的范围，也不构成真实设备、商店或正式 Release 验收。
+
 ## Android 档案持久化失败时阻止启动后台保活（2026-10-17）
 
 - 源码检查发现 `mobile/main.py` 的 `_save_profile()` 只记录异常、不返回成功状态；Android 开启前台保活时即使 Keystore 加密/档案持久化失败，仍继续请求通知权限并启动服务。若应用目录已有旧档案，服务可能继续读取旧凭据。
