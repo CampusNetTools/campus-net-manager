@@ -315,3 +315,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12091000717` 外层 SHA-256 与 Actions digest 一致：`d53aad1fca28a75f4c9a18a8325e6e0e8a7da7a532d217913e95ab89af8fe8fe`，外层 ZIP CRC 通过；EXE SHA-256 `d991f11c35edf8094397bfd64aace31883f6096ee21ce2cae49fe222eaade802` 与 sidecar 一致，文件为 PE32+ GUI x86-64，PE 证书表大小为 0（未签名）。两项 artifact 均是 PR 候选。
 - Android API 36 APK run `39003633514`（源码 head `794d69d`）已完成 APK 编译、前台服务 Manifest gate 和 KVM 权限步骤；截至本次轮询，模拟器安装并启动步骤 14 正在运行，APK 与 emulator evidence 上传仍 pending。尚无新的 readiness marker、截图、运行证据或 APK artifact 结论；继续只轮询此原 run。
 - 本次只核实 Actions runner 与候选包；不能据此声称用户 Windows/macOS 安装、正式 Release、公证、Android 真机、真实校园网或商店验收完成。
+
+## Android API 36 模拟器启动与候选 APK 回读（run 39003633514，2026-10-17）
+
+- run `39003633514`（源码 head `794d69d`）最终 success：APK 编译、前台服务 Manifest gate、KVM 权限、API 36 模拟器安装/启动、APK artifact 上传及 emulator evidence 上传均成功。
+- APK artifact `12091360109` 外层 SHA-256 与 Actions digest 一致，为 `a4a5d369e858c30a57af37092a081e84a2bf33d041a58ceb0cb870bc04b00183`，外层 ZIP CRC 通过。内含 `campusnetmanager-1.0.0-arm64-v8a_armeabi-v7a_x86_64-debug.apk`，APK SHA-256 `dfedbbcbc19584a4367f83f6a8fbbf4f0266c9147a0b4958bd5792e206fd8210`；APK ZIP CRC 通过、含 `AndroidManifest.xml` 与 arm64-v8a/armeabi-v7a/x86_64 三个 ABI。
+- 模拟器证据 artifact `12091380038` 外层 SHA-256 与 Actions digest 一致，为 `17b0417c1472bf27e419b35b966de51f0c4ca1f5d832519792dc59c4722a1dd0`，ZIP CRC 通过，含截图和 logcat。logcat 有 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未见 `FATAL EXCEPTION`、`ANR in` 或进程死亡记录。截图显示登录表单已渲染并呈现上述非校园网状态；账号/密码为空，说明页未停留在“正在检测网络环境”。
+- 这是 Android API 36 x86_64 模拟器的启动/首屏状态证据；状态为模拟环境下认证服务器不可达。它不验证真实校园网络、真实手机、锁屏/切网、Keystore、VPN 双向流量、Play 签名或商店接收。
