@@ -593,3 +593,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - artifact `12102031309` 大小 5,162,680 bytes，GitHub Actions digest 为 `9ed4202daf1c72b316d37377641bf8d87d8b74256b0f57a6a11cd83971b23adf`；本机经认证 API 下载回读后 SHA-256 相同，外层 ZIP CRC 通过。内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `06f279604f6820d9944170169e647eae9496a3b0f768a1cc8e1e51a0136d2718`，ZIP CRC 通过并保留 `CampusNetCompanion.app/` 目录结构。
 - bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，主二进制为 Simulator x86_64/arm64 universal Mach-O，adhoc/linker 签名、无 Team ID。运行记录仅证明 iOS 模拟器安装启动，不代表真机签名、Keychain/VPN 授权、IKEv2 双向流量、升级或 App Store 验收。
 - Android API 36 APK 原 run `39033215828`（head `f9c6d73`）本次复核仍处于 API 36 debug APK 编译 step 11；前置步骤 1–10 success，Manifest、KVM、模拟器与 artifact steps pending。Actions 仍不提供该活跃 job 的日志；只轮询原 run，不重启。
+
+## f9c6d73 Android API 36 APK 与 Emulator artifact 回读（2026-10-17 13:07 UTC）
+
+- Android API36 APK run `39033215828`（head `f9c6d73147a62530b1edffa28c294610a26e19e2`）completed/success。debug APK 编译、合并 Manifest 前台服务校验、runner KVM 权限、API36 x86_64 模拟器安装/启动、APK 和运行证据 artifact 上传均 success。Manifest gate 检查 special-use 权限、`ServiceCampusguard`、`foregroundServiceType`、subtype 属性及 `0x400` 标志。
+- APK artifact `12101487836`（67,968,574 bytes）Actions digest 与认证 API 下载 SHA-256 一致：`3a19aaccca4db9c748ff9baa3ba474c02c08bd657e467f7dd20e7e9ace3ce91e`；外层 ZIP CRC 通过。内含 debug APK `campusnetmanager-1.0.0-arm64-v8a_armeabi-v7a_x86_64-debug.apk`，SHA-256 `70b17ad2bd373fe30df52c584ac0d85de2d2e31bca43a74f6ee796c505d9a3b4`，APK ZIP CRC 通过，含 arm64-v8a、armeabi-v7a 和 x86_64 三种 ABI。
+- Emulator evidence artifact `12101129184`（108,544 bytes）Actions digest 与认证 API 下载 SHA-256 一致：`b4e7ecbfcf30fa67096d5c2a9fc9668cdb7c784aa0baf0b4a29c89c5381e2e2e`；ZIP CRC 通过。logcat 出现 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未检出 `FATAL EXCEPTION`、`ANR in` 或 app process death 标记。截图显示登录页和环境状态，已退出加载态，账号/密码为空；HTTP 默认地址旁显示凭据明文风险提示。模拟器未连接真实校园网。
+- 该结果证明此 head 的 debug APK 构建、指定 API36 模拟器启动和首屏可见状态；不证明 Android 实体手机锁屏/切网/Keystore、校园网认证流量、signed AAB、Play Console 接收或商店发布。
