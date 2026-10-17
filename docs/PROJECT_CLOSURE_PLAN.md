@@ -607,3 +607,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12100139992` 外层 Actions digest 与本机 API 下载 SHA-256 一致：`33642a5a62cbec37e4e3b9686979f9f80ce8cab831cbd069952c50bb2f5fcd07`，ZIP CRC 通过。内层 EXE SHA-256 `1bbed74f60f0b47f81aa982b28e1ba94d02c2cc82f75a18f59c7f72bcdc18dfb` 与 sidecar 一致；PE 为 GUI x86-64 PE32+，Authenticode Security Directory `(0, 0)`，未签名。
 - macOS artifact `12101361339` 外层 Actions digest 与本机 API 下载 SHA-256 一致：`2fe072316b2285e3d056535484f3ac77105a250871a9116eade8138d209933b2`，ZIP CRC 通过。内层候选 ZIP SHA-256 `777d66d51c5d2bee43db9b5d41be23a34b605fb45209a2afcff81563bf5e8de1` 与 sidecar 一致，CRC 通过；`ditto` 解包后包含 62 个 symlink，strict codesign 验证通过。bundle `com.campusnettools.campusnetmanager` v5.6.0，arm64，adhoc 签名、无 Team ID。
 - 两者均为 OPEN draft PR 的候选包和 CI runner smoke；不证明 Windows 用户设备安装/签名、macOS Developer ID/公证/升级，也不是正式 Release。
+
+## 1b56c24 候选包回读文档检查终态（2026-10-17）
+
+- PR CI run `39035668964` 对 head `1b56c24ca91a62e3a9e72a4db44df25e7a7d2b5c` 的 Windows/macOS 全套测试、静态、版本、路由器工作台页面和敏感值检查均 success；发布 job 因 PR #1 仍为 OPEN draft skipped。
+- Desktop candidate run `39035668921` detector success；本次只改闭环 Markdown 文档，Windows/macOS 打包和 runner smoke jobs 按检测规则 skipped。
+- 上述 checks 验证文档提交未破坏 CI；不改变 `f9c6d73` 候选包与 runner smoke 的证据范围，也不构成用户设备安装或正式发布验证。
