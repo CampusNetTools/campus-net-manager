@@ -242,7 +242,7 @@ class FeatureWindowsMixin:
             self.btn_detect.grid(row=0, column=1, padx=(6, 0))
             ttk.Label(
                 f,
-                text="提醒：当前 Dr.COM 方式通过 HTTP 发送账号和密码，校园网络可见；只在可信校园网登录。",
+                text="提醒：若认证地址使用 HTTP，账号和密码会明文发送，校园网络可见；HTTPS 地址会按配置使用且不会降级。只在可信校园网登录。",
                 style="Muted.TLabel", wraplength=720, justify="left",
             ).grid(row=11, column=0, columnspan=2, sticky="w", pady=(0, 6))
 

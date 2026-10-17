@@ -76,7 +76,7 @@ class Root(BoxLayout):
         form.add_widget(self.sp_method)
         self.in_auth = self._field(form, "认证服务器", text=auth.DEFAULT_AUTH_URL)
         self.lbl_auth_warning = Label(
-            text="提醒：当前 Dr.COM 方式通过 HTTP 发送账号和密码，校园网络可见；只在可信校园网登录。",
+            text="提醒：若认证地址使用 HTTP，账号和密码会明文发送，校园网络可见；HTTPS 地址会按配置使用且不会降级。只在可信校园网登录。",
             size_hint_y=None, height=48, color=(0.95, 0.68, 0.25, 1),
             font_size="11sp", font_name=_FONT_NAME, halign="left", valign="middle",
         )
