@@ -662,3 +662,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 截图显示 Android 登录表单及 `非校园网环境（认证服务器不可达）`，没有停留在加载页，账号/密码为空；logcat 有 ready marker，未见 `FATAL EXCEPTION`、ANR 或 app 进程死亡标记。该结果是 runner API36 模拟器 smoke，不代表真实校园网或实体手机验收。
 - 重要反证：logcat 目标路径已从 `files/app/.kivy/icon` 变为 `files/.kivy/icon`，但 Kivy 2.3.1 仍对目标图标文件报 `Permission denied`。因此仅移动 `KIVY_HOME` 不足以消除 warning；同一 logcat 仍有 HIDAPI receiver flag 异常和 `Unknown <android> provider` warning，根因尚未确证。
 - 后续源码候选现于首次导入 Kivy 前预建默认 Kivy home 下的可选空 `icon` 目录，让 Kivy 跳过非必需的 logo copytree；保留用户显式 `KIVY_HOME`。Windows 回归测试改为显式用 `posixpath` 模拟 Android 路径。当前本机 5 项专项测试、Ruff F/E9、`py_compile` 和 diff check 通过；这些新改动等待新 Actions/API36 模拟器验证。
+
+## ffc69a0 Android Kivy icon 目录预建复验（2026-10-17）
+
+- Android API 36 debug APK run `39042050230` 对 head `ffc69a0955d26dc8bab7e21de20c0b58097180f0` completed/success；API 36 APK 编译、前台服务 Manifest gate、runner KVM 权限、模拟器安装/启动、APK 上传和模拟器证据上传步骤均 success。
+- APK artifact `12104024211` 的 Actions digest 为 `4422e9b55ac88ad576b074ebfe839659f88c71897115ea835c13856022fa9f7d`；本机下载 ZIP SHA-256 一致且 CRC 通过。APK SHA-256 `efdc98de8055a12a96acd8e57de0955d53c4a5458a4e0eae81befa034ebcf3d8`，APK ZIP CRC 通过，含 `AndroidManifest.xml` 与 arm64-v8a、armeabi-v7a、x86_64 三个 ABI。
+- 模拟器证据 artifact `12103854645` 的 Actions digest、本机下载 SHA-256 一致：`013763b8d08843a8ec6e66e8f0da547b09a9c7a1d8bf2e3e2c272d3dd2e1992a`，ZIP CRC 通过。解包 logcat SHA-256 `efb6a2d37749241d554b5f31e38ac9e643a61bd639badf8f2d99c638eada215d`；截图 SHA-256 `1902a615fe658e99d0532343d9e2305db4ce6459685839ddbe02ded88f2a633d`。logcat 有 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未发现 `FATAL EXCEPTION`、`ANR in` 或应用进程死亡记录。截图显示登录表单和状态提示已渲染、非加载态、账号与密码为空。
+- 复验 logcat 不再出现前次 `Error when copying logo directory` / `Permission denied`，支持“首次导入 Kivy 前预建默认空 icon 目录”消除该可选图标复制警告的 Android API 36 模拟器证据。该结论只限本次 runner 镜像和启动路径，不代表所有设备/环境均无权限问题。
+- 同一 logcat 仍记录 HIDAPI 动态广播接收器未指定 `RECEIVER_EXPORTED`/`RECEIVER_NOT_EXPORTED` 的异常，以及 `Unknown <android> provider` warning；两者根因及 HID/USB 功能均未验证。模拟器 smoke 不证明实体手机、Keystore、锁屏/切网后台能力、校园网络流量或 Play 接收与上架。
+- PR CI run `39042053877` Windows/macOS 检查 success、发布因 draft skipped；Desktop candidate run `39042053873` 两平台构建、runner launch smoke 和 artifact upload success。该桌面候选状态不扩展本节 Android 运行证据范围。
