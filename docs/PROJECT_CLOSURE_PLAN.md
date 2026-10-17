@@ -586,3 +586,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 **待验证**
 - Android 真机锁屏/切网/Keystore 与 signed Play；iPhone 真机签名、VPN/Keychain、IKEv2 双向流量与 App Store；Windows 用户设备安装逐功能；macOS Developer ID、公证、升级、逐功能和正式 Release 回读。
+
+## d232b5d iOS Simulator enrollment run artifact 回读（2026-10-17 13:02 UTC）
+
+- iOS Simulator run `39034330011`（head `d232b5d58a56a630579b4d02699bb6e9c7227d7e`）completed/success：XcodeGen、工程生成、IKEv2 enrollment XCTest、unsigned Simulator build、模拟器安装/启动、完整 `.app` 目录打包和 artifact 上传均 success。8 项 XCTest 全部通过（0 failures），覆盖配置 JSON 校验和 64 KiB 边界。
+- artifact `12102031309` 大小 5,162,680 bytes，GitHub Actions digest 为 `9ed4202daf1c72b316d37377641bf8d87d8b74256b0f57a6a11cd83971b23adf`；本机经认证 API 下载回读后 SHA-256 相同，外层 ZIP CRC 通过。内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `06f279604f6820d9944170169e647eae9496a3b0f768a1cc8e1e51a0136d2718`，ZIP CRC 通过并保留 `CampusNetCompanion.app/` 目录结构。
+- bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，主二进制为 Simulator x86_64/arm64 universal Mach-O，adhoc/linker 签名、无 Team ID。运行记录仅证明 iOS 模拟器安装启动，不代表真机签名、Keychain/VPN 授权、IKEv2 双向流量、升级或 App Store 验收。
+- Android API 36 APK 原 run `39033215828`（head `f9c6d73`）本次复核仍处于 API 36 debug APK 编译 step 11；前置步骤 1–10 success，Manifest、KVM、模拟器与 artifact steps pending。Actions 仍不提供该活跃 job 的日志；只轮询原 run，不重启。
