@@ -71,10 +71,15 @@ def _log(msg):
         pass
 
 
-def check_for_update(current_version, timeout=10, opener=None):
-    """查询最新 Release。有更新返回信息 dict; 已最新/失败返回 None。
+class UpdateCheckError(RuntimeError):
+    """无法读取或解释 GitHub 最新 Release。"""
 
-    返回: {tag, version, notes, page, assets: [{name, url, size}]}
+
+def check_for_update(current_version, timeout=10, opener=None):
+    """查询最新 Release, 并显式区分可更新、已最新和本机版本领先。
+
+    返回的 dict 至少包含 status；可更新时还包含 tag、version、notes、page、assets。
+    网络、响应格式或版本号无效时抛出 UpdateCheckError。
     """
     try:
         req = urllib.request.Request(API_LATEST, headers=_UA)
@@ -87,17 +92,33 @@ def check_for_update(current_version, timeout=10, opener=None):
                 data = json.loads(resp.read().decode("utf-8"))
     except Exception as exc:
         _log("更新检查失败: %r (%s)" % (exc, API_LATEST))
-        return None
+        raise UpdateCheckError("无法读取 GitHub 最新版本") from exc
+    if not isinstance(data, dict):
+        raise UpdateCheckError("GitHub 最新版本响应格式无效")
     tag = data.get("tag_name", "")
-    if not is_newer(tag, current_version):
+    latest_version = parse_version(tag)
+    installed_version = parse_version(current_version)
+    if latest_version is None:
+        raise UpdateCheckError("GitHub 最新 Release 的版本号无效")
+    if installed_version is None:
+        raise UpdateCheckError("本机应用版本号无效")
+    if latest_version == installed_version:
         _log("更新检查: 已是最新 (%s)" % tag)
-        return None
+        return {"status": "current", "tag": tag, "version": latest_version}
+    if latest_version < installed_version:
+        _log("更新检查: 本机版本高于最新公开版 (%s > %s)" % (current_version, tag))
+        return {"status": "ahead", "latest_tag": tag,
+                "latest_version": latest_version}
+    raw_assets = data.get("assets", [])
+    if not isinstance(raw_assets, list) or any(not isinstance(a, dict) for a in raw_assets):
+        raise UpdateCheckError("GitHub 最新版本资产列表格式无效")
     assets = [{"name": a.get("name", ""),
                "url": a.get("browser_download_url", ""),
                "size": a.get("size", 0),
                "digest": a.get("digest") or ""}   # GitHub 会带 "sha256:<hex>"
-              for a in data.get("assets", [])]
-    return {"tag": tag,
+              for a in raw_assets]
+    return {"status": "available",
+            "tag": tag,
             "version": parse_version(tag),
             "notes": (data.get("body") or "").strip(),
             "page": data.get("html_url") or RELEASES_PAGE,

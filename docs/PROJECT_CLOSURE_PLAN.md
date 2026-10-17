@@ -255,3 +255,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12089786893` 的 Actions 外层 digest、直接下载 ZIP SHA-256 均为 `101d074c72b6723e96dbb4d504b541df98dbd7d0a46eb678f80b0f7bd19fa694`，CRC 通过；内层候选 ZIP SHA-256 `b958a59e102feef5908642718533c716c4df21509230fc3a924b545ef73f2569` 与 sidecar 一致且 CRC 通过。`ditto` 解包后 strict codesign 通过，bundle id `com.campusnettools.campusnetmanager`，版本 `5.6.0`，arm64、62 个符号链接，签名 adhoc、无 Team ID。
 - Android API 36 APK run `39001309887`（head `c56b2c1bf77738c28e3e7521217ac17b41f106e2`）仍在 APK 编译步骤。实时 Actions job log 在 `04:24:04Z` 显示正在将 Kivy Python 模块复制到 wheel；随后 `04:25Z` 的 job 查询仍显示编译中。Manifest、KVM、模拟器截图门禁与 artifact 步骤尚未执行；不要重启该 run，也不能据此声称黑屏修复通过。
 - Windows/macOS 包为 draft PR 候选和 runner smoke，不代表用户设备安装或正式发布；本节不新增真实手机、签名商店、升级或校园网流量证据。
+
+## 更新检查结果区分修复（2026-10-17）
+
+- 代码审查发现更新器把网络请求异常和“当前没有更高版本”都返回为 `None`，主界面与偏好页会将检查失败误报为“已是最新”。对 v5.6.0 本机候选而言，公开 Release 版本较低时也会被错误当作与最新版本相同。
+- `updater.check_for_update` 现在返回 `available`、`current` 或 `ahead` 状态；网络/响应/版本无效抛出 `UpdateCheckError`。主界面和偏好页分别呈现失败、相同版本及本机候选高于公开 Release，并在非更新结果后恢复“立即检查”按钮。
+- 以当前仓库源码实时查询 GitHub 最新 Release，应用版本 `5.6.0` 得到 `ahead`，公开版本 `v5.5.0`；这仅是本轮源码功能调用的联网证据，不代表已安装应用包含该修复或已发布新版本。
+- `tests.test_updater` 30 项通过（1 项 Windows-only 跳过）；完整 unittest 519 项通过、3 项跳过。CI 同款 Ruff F/E9 规则、Python 编译和 `git diff --check` 通过。测试输出另有既存 ResourceWarning，未据此推断本次代码失败。
+- 更新检查 UI 的可视点击验收尚未形成证据；本机安装包需在后续构建后复核。功能修复仍需最新 PR CI 与桌面候选构建验证。

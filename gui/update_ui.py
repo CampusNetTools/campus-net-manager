@@ -38,18 +38,44 @@ class UpdateUiMixin:
         self._log("正在检查更新…" if manual else "后台自动检查更新…")
 
         def work():
-            info = updater.check_for_update(core.APP_VERSION)
-            self._log(("发现新版本 %s" % info["tag"]) if info else "更新检查无结果")
+            try:
+                info = updater.check_for_update(core.APP_VERSION)
+            except updater.UpdateCheckError as exc:
+                error = str(exc)
+                self._log("更新检查失败: %s" % error)
+                self.after(0, lambda err=error: self._on_update_check_failed(
+                    err, manual, on_result))
+                return
+            status = info["status"]
+            if status == "available":
+                self._log("发现新版本 %s" % info["tag"])
+            elif status == "ahead":
+                self._log("本机版本高于最新公开版 %s" % info["latest_tag"])
+            else:
+                self._log("当前版本已是最新 %s" % info["tag"])
             self.after(0, lambda: self._on_update_checked(info, manual, on_result))
         threading.Thread(target=work, daemon=True).start()
 
+    def _on_update_check_failed(self, error, manual, on_result=None):
+        if on_result:
+            on_result({"status": "error", "error": error})
+            return
+        if manual:
+            messagebox.showerror("检查更新", "%s，请检查网络后重试。" % error,
+                                 parent=self)
+
     def _on_update_checked(self, info, manual, on_result=None):
-        if not info:
+        if info["status"] in {"current", "ahead"}:
             if on_result:
-                on_result(None)
+                on_result(info)
                 return
             if manual:
-                messagebox.showinfo("检查更新", "当前已是最新版本 v%s" % core.APP_VERSION, parent=self)
+                if info["status"] == "current":
+                    text = "当前已是最新版本 v%s" % core.APP_VERSION
+                else:
+                    text = "当前版本 v%s 高于最新公开版 %s（可能是预览版本）" % (
+                        core.APP_VERSION, info["latest_tag"])
+                messagebox.showinfo("检查更新", text, parent=self)
             return
         core.ensure_preferences(self.cfg)
         prefs = self.cfg

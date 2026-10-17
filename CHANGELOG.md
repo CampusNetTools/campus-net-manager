@@ -8,6 +8,7 @@
 - **iOS 系统 IKEv2 配套应用**：通过 Mac 生成单设备 enrollment，iPhone 将 VPN 凭据存入 Keychain，再由系统 `NEVPNManager` 管理 IKEv2 连接；移除未实现网关转发的 Packet Tunnel 原型。
 - **桌面更新包完整性**：macOS 发布 ZIP 保留 Python.framework 符号链接；更新器校验归档路径后使用系统 `ditto` 解压。
 - **移动端界面与线程修复**：Android 随包提供简体中文字体；首次启动缺少档案按空档案处理；后台任务在 UI 线程快照表单数据。
+- **更新检查结果更准确**：将检查失败、已是最新和本机候选版本高于最新公开版分开展示，网络错误不再误报为“已是最新”。
 - **发布检查**：增加 Windows/macOS 候选包构建和启动烟雾、API 36 APK Manifest/模拟器门禁及 iOS Simulator 构建工作流。
 
 ## v5.5.0

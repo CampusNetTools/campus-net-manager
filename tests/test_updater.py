@@ -79,6 +79,7 @@ class CheckTests(unittest.TestCase):
     def test_check_has_update(self):
         info = updater.check_for_update("3.0.0", opener=_FakeOpener(RELEASE))
         self.assertIsNotNone(info)
+        self.assertEqual(info["status"], "available")
         self.assertEqual(info["tag"], "v9.9.9")
         self.assertEqual(info["version"], (9, 9, 9))
         self.assertIn("新功能A", info["notes"])
@@ -86,13 +87,30 @@ class CheckTests(unittest.TestCase):
 
     def test_check_already_latest(self):
         old = dict(RELEASE, tag_name="v1.0.0")
-        self.assertIsNone(updater.check_for_update("3.0.0", opener=_FakeOpener(old)))
+        result = updater.check_for_update("1.0.0", opener=_FakeOpener(old))
+        self.assertEqual(result["status"], "current")
+
+    def test_check_installed_version_ahead_of_latest_release(self):
+        old = dict(RELEASE, tag_name="v1.0.0")
+        result = updater.check_for_update("3.0.0", opener=_FakeOpener(old))
+        self.assertEqual(result["status"], "ahead")
+        self.assertEqual(result["latest_tag"], "v1.0.0")
 
     def test_check_network_failure(self):
         class BadOpener:
             def open(self, req, timeout=0):
                 raise OSError("网络不通")
-        self.assertIsNone(updater.check_for_update("3.0.0", opener=BadOpener()))
+        with self.assertRaises(updater.UpdateCheckError):
+            updater.check_for_update("3.0.0", opener=BadOpener())
+
+    def test_check_rejects_invalid_release_version(self):
+        invalid = dict(RELEASE, tag_name="draft")
+        with self.assertRaises(updater.UpdateCheckError):
+            updater.check_for_update("3.0.0", opener=_FakeOpener(invalid))
+
+    def test_check_rejects_invalid_response_shape(self):
+        with self.assertRaises(updater.UpdateCheckError):
+            updater.check_for_update("3.0.0", opener=_FakeOpener(["not", "release"]))
 
 
 class AssetTests(unittest.TestCase):
