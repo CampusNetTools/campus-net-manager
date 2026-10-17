@@ -37,4 +37,3 @@
 
 - [Google Play Data safety 表单说明](https://support.google.com/googleplay/android-developer/answer/10787469)
 - [Apple App Review Guidelines 5.4：VPN Apps](https://developer.apple.com/app-store/review/guidelines/uk/)
-
