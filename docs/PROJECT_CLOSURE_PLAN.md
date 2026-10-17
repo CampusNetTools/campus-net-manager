@@ -377,3 +377,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 当前可访问的无障碍树只给出标准窗口和菜单；针对可见的“新手向导”“网络控制台”按钮点击后没有观察到窗口或页面切换。因此本轮不能据此判定这些功能通过或失败，按钮级功能验收仍待完成。
 - Android API 36 debug APK run `39006870412`（head `dae0f8ede3f97cd00d71cf7e1d8a9f6e514f565b`）在本次核对时仍处于步骤 11“构建 Android API 36 debug APK”；前置环境步骤均 success，Manifest、KVM、模拟器安装启动和 APK/emulator evidence 上传仍 pending。继续只轮询该 run，不重启。
 - 这次没有保存或修改本机档案；当前窗口状态、Actions 编译及桌面候选包都不构成 Windows 用户设备、Android 真机、iOS 真机、商店或正式签名发布验收。
+
+## a3dc709 双平台 CI 与桌面候选包回读（2026-10-17）
+
+- PR CI run `39007754660` 对 head `a3dc7096e9c90286c21d0fd74bb49e18fddf566c` 的 Windows/macOS 测试、静态、版本、页面与敏感值检查均 success；正式发布 job 因 PR 仍为 draft 而 skipped。
+- Desktop candidate run `39007754498` 两平台构建、10 秒 runner launch smoke 和 artifact 上传均 success。Windows artifact `12091263082` 的 SHA-256 为 `278831868f0067ad6247b20f777d23c398205e488ba3508676991744340233c6`，与 Actions digest 相同；外层 ZIP CRC 通过。EXE SHA-256 `936bd651b007513adf713773be29b1c51b99aca41811af93bc78a110617f340f` 与 sidecar 一致，文件为 PE32+ GUI x86-64；PE Security Directory 为 0，未签名。
+- macOS artifact `12091228169` 的 SHA-256 为 `438de1fee4d5676541ae14a6a94d0129115e7d37ae09835cf675357c02df19a7`，与 Actions digest 相同；外层 ZIP CRC 通过。内层候选 ZIP SHA-256 `38361dcbae18c8b701fa58709f304e3cface66c89907bcd57a463b3cf0bb45c8` 与 sidecar 一致，CRC 通过；含 62 个符号链接。用 `ditto` 解包后 strict codesign 验证通过；bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64；adhoc 签名、无 Team ID。
+- CUA 键盘操作可打开偏好设置窗口并回到主窗口；更新检查按钮未观察到结果变化，因此更新服务交互仍未证实。macOS 主窗口可见及 runner smoke 不等于逐项控件验收、更新安装、公证或用户设备验收。
+- Android API 36 debug APK run `39006870412`（head `dae0f8e`）在本次检查时仍停在 APK 编译步骤 11；Manifest、KVM、模拟器、APK 与运行证据上传仍未开始。仅轮询原 run，不重启。两项桌面 artifact 是 draft PR 候选，不是正式 Release、用户设备安装或商店验收。
