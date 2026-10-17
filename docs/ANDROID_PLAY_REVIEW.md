@@ -50,3 +50,9 @@
 - [Google Play：Developer Program Policy — Permissions for Foreground Services](https://support.google.com/googleplay/android-developer/answer/18258653)
 - [Google Play：Target API level requirements](https://support.google.com/googleplay/android-developer/answer/11926878)
 - [Google Play：Testing requirements for new personal developer accounts](https://support.google.com/googleplay/android-developer/answer/14151465)
+
+## Latest API 36 verification snapshot (2026-10-17 12:51 UTC)
+
+- The HTTPS login transport change at commit `f9c6d73147a62530b1edffa28c294610a26e19e2` triggered Android API 36 APK run `39033215828`. Environment setup steps 1–10 succeeded; at this snapshot the original run was still in APK build step 11. Manifest, KVM, emulator installation/launch, and artifacts had not run yet. Job-log retrieval returned `Transport closed` / “logs will be available when it is complete”; this is not evidence of a build failure. The run is being polled without restart.
+- The Android package includes `core/` from the same source tree, so this run is the build evidence needed to confirm the HTTPS handling change is included. It cannot establish that a real campus portal supports HTTPS; no campus-network test was performed.
+- The earlier successful emulator screenshot/logcat evidence is from older commits and is not a result for `f9c6d73`. Do not present it as current-package evidence.
