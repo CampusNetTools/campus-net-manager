@@ -364,3 +364,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12090798694` 外层 SHA-256 与 Actions digest 一致：`b8acf442e32d77d5b06c5b5a68fbe0e439c033237884a5d7f75f8e76db701031`，ZIP CRC 通过；内层候选 ZIP SHA-256 `abf955568cb635ad3ad1f19d4fc25c00b85c52cc1fcbea22ecfdb9cdf6d9bbe8` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个符号链接，签名 adhoc、无 Team ID。
 - Windows artifact `12091001863` 外层 SHA-256 与 Actions digest 一致：`ada8035bec08b3115672a74782a471404ce3df08b6beac85d6c8060763857315`，ZIP CRC 通过；EXE SHA-256 `3e3ffc846a45c9333125a6ec9b87ed3e6ff7f52f8d2cfb0944f066080e4b6d92` 与 sidecar 一致，PE32+ GUI x86-64，证书表大小为 0（未签名）。
 - 这些是 PR 候选包与 runner smoke 证据，不能替代用户设备安装/升级、正式签名、公证、Release 或商店验收。
+
+## f9da306 双平台 CI 与桌面候选上传（2026-10-17）
+
+- PR CI run `39006513269` 对 head `f9da3068eb345a880dae13358aad755ef66f1f1c` 的 Windows/macOS 全套测试、静态、版本、页面和敏感值检查均 success；发布 job 因 PR 为 draft skipped。Actions 对 `actions/checkout@v4` 与 `actions/setup-python@v5` 发出 Node.js 20 弃用警告，桌面候选 workflow 的 `actions/upload-artifact@v4` 也有相同警告。
+- Desktop candidate run `39006513267` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。Windows artifact `12091565156`（20,534,141 bytes）Actions digest 为 `66bf716242921530348f84891c3569f1d7e6814c0f233e4343077eaa08fa5839`；macOS artifact `12090493655`（17,992,449 bytes）Actions digest 为 `f3ebe9b32ad5ae71e9b57d6662345280507547e28aac9022e36e815f6a9e50a0`。该 digest 来自 GitHub artifact 元数据，本轮未能本机下载回读候选包内容：`gh run download` 对 Actions blob 下载返回 EOF，改用系统 Python 的 TLS 下载分别返回 EOF 与 401，达到三次下载尝试后停止。
+- 因未取得本机包体，本轮不记录内层文件哈希、Windows PE/签名或 macOS bundle/code signature 回读结果。当前证据只确认 Actions 构建、runner smoke、上传步骤与 artifact 元数据成功；仍为 draft PR 候选，不代表用户设备安装、正式发布、Developer ID/公证、升级或商店验收。
