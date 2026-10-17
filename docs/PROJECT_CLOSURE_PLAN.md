@@ -600,3 +600,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - APK artifact `12101487836`（67,968,574 bytes）Actions digest 与认证 API 下载 SHA-256 一致：`3a19aaccca4db9c748ff9baa3ba474c02c08bd657e467f7dd20e7e9ace3ce91e`；外层 ZIP CRC 通过。内含 debug APK `campusnetmanager-1.0.0-arm64-v8a_armeabi-v7a_x86_64-debug.apk`，SHA-256 `70b17ad2bd373fe30df52c584ac0d85de2d2e31bca43a74f6ee796c505d9a3b4`，APK ZIP CRC 通过，含 arm64-v8a、armeabi-v7a 和 x86_64 三种 ABI。
 - Emulator evidence artifact `12101129184`（108,544 bytes）Actions digest 与认证 API 下载 SHA-256 一致：`b4e7ecbfcf30fa67096d5c2a9fc9668cdb7c784aa0baf0b4a29c89c5381e2e2e`；ZIP CRC 通过。logcat 出现 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未检出 `FATAL EXCEPTION`、`ANR in` 或 app process death 标记。截图显示登录页和环境状态，已退出加载态，账号/密码为空；HTTP 默认地址旁显示凭据明文风险提示。模拟器未连接真实校园网。
 - 该结果证明此 head 的 debug APK 构建、指定 API36 模拟器启动和首屏可见状态；不证明 Android 实体手机锁屏/切网/Keystore、校园网认证流量、signed AAB、Play Console 接收或商店发布。
+
+## f9c6d73 Windows/macOS 桌面候选包回读（2026-10-17）
+
+- Desktop candidate run `39033219343` 对 head `f9c6d73147a62530b1edffa28c294610a26e19e2` 的 detector、Windows/macOS 构建、runner launch smoke 和 artifact upload 均 success；PR CI run `39033219351` Windows/macOS 检查 success，publish job 因 draft skipped。
+- Windows artifact `12100139992` 外层 Actions digest 与本机 API 下载 SHA-256 一致：`33642a5a62cbec37e4e3b9686979f9f80ce8cab831cbd069952c50bb2f5fcd07`，ZIP CRC 通过。内层 EXE SHA-256 `1bbed74f60f0b47f81aa982b28e1ba94d02c2cc82f75a18f59c7f72bcdc18dfb` 与 sidecar 一致；PE 为 GUI x86-64 PE32+，Authenticode Security Directory `(0, 0)`，未签名。
+- macOS artifact `12101361339` 外层 Actions digest 与本机 API 下载 SHA-256 一致：`2fe072316b2285e3d056535484f3ac77105a250871a9116eade8138d209933b2`，ZIP CRC 通过。内层候选 ZIP SHA-256 `777d66d51c5d2bee43db9b5d41be23a34b605fb45209a2afcff81563bf5e8de1` 与 sidecar 一致，CRC 通过；`ditto` 解包后包含 62 个 symlink，strict codesign 验证通过。bundle `com.campusnettools.campusnetmanager` v5.6.0，arm64，adhoc 签名、无 Team ID。
+- 两者均为 OPEN draft PR 的候选包和 CI runner smoke；不证明 Windows 用户设备安装/签名、macOS Developer ID/公证/升级，也不是正式 Release。
