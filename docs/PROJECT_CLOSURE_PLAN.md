@@ -246,3 +246,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12089397403` 的 Actions 外层 digest 为 `70711406547d7f5105de8f99550cfd35f24568b5f5be8c0290c3feda99444161`，直接下载 artifact ZIP 后 SHA-256 相同且 CRC 通过。内层候选 ZIP SHA-256 `afbede45481142ac5b8df71d6dbce1a571ed5bd1f305f1307477bba61b3b9c81` 与 sidecar 一致且 CRC 通过；`ditto` 解包后 strict codesign 验证通过，bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、62 个符号链接，签名 adhoc、无 Team ID。
 - Android API 36 debug APK run `39001309887`（head `c56b2c1bf77738c28e3e7521217ac17b41f106e2`）的环境准备步骤均 success，但截至本次检查仍在 APK 编译步骤；Manifest、KVM、模拟器截图门禁与 artifacts 尚未运行。该 run 持续轮询，不重启。先前 `38998932605` 的模拟器截图主体黑屏，因此静态字体和非黑屏截图门禁仍是待验证修复候选。
 - 以上桌面包仍为 OPEN draft PR 的候选，不代表正式 Release、Windows 用户设备安装、macOS Developer ID/公证或升级验收。Android API 36 模拟器也不代表实体手机、校园网流量或商店验收。
+
+## 6ecbede 用户手册与双平台候选回读（2026-10-17）
+
+- 用户手册已从“iOS 暂不支持”更新为准确描述现有系统 IKEv2 配套 App 的 CA 与 enrollment 导入步骤，并注明目前只有 Simulator 构建/安装/启动证据；真机签名、证书信任、IKEv2 双向流量、升级和 App Store 均未验收。该更改位于 `docs/用户使用手册.md`，不是 iOS 功能代码变更。
+- 提交 `6ecbede6b028ac19148bf9091409355fbc8871eb` 的 PR CI run `39002308814` 中 Windows/macOS 检查均 success，发布 job 因 PR draft skipped；Desktop candidate run `39002308820` 两平台构建、runner launch smoke 和 artifact 上传均 success。
+- Windows artifact `12089961124` 的 Actions 外层 digest、直接下载 ZIP SHA-256 均为 `06cab1f8e911166092dac79256f3ee5cf659c19691e7398e05030513e3cf9c5e`，CRC 通过；EXE SHA-256 `45d46f23255fd75b4f32df5d3c83c9a610527817c74297d8f6998832bcc95ce9` 与 sidecar 一致，PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
+- macOS artifact `12089786893` 的 Actions 外层 digest、直接下载 ZIP SHA-256 均为 `101d074c72b6723e96dbb4d504b541df98dbd7d0a46eb678f80b0f7bd19fa694`，CRC 通过；内层候选 ZIP SHA-256 `b958a59e102feef5908642718533c716c4df21509230fc3a924b545ef73f2569` 与 sidecar 一致且 CRC 通过。`ditto` 解包后 strict codesign 通过，bundle id `com.campusnettools.campusnetmanager`，版本 `5.6.0`，arm64、62 个符号链接，签名 adhoc、无 Team ID。
+- Android API 36 APK run `39001309887`（head `c56b2c1bf77738c28e3e7521217ac17b41f106e2`）仍在 APK 编译步骤。实时 Actions job log 在 `04:24:04Z` 显示正在将 Kivy Python 模块复制到 wheel；随后 `04:25Z` 的 job 查询仍显示编译中。Manifest、KVM、模拟器截图门禁与 artifact 步骤尚未执行；不要重启该 run，也不能据此声称黑屏修复通过。
+- Windows/macOS 包为 draft PR 候选和 runner smoke，不代表用户设备安装或正式发布；本节不新增真实手机、签名商店、升级或校园网流量证据。
