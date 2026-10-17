@@ -14,15 +14,25 @@ import threading
 import traceback
 
 
-def _configure_kivy_home(environ=None):
+def _configure_kivy_home(environ=None, path_module=None):
     """Keep Kivy's writable cache/config outside p4a's extracted source tree."""
     environ = os.environ if environ is None else environ
+    path_module = os.path if path_module is None else path_module
     app_path = environ.get("ANDROID_APP_PATH")
     if app_path and not environ.get("KIVY_HOME"):
         # p4a extracts bundled Python sources under files/app, which is not a
         # writable home for Kivy's default .kivy/icon copy. The parent files/
-        # directory is app-private and writable by this package.
-        environ["KIVY_HOME"] = os.path.join(os.path.dirname(app_path), ".kivy")
+        # directory is app-private. Pre-create Kivy's optional icon directory:
+        # Kivy otherwise copytrees its bundled icons there, which fails on the
+        # Android runner's app-private filesystem even though the UI can run.
+        kivy_home = path_module.join(path_module.dirname(app_path), ".kivy")
+        environ["KIVY_HOME"] = kivy_home
+        try:
+            os.makedirs(path_module.join(kivy_home, "icon"), exist_ok=True)
+        except OSError:
+            # Keep startup available if a device restricts the optional cache;
+            # Kivy can still report its own non-fatal icon-copy diagnostic.
+            pass
 
 
 _configure_kivy_home()

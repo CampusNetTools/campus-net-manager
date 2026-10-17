@@ -1,7 +1,9 @@
 """Kivy must use app-writable storage before its package is imported."""
 import ast
 import os
+import posixpath
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -23,11 +25,26 @@ def load_configurer():
 
 class MobileKivyHomeTests(unittest.TestCase):
     def test_android_uses_writable_parent_of_extracted_source(self):
-        env = {"ANDROID_APP_PATH": "/data/user/0/example/files/app"}
+        with tempfile.TemporaryDirectory() as root:
+            app_path = posixpath.join(root, "files", "app")
+            os.makedirs(app_path)
+            env = {"ANDROID_APP_PATH": app_path}
 
-        load_configurer()(env)
+            load_configurer()(env, path_module=posixpath)
 
-        self.assertEqual(env["KIVY_HOME"], "/data/user/0/example/files/.kivy")
+            self.assertEqual(
+                env["KIVY_HOME"], posixpath.join(root, "files", ".kivy"))
+
+    def test_default_icon_directory_is_precreated_to_skip_optional_copy(self):
+        configure = load_configurer()
+        with tempfile.TemporaryDirectory() as root:
+            app_path = os.path.join(root, "files", "app")
+            os.makedirs(app_path)
+            env = {"ANDROID_APP_PATH": app_path}
+
+            configure(env)
+
+            self.assertTrue(os.path.isdir(os.path.join(env["KIVY_HOME"], "icon")))
 
     def test_existing_kivy_home_is_preserved(self):
         env = {
@@ -38,6 +55,7 @@ class MobileKivyHomeTests(unittest.TestCase):
         load_configurer()(env)
 
         self.assertEqual(env["KIVY_HOME"], "/data/user/0/example/custom-kivy")
+        self.assertFalse(os.path.exists(os.path.join(env["KIVY_HOME"], "icon")))
 
     def test_non_android_environment_is_unchanged(self):
         env = {"HOME": "/Users/test"}

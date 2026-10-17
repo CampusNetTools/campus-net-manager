@@ -654,3 +654,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - `mobile/main.py` 现在在首次导入 Kivy 前，如果 Android 提供 `ANDROID_APP_PATH` 且未由部署环境显式设置 `KIVY_HOME`，将 Kivy home 设为其父级 app-private `files/.kivy`；桌面环境和用户/打包器预设的 `KIVY_HOME` 不变。参考 [Kivy 2.3.1 初始化源码](https://raw.githubusercontent.com/kivy/kivy/2.3.1/kivy/__init__.py)。
 - 新增 `tests/test_mobile_kivy_home.py` 4 项回归；专项 4 项通过，全套 unittest `544 passed, 3 skipped`；Ruff F/E9、版本一致性、路由器页面检查、敏感值扫描、Android emulator smoke bash 语法和 `git diff --check` 通过。本地 standalone pyflakes 命令仍输出项目 star-import 架构的既有诊断，须以 CI 中过滤后的未定义名 gate 为准。
 - 以上仅证明源码逻辑与本机测试。尚未通过新的 APK/API36 模拟器 logcat 证明 permission denied 消失，不能视为 Android 运行期修复验收；HIDAPI receiver 错误与 `<android>` provider 警告仍未定位，也不能归因于 Kivy home 路径。
+
+## 6cb2e62 Android API 36 Kivy home 复核（2026-10-17）
+
+- Android APK run `39039536750` 对 head `6cb2e627b4bbaedd9a1090c78bb1f36d2da5b23a` completed/success：APK 编译、special-use Manifest gate、KVM、API36 模拟器安装/启动及 APK/运行证据上传均通过。
+- APK artifact `12104281708` 的 Actions digest 为 `77fdd751fcce92f3f26cb8557abf7c8a6be9fb8c5323cbdbdffee76d757789ab`；下载 APK SHA-256 `dd3d4ccbc87227bc1e1442dc6e7ca1a4ee66bd463686aef4348f30da35fe816c`，ZIP CRC 通过。Emulator evidence artifact `12104406070` 的 digest 为 `7fd3643834b381bb4568e1562974f0660a77e98c89c28c84a422f444b14ab1d2`；解包后 logcat SHA-256 `80b0fb8374610c6034bbf23418791fb9ddfa93e123a661d82b61a310014de8cb`，截图 SHA-256 `3c5a4582fe36c7f2a3c125ea821daad0466f86db251276559e47a59f39dbb8b8`。
+- 截图显示 Android 登录表单及 `非校园网环境（认证服务器不可达）`，没有停留在加载页，账号/密码为空；logcat 有 ready marker，未见 `FATAL EXCEPTION`、ANR 或 app 进程死亡标记。该结果是 runner API36 模拟器 smoke，不代表真实校园网或实体手机验收。
+- 重要反证：logcat 目标路径已从 `files/app/.kivy/icon` 变为 `files/.kivy/icon`，但 Kivy 2.3.1 仍对目标图标文件报 `Permission denied`。因此仅移动 `KIVY_HOME` 不足以消除 warning；同一 logcat 仍有 HIDAPI receiver flag 异常和 `Unknown <android> provider` warning，根因尚未确证。
+- 后续源码候选现于首次导入 Kivy 前预建默认 Kivy home 下的可选空 `icon` 目录，让 Kivy 跳过非必需的 logo copytree；保留用户显式 `KIVY_HOME`。Windows 回归测试改为显式用 `posixpath` 模拟 Android 路径。当前本机 5 项专项测试、Ruff F/E9、`py_compile` 和 diff check 通过；这些新改动等待新 Actions/API36 模拟器验证。
