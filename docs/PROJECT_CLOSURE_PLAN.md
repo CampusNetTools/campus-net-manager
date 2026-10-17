@@ -350,3 +350,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12091107449` 外层 SHA-256 与 Actions digest 一致：`298a86e00cce68cd2c33cf2bbf0269633c25c072c7b8b5fd2d372b366283750e`，ZIP CRC 通过；内层候选 ZIP SHA-256 `3ea7c156e9455fc357a69904d860587a569835f12a39c935569ab8a5a88b25ed` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个符号链接，签名 adhoc、无 Team ID。
 - Windows artifact `12091041463` 外层 SHA-256 与 Actions digest 一致：`51e242fecf1540e2689a7039037a7df704caf7a7a4cf13f6f8da231e3409304c`，ZIP CRC 通过；EXE SHA-256 `ee2b18e829eece931170f9773f73d4f379be1aeb9fac11f509e4352e4438801c` 与 sidecar 一致，PE32+ GUI x86-64，证书表大小为 0（未签名）。
 - 以上仍是 PR 候选与 runner smoke；没有用户设备安装/升级、正式签名、公证、Release 或商店验收证据。
+
+## 24ec8a1 双平台 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39006198867` 对 head `24ec8a1bbe9700eeda975643d8f16eb58f9879b1` 的 Windows/macOS 测试、静态、版本、页面与敏感值检查均 success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39006198880` 两平台构建、runner launch smoke 和 artifact 上传均 success。
+- macOS artifact `12090853397` 外层 SHA-256 与 Actions digest 一致：`973dde9d4d1a5e97c2a31bd35986b552494f1adfe1ecace0c6213c112a55a9d0`，ZIP CRC 通过；内层候选 ZIP SHA-256 `988573749696932e9b692d6f552fc11a48943cf4c9300328884b1f3c9fcc966d` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个符号链接，签名 adhoc、无 Team ID。
+- Windows artifact `12090313725` 外层 SHA-256 与 Actions digest 一致：`6b0e7d89eee1d2d924b354800f06ecd5e1c14cf9976d5c57909e6e31607aea8a`，ZIP CRC 通过；EXE SHA-256 `803a7acddd46f4aec8dbebb6d63f5314f08228e2cb96358a6628aeac0e7f762d` 与 sidecar 一致，PE32+ GUI x86-64，证书表大小为 0（未签名）。下载初次遇到 TLS `SSL_ERROR_SYSCALL`，重新取下载地址后成功完成外层与内层检查。
+- 这些仍是 PR 候选包和 runner smoke 证据；不能证明用户设备安装/升级、正式签名、公证、Release 或商店接收。
