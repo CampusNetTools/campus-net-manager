@@ -200,3 +200,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - `mobile/guard_service.py` 现在无论加密档案是否已存在，都会重试清理旧文件；清理暂时失败时仍返回可解密档案并提示用户，避免将有效档案当作空档案载入。首次迁移仍先原子写入加密文件，再清理明文。
 - 新增回归检查覆盖首次迁移、加密文件已存在时重试清理，以及删除失败时档案仍可用。完整本机套件 `python3 -m unittest discover -s tests -v`：514 passed、3 skipped；相关文件 Ruff、Python 编译与 `git diff --check` 均通过。
 - 此为源码、自动测试和静态检查证据；尚未在 Android 真机验证 Keystore 和文件系统行为，也不构成商店验收。
+
+## 19cb82f 双平台桌面候选回读（2026-10-17）
+
+- PR #1 head `19cb82f37f92e90719637922986e8c7553f65751` 的 CI run `38998935520` 中 Windows/macOS 测试、静态、版本、路由器页面和敏感值检查全部 success；发布 job 因 PR 仍为 draft 而 skipped。Desktop candidate run `38998935527` 的 Windows/macOS 构建、runner 启动 smoke 与 artifact 上传均 success。
+- Windows artifact `12088595887` 的外层 SHA-256 `61a766cd2d185a32e3dd85d766c77c7dcafe9140d80ae2b7c8394a97e499292f` 与 Actions digest 一致且 ZIP CRC 通过。EXE SHA-256 `34d377f8e4fb2d37566ae642ce7e067a3f889e061bdbb4f4b41b77a9dd62346d` 与包内 sidecar 一致；文件为 PE32+ GUI x86-64，未在用户 Windows 设备安装验收。
+- macOS artifact `12088406849` 的外层 SHA-256 `c270690302438e34540db868b4531727ea0ff4d5aa7b3efe62b0604db51c71b1` 与 Actions digest 一致且外层 CRC 通过。内层候选 ZIP SHA-256 `2ca6df45ac9069e55a100abe58108b9999cf561c840239e75561e9a887f49910` 与 sidecar 一致、CRC 通过；`ditto` 解包后 strict codesign 验证通过，bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、62 个符号链接。签名为 adhoc、无 Team ID。
+- 当前 Mac 上运行的安装版窗口仍显示 v5.5.0；本轮未安装候选包。上述候选仅为 PR artifact 与 runner smoke，不代表用户安装/升级、Developer ID 公证或正式 Release。
+- Android API 36 APK run `38998932605`（同 head）复核时仍在 APK 编译步骤；Manifest、模拟器与 artifact 步骤尚未开始，故本轮不据此声称 Android 包或模拟器验收已完成。
