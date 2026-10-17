@@ -462,3 +462,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12093685060`（20,535,393 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`2b989156074abb3b409e248799f6a9bd51f7e1778bfc0d8058650c4f1e30f44a`，ZIP CRC 通过；EXE SHA-256 `73f2b77ab7a711d3f73f19109829171cc1241d2b7d21651af78c0a5bd4bf3537` 与 sidecar 一致，文件为 PE32+ GUI x86-64，Security Directory offset/size 均为 0，未签名。
 - macOS artifact `12092673211`（17,995,704 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`2b49256e9bca73c50fc0bc3ad5e0655fce8475cb108e535d442606dd19e1ae36`，外层 ZIP CRC 通过；候选 ZIP SHA-256 `3f05da560967d4f218760a0d54f8be0760bbaa352a677d8de8595bfe23fdbb62` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64，adhoc 签名、无 Team ID。
 - 两份均为 PR draft 候选。它们不证明用户设备安装/升级、Windows Authenticode、macOS Developer ID/公证或正式 Release；对应真实手机和商店验收仍待完成。
+
+## 53c9291 双平台 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39012018972` 对 head `53c9291ad4e68a870cb1e57fba621add59618ea9` 的 Windows/macOS 全套检查均 success，release job 按 draft 规则 skipped。Desktop candidate run `39012019038` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。
+- Windows artifact `12093296138`（20,533,014 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`0da3afad34f8f57406115c94312619c0df24c60cc2204e43e61aecc051c4d63e`，ZIP CRC 通过；EXE SHA-256 `38be0832c6c18ee8ad9864303598e0fe0661a9164cfb2e0fca7c675f3a6028df` 与 sidecar 一致，文件为 PE32+ GUI x86-64，Security Directory offset/size 均为 0，未签名。
+- macOS artifact `12093455787`（17,995,260 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`2f5add5f38fbe170faa27597c2ac40b12d298b23b2300632908b588b8d4eda70`，外层 ZIP CRC 通过；候选 ZIP SHA-256 `7fb69f44f22549a557a708451ea88fa62d271897f932289c01d8d46632cb557e` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64，adhoc 签名、无 Team ID。
+- Android APK runs `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）查询时仍为 in progress，活动步骤为 API 36 APK 编译；Actions job log 工具返回 `Transport closed`，GitHub CLI 查询返回 API `EOF`。这些下载错误不代表构建失败，未重启原 run。
+- Android/iPhone 真机、签名商店、Windows 用户设备安装、macOS Developer ID/公证和正式 Release 仍待验收；以上两项桌面产物仍是 PR 候选包与 runner smoke 证据。
