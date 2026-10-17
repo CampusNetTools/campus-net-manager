@@ -446,3 +446,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 本机已安装应用窗口标题显示 v5.6.0；主页显示“守护：运行中”和“VPN 与校园网在线”。这是界面状态观察，不等于隧道双向流量或网络可达性验收；未读取或记录账号字段，也未修改配置或停止服务。当前自动化未获得应用画布内部控件的可访问树，不能据此判定各功能按钮通过。
 - 截至 2026-10-17 06:53 UTC，Android APK runs `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）仍为 in progress，尚无终态或 artifact；两次 Actions job log 获取均返回 `Transport closed`，不据此推断构建失败或停滞。只轮询原 run，不重启。
 - Desktop packages 是 draft PR 候选与 runner smoke，不证明用户设备安装、Developer ID/公证、升级或正式 Release。Android runner 也不代表实体手机、锁屏/切网、Keystore 或商店验收。
+
+## 8b421b8 桌面候选回读与设备可用性复核（2026-10-17）
+
+- PR CI run `39011643663` 的 Windows/macOS 全套检查均 success，release job 按 draft 规则 skipped；Desktop candidate run `39011643691` 两个平台构建、runner 启动 smoke 与 artifact 上传均 success。
+- Windows artifact `12093415365`（20,533,119 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`466eb98634700e67538a801648fd9678f7b1674fcaf24a851c481fcdb04b8330`，外层 ZIP CRC 通过；EXE SHA-256 `9389af9d1ced427c7d58e1a3e20b6275a77a72e092debf61cb3e21365ac6d88a` 与 sidecar 一致，PE32+ GUI x86-64，Security Directory offset/size 均为 0，未签名。
+- macOS artifact `12092428899`（17,994,384 bytes）Actions digest 与下载 artifact ZIP SHA-256 一致：`11fe05dd1192b09633f6260824cbf06397858230e76881a61a29ac019f5f26a2`，外层 ZIP CRC 通过；内层候选 ZIP SHA-256 `acd14ff07ee6ef3e66fe5a52c87d5ee6761139ddef39c8d932e498f977644d09` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64，adhoc 签名、无 Team ID。
+- 本机检查仍无 Android `adb`、完整 Xcode、`simctl` 或 iOS provisioning profile。iPhone 镜像恢复连接后显示找不到设备，要求设备在 Mac 附近、开机、近期解锁并启用蓝牙/Wi-Fi；没有加载到手机应用界面，也没有进行真机测试。
+- Android APK runs `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）的 job 当前仍在 API 36 APK 编译步骤 11；job metadata 为 in progress，日志下载返回 `Transport closed`，尚无 Manifest/emulator/artifact 终态证据。只轮询原 run，不重启。
+- 以上桌面包仍是 draft PR 候选；CI/runner smoke、macOS 本机界面状态和包签名结构均不替代 Windows 用户安装、Android/iPhone 真机验收、Developer ID/公证、升级或正式商店发布。
