@@ -16,7 +16,7 @@ jobs:
     name: Build iOS simulator app (unsigned)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -70,7 +70,7 @@ jobs:
             "$RUNNER_TEMP/CampusNetCompanion-Simulator.app.zip"
 
       - name: 上传 iOS 模拟器构建产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: campusnet-ios-simulator-unsigned
           path: ${{ runner.temp }}/CampusNetCompanion-Simulator.app.zip

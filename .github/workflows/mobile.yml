@@ -22,7 +22,7 @@ jobs:
     # (configure.ac: LT_SYS_SYMBOL_USCORE possibly undefined macro), 22.04 可正常构建
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 组装打包目录 (UI + foreground service + core)
         run: |
@@ -47,7 +47,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -157,14 +157,14 @@ jobs:
           script: bash scripts/android_emulator_smoke.sh
 
       - name: 上传 APK 产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: 校园网连接管家-android-api36-debug-apk
           path: build_mobile/bin/*.apk
 
       - name: 上传 Android 模拟器运行证据
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: 校园网连接管家-android-api36-emulator-evidence
           path: |
