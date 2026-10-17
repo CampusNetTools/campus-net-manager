@@ -285,3 +285,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 当前安装版窗口标题显示 v5.6.0。使用键盘焦点导航进入“方式 B：路由器中继”，再选择“校园网”上游；向导画面显示已检测到副路由器，但品牌未知，并呈现通用中继步骤。
 - 该流程只执行应用内的路由器发现并显示说明；没有打开路由器管理页面、修改设置、保存档案或启动隧道。随后关闭向导并回到主窗口。
 - 这是本机当前安装版的控件级只读界面证据，不证明 BE6500 Pro 型号识别、路由器中继配置成功、手机/电脑流量经过中继，或真实校园网双向连通。Windows 用户设备验收、macOS Developer ID/公证、升级和正式 Release 仍未完成。
+
+## 6ae16cd 桌面候选回读与 Android 首屏修复轮询（2026-10-17）
+
+- PR CI run `39004505005` 对 head `6ae16cd447791fe8cfe81d8213af4ebd09cd23fb` 的 Windows/macOS 全套测试、静态、版本、页面与敏感值检查均 success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39004505002` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。
+- macOS artifact `12090850387` 外层 SHA-256 与 Actions digest 一致，为 `d30a42976a420d67dfd96eadbcdcb3419ae1552234848ee53af03ef91b4d28ac`，ZIP CRC 通过。内层候选 ZIP SHA-256 `ff6623b7bba86fdfc19e53cd2c103d41bd535362065be110bd780a34c5504f99` 与 sidecar 一致，CRC 通过；含 62 个符号链接，`ditto` 解包后 strict codesign 通过。bundle `com.campusnettools.campusnetmanager`、v5.6.0、arm64；adhoc 签名、无 Team ID。
+- Windows artifact `12090346511` 外层 SHA-256 与 Actions digest 一致，为 `e11e4e692b37b70de87e25795fee74b09bae73b3e72d0805c5bc9f6f5ed9c0cc`，ZIP CRC 通过。EXE SHA-256 `626d1f5a74739adf6ed63b1295fbfb876af8794a166636f960683b105765cfe8` 与 sidecar 一致，PE32+ x86-64；Authenticode security directory size 为 0，未签名。
+- Android API 36 APK run `39003633514`（head `794d69ddb936277561d6debc71c57fd22d6a28e6`）截至记录仍在 APK 编译步骤 11；Manifest、KVM、模拟器首屏状态门禁与 artifact 步骤均未开始，无 artifact。日志读取接口曾返回 Transport closed；不推断其根因，继续只轮询原 run。
+- 桌面包仍是 draft PR 候选和 Actions runner smoke，不代表正式 Release 或用户 Windows/macOS 安装验收。Android 模拟器运行也不代表实体手机、真实校园网、锁屏/切网、Keystore 或 Play 验收。
