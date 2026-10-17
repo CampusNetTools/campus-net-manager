@@ -272,3 +272,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12088979506` 中 EXE sidecar 校验通过，格式为 PE32+ GUI x86-64；PE security directory size 为 0（未签名）。该包为 PR 候选和 runner smoke，不代表 Windows 用户设备安装验收。
 - 使用 `.venv` / PyInstaller 6.22.2 从当前源码构建 macOS arm64 app；替换前将 `/Applications` 原安装版与 `dist/macos` 原构建各自备份到 `archives/installed-macos-v5.6.0-before-updater-ui-2026-10-17/` 与 `archives/dist-macos-v5.6.0-before-updater-ui-2026-10-17/`。新包安装到 `/Applications/校园网连接管家.app` 后 bundle id、版本与签名验证通过，安装版与 dist 主可执行文件 SHA-256 均为 `57746e0d4e8bb0d6f0668cf079f722de767a3a101abebbec8755bc5db7854b2b`；进程从安装路径运行，CUA 窗口标题显示 v5.6.0。
 - 安装包构建、替换、启动已核实；更新检查控件的运行时点击及错误状态的可视呈现仍未验收。当前签名为 adhoc、无 Team ID；Developer ID、公证、用户升级和正式 Release 尚未完成。
+
+## Android API 36 启动截图发现首屏仍停留加载态（2026-10-17）
+
+- run `39001309887`（head `c56b2c1bf77738c28e3e7521217ac17b41f106e2`）APK 编译、前台服务 Manifest 校验、KVM、模拟器安装/启动、进程存活与截图上传步骤都显示 success。APK artifact `12089404363` 的 Actions digest 为 `0dc84e172e9dc4e342becf0f033c99fe4543fd9ee79bafe9c9b40be81bb42a9f6`；下载 APK SHA-256 为 `50cad4ac3f5bb21406bfaa7e5157e2cac45df38d3e722cc7ee46814016e29438`，ZIP 完整性通过。模拟器证据 artifact `12089693635` 的 digest 为 `66dfcf16c4e7764d12c886915678bcac01be0a0b85b2045a5dcea46a29b0c24e`；截图 SHA-256 `92db0db6f22782637d8a566ed8c2746f2f84503d008bb3f75a5f7ecf2c0943e7`，logcat SHA-256 `b0fbebbfea3ba74382763f2c5c35d24e4ce94b74482513e72d1f18649eacb25c`。
+- 截图显示 UI 仍为“正在检测网络环境…”且其余大部分内容为空；旧图片门禁只要求 0.1% 采样像素非黑，报告实际 2.524% 后即通过，因此旧 run 的 launch smoke 是误绿，不能作为首屏就绪证据。logcat 有 SDL2/OpenGL 初始化和 `Start application main loop`，未见 `FATAL EXCEPTION`；另有 Kivy 图标目录复制 Permission denied 与 HIDAPI receiver 异常，尚无证据把它们认定为首屏停滞根因。
+- 修复候选把纯网络状态决策提取至 `mobile/startup_status.py`，网络探测异常会产生可见失败状态；网络状态更新后发出不含凭据的 `CNM_NETWORK_STATUS_READY` 信号。模拟器脚本新增最多 30 秒的该信号门禁，必须先观察到网络检查终态，再执行截图像素门禁；APK 与 AAB 组装步骤同步复制该模块。16 项相关单测通过，全套 unittest `527 passed, 3 skipped`，CI 同款 Ruff F/E9、`py_compile`、bash 语法、工作流 YAML 解析和 `git diff --check` 通过。
+- 该修复尚未由新 Actions API 36 run 验证；需确认新截图已离开加载态且状态标记出现。模拟器证据不等于实体设备、真实校园网、锁屏/切网、Keystore 或 Play 上架验收。

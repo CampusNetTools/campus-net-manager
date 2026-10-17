@@ -39,6 +39,7 @@ jobs:
         run: |
           mkdir -p build_mobile
           cp mobile/main.py mobile/buildozer.spec build_mobile/
+          cp mobile/startup_status.py build_mobile/
           cp mobile/guard_service.py build_mobile/
           cp -r mobile/services build_mobile/
           cp -r mobile/java build_mobile/

@@ -59,6 +59,25 @@ if grep -q 'FATAL EXCEPTION' "$log_file"; then
   exit 1
 fi
 
+# A live process and a few colored pixels can still be a startup screen stuck
+# on "正在检测网络环境…". Wait for the network check to publish a terminal UI
+# status before treating this as an app launch smoke pass.
+network_status_ready=0
+for attempt in $(seq 1 30); do
+  adb logcat --pid="$pid" -d > "$log_file"
+  if grep -q 'CNM_NETWORK_STATUS_READY:' "$log_file"; then
+    network_status_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$network_status_ready" -ne 1 ]]; then
+  echo "::error::Android UI stayed on its initial network-check status."
+  tail -n 80 "$log_file" || true
+  exit 1
+fi
+grep 'CNM_NETWORK_STATUS_READY:' "$log_file" | tail -1
+
 pid="$(adb shell pidof "$package_name" 2>/dev/null | tr -d '\r' || true)"
 if [[ -z "$pid" ]]; then
   echo "::error::CampusNetManager exited during the emulator smoke period."

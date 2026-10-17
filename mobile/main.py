@@ -27,6 +27,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _HERE)                       # 打包后 core/ 与 main.py 同目录
 sys.path.insert(0, os.path.dirname(_HERE))      # 开发时 core/ 在仓库根
 from core import auth, config  # noqa: E402
+from startup_status import initial_network_status  # noqa: E402
 
 _FONT_PATH = os.path.join(_HERE, "assets", "NotoSansSC.ttf")
 _FONT_NAME = _FONT_PATH if os.path.isfile(_FONT_PATH) else "Roboto"
@@ -109,10 +110,14 @@ class Root(BoxLayout):
             self.lbl_log.text = "\n".join(lines)
         Clock.schedule_once(_upd)
 
-    def set_status(self, text, ok=None):
+    def set_status(self, text, ok=None, source=None):
         def _upd(_dt):
             self.lbl_status.text = text
             self.lbl_status.color = MUTED if ok is None else (GREEN if ok else RED)
+            if source == "network":
+                # A non-sensitive readiness marker lets the emulator smoke
+                # distinguish a live UI from one stuck on its loading label.
+                print("CNM_NETWORK_STATUS_READY: " + text, flush=True)
         Clock.schedule_once(_upd)
 
 
@@ -192,19 +197,10 @@ class CampusNetMobile(App):
         auth_url = self._form_data()["auth_url"]
 
         def work():
-            reachable = auth.auth_reachable(auth_url)
-            if not reachable:
-                self.root.set_status("非校园网环境（认证服务器不可达）", ok=None)
-                self.root.log("认证服务器 %s 不可达，保活休眠" % auth_url)
-                return
-            authed = auth.check_auth(auth_url)
-            internet = auth.check_internet()
-            if authed and internet:
-                self.root.set_status("校园网在线（已认证 · 可上网）", ok=True)
-            elif authed:
-                self.root.set_status("已认证但外网不通", ok=False)
-            else:
-                self.root.set_status("校园网未认证（需要登录）", ok=False)
+            status, healthy, error_type = initial_network_status(auth, auth_url)
+            if error_type:
+                self.root.log("网络状态检测失败：%s" % error_type)
+            self.root.set_status(status, ok=healthy, source="network")
         threading.Thread(target=work, daemon=True).start()
 
     # ---------- 登录 / 保活 ----------

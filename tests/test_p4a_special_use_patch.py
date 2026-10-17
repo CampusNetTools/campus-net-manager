@@ -66,6 +66,7 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn("- mobile/**", workflow)
         self.assertIn("- scripts/android_emulator_smoke.sh", workflow)
         self.assertIn("cp -r mobile/assets build_mobile/", workflow)
+        self.assertIn("cp mobile/startup_status.py build_mobile/", workflow)
         self.assertIn("assets/NotoSansSC.ttf", workflow)
         self.assertIn("assets/private.tar", workflow)
         kvm_step = workflow.index("启用 GitHub runner 的 KVM 权限")
@@ -92,6 +93,12 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn('pid="$(adb shell pidof "$package_name"', smoke)
         self.assertIn("trap capture_evidence EXIT", smoke)
         self.assertIn("scripts/check_android_screenshot.py", smoke)
+        self.assertIn("CNM_NETWORK_STATUS_READY:", smoke)
+        self.assertIn("seq 1 30", smoke)
+        self.assertLess(
+            smoke.index("network_status_ready=1"),
+            smoke.index("scripts/check_android_screenshot.py"),
+        )
         self.assertIn("seq 1 10", smoke)
 
     def test_inserts_android_special_use_subtype_for_campusguard(self):
