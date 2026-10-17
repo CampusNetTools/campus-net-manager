@@ -405,5 +405,6 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 - 加强 Swift enrollment 导入校验：IPv4/IPv6 使用系统地址解析器检查，DNS 标签限制为 ASCII 字母/数字/连字符；拒绝畸形地址、带 scope 的 IPv6、含空白主机名和无效 DNS 标签。Mac 侧 profile generator 使用同一主机名边界，避免导出后被 iOS App 拒绝。
 - 新增 `CampusNetCompanionTests` XCTest target，覆盖生成格式、IPv6、畸形 IPv4/IPv6、无效服务器标识、空凭据及未知版本；iOS Simulator workflow 在安装启动 app 前执行 `xcodebuild test`。
-- 本机运行受影响的 Python profile 测试 `5 passed`；Swift 源码/测试语法解析、XcodeGen 项目 YAML、workflow YAML 与 `git diff --check` 均通过。当前本机 Swift 6.3.3 与已安装 macOS 27 SDK 所需 Swift 6.4 不匹配，完整 Xcode 不可用，故未能本机 Swift typecheck 或执行 XCTest；等待 Actions 的匹配 Xcode runner 验证。
-- 新增 XCTest 和模拟器 workflow 检查只覆盖配置文件解析边界，不证明真机凭据存储、系统 VPN 授权、IKEv2 建连或双向网络流量；真机签名、App Store 资格和发布仍未验收。
+- 本机运行受影响的 Python profile 测试 `5 passed`；Swift 源码/测试语法解析、XcodeGen 项目 YAML、workflow YAML 与 `git diff --check` 均通过。本机 Swift 6.3.3 与 macOS 27 SDK 所需 Swift 6.4 不匹配，故本机未能 typecheck；对应 source head `80928747` 的 Actions run `39009254452` 在匹配 Xcode runner 上执行 XCTest：6 tests、0 failures，Simulator build、install、launch、package 和 artifact upload 全部 success。
+- iOS Simulator artifact `12092731306`（5,156,008 bytes）SHA-256 与 Actions digest 一致：`b0c4ee1487a575f6dfbf60d8a37662f97ca7c7f9c94236ceb450c37ae1b18f2e`，外层 ZIP CRC 通过；内层 `CampusNetCompanion-Simulator.app.zip` 有 54 项且 CRC 通过。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，主二进制为 x86_64/arm64 universal。主二进制显示 adhoc linker signature；整个 app bundle 未做分发签名、没有 Team ID，strict bundle signature verify 不通过（`CODE_SIGNING_ALLOWED=NO`）。
+- 新增 XCTest 只覆盖 enrollment 配置解析边界；Simulator install/launch 与 artifact 不证明真机凭据存储、系统 VPN 授权、IKEv2 建连或双向流量。真机签名、App Store 资格和发布仍未验收。
