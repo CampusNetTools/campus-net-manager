@@ -2,7 +2,7 @@
 
 更新时间：2026-10-17
 
-当前 PR 基线：`88d90ed0e6d0b8a5a9481e40d936b4532fe399d3`（`codex/full-project-closure`）
+当前 PR head：`927c142f1eb88013b02b5ebe42a8e8a57e7ac2c1`（`codex/full-project-closure`）
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
 Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
@@ -22,10 +22,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 当前状态摘要（2026-10-17）
 
-- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft，当前 head 与本地/origin `88d90ed` 对齐，工作树干净。
-- 当前 head 的 PR CI run `39015376122` Windows/macOS 测试和静态检查全部 success；发布 job 因 draft skipped。Desktop candidate run `39015376151` 的检测 job success，文档-only提交跳过 Windows/macOS打包 job。最近一次实际双平台候选 build/smoke/upload 是 `bacc98b` 的 run `39014815613`，包体回读记录见下文。
+- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft；`927c142` 为最新功能提交，紧随的文档证据更新提交会在推送后成为 head。
+- 功能提交 `927c142` 的 PR CI run `39015993367` Windows/macOS 全套测试和静态检查 success；发布 job 因 draft skipped。Desktop candidate run `39015993366` 两平台 build、runner launch smoke 和 artifact upload success；本轮未回读桌面包体。
 - Android API36 run `39013104353` 对 head `32c9a9e` 全步骤 success，包括前台服务 Manifest gate、模拟器安装启动和 APK/运行证据上传。APK 三 ABI；模拟器截图显示非校园网状态，不能证明真机锁屏、切网、Keystore 或真实校园认证。
-- iOS Simulator run `39013866613` 对 head `3da21dc` 全步骤 success，包括 enrollment XCTest、模拟器安装启动和 app bundle artifact 上传。产物无 Team ID、未分发签名；不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
+- iOS Simulator run `39015990577` 对 head `927c142` 全步骤 success：8 项 enrollment XCTest（0 failures）、unsigned Simulator build、模拟器安装启动及 app bundle artifact 上传。artifact `12095062191` 的 Actions digest 与外层下载 ZIP SHA-256 一致，为 `a0a78aedd68c57a759df29b135436cea2085c9cb66e82348eea9f80acad50742`；外层 ZIP CRC 通过，内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `3c94533bd5f0a9b24e2b6d616470ef3b298111e75e838dd8a05d42b39a74cf90`、CRC 通过。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，Simulator 二进制 x86_64/arm64，adhoc/linker 签名且无 Team ID。不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
 - 本机当前开发目录是 `/Library/Developer/CommandLineTools`；`xcodebuild` 提示需要完整 Xcode，`simctl` 与 `adb` 不可用。无法在本机完成实体 iPhone/Android 的 USB 验收；Windows 用户设备验收也没有本机证据。
 - 仍未闭环：Android 实体手机锁屏/切网/Keystore与 Play signed AAB/测试轨道；iOS 真机签名、IKEv2 双向流量与 App Store；Windows 用户设备安装与逐功能；macOS Developer ID/公证、升级、逐功能和正式 Release 回读。当前候选与模拟器证据均不替代上述验收。
 
@@ -555,3 +555,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - bacc98b 的 detector job 与 Windows/macOS 桌面候选 job 全部 success，证明改动工作流的 commit 正常执行候选构建。PR CI run `39014815582` 两平台全部检查 success，release job 因 draft skipped。Desktop candidate run `39014815613` 两平台构建、runner smoke 与上传 success。
 - Windows artifact `12093799835` 外层 SHA-256 与 Actions digest 一致：`515ada688b32e05bf5f55fda843e2bb1fc21ec6060ba5ecff493fee3d090244c`，CRC 通过；EXE SHA-256 `b62f21cf19abc5c455577d039116e289e6d92bf7e21226a4edfa60d4ba16b96f` 与 sidecar 一致，PE32+ GUI x86-64，Authenticode Security Directory 为 `(0, 0)`，未签名。macOS artifact `12094556435` 外层 SHA-256 与 digest 一致：`ec025794dd9506c2db7fc8d152ec5a20ee5a23bfcf745bd5822a1b9adcff29a7`，CRC 通过；内层候选 ZIP SHA-256 `e8e1457fd924933ebd523fe98c2411847f519a26086957cfc414fa5f4f10811b` 与 sidecar 一致、CRC 通过，ditto 解包 strict codesign 通过，bundle v5.6.0 adhoc、无 Team ID。
 - bacc98b 是 workflow-only commit，detector 选择继续打包。随后文档-only提交 `fb34427c9e44d80c8143206fb4b61a40b330fbcc` 的 Desktop candidate run `39014969255` 中 detector success、两个平台打包 job skipped；同 head 的 PR CI run `39014969246` Windows/macOS检查 success，release job因 draft skipped。这验证文档-only同步不会重复打包，同时保留 PR CI。候选与 runner smoke不代表 Windows用户安装、Developer ID/公证、升级或正式Release。
+
+## 927c142 iOS enrollment 大小边界修复与跨平台 CI（2026-10-17）
+
+- enrollment JSON 文件导入此前先将整个文件读入内存，再进行字段校验。`IKEv2Enrollment.decode(_:)` 现在拒绝超过 64 KiB 的数据；FileImporter 通过 `FileHandle` 分块读取，超过上限即停止继续读取并显示明确错误。README 记录该限制。
+- iOS Simulator run `39015990577` 对 head `927c142f1eb88013b02b5ebe42a8e8a57e7ac2c1` completed/success。XcodeGen、工程生成、enrollment XCTest、unsigned Simulator build、模拟器安装/启动和 artifact 上传均 success；8 项 XCTest 全部通过（0 failures），包括恰好 64 KiB 接受和超过上限拒绝。
+- artifact `12095062191`（5,162,667 bytes）的 Actions digest 与外层 ZIP SHA-256 一致：`a0a78aedd68c57a759df29b135436cea2085c9cb66e82348eea9f80acad50742`；外层 ZIP CRC 通过。内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `3c94533bd5f0a9b24e2b6d616470ef3b298111e75e838dd8a05d42b39a74cf90`，CRC 通过并含完整 `.app` 目录。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，Simulator 二进制 x86_64/arm64，adhoc/linker 签名，无 Team ID。
+- 同 head 的 PR CI run `39015993367` Windows/macOS 测试与静态检查均 success，发布 job 因 PR 为 draft skipped。Desktop candidate run `39015993366` 两平台构建、runner launch smoke 与 artifact 上传均 success；本节未回读这轮桌面 artifact 内容。
+- Actions 证据仅覆盖自动测试和模拟器。iPhone 真机安装、VPN 授权、Keychain 生命周期、IKEv2 双向流量、签名分发及 App Store 仍待验；以上结果不代表真机或商店验收。
