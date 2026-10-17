@@ -2,7 +2,7 @@
 
 更新时间：2026-10-17
 
-当前 PR 基线：`3501148f4c3ce48e35d6c9cd9d9cff8b3a9e784c`（`codex/full-project-closure`）
+当前 PR 基线：`88d90ed0e6d0b8a5a9481e40d936b4532fe399d3`（`codex/full-project-closure`）
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
 Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
@@ -22,8 +22,8 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 当前状态摘要（2026-10-17）
 
-- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft，当前 head 与本地/origin `3501148` 对齐，工作树干净。
-- 当前 head 的 PR CI run `39015100061` Windows/macOS 测试和静态检查全部 success；发布 job 因 draft skipped。Desktop candidate run `39015100047` 的检测 job success，文档-only提交跳过 Windows/macOS打包 job。最近一次实际双平台候选 build/smoke/upload 是 `bacc98b` 的 run `39014815613`，包体回读记录见下文。
+- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft，当前 head 与本地/origin `88d90ed` 对齐，工作树干净。
+- 当前 head 的 PR CI run `39015376122` Windows/macOS 测试和静态检查全部 success；发布 job 因 draft skipped。Desktop candidate run `39015376151` 的检测 job success，文档-only提交跳过 Windows/macOS打包 job。最近一次实际双平台候选 build/smoke/upload 是 `bacc98b` 的 run `39014815613`，包体回读记录见下文。
 - Android API36 run `39013104353` 对 head `32c9a9e` 全步骤 success，包括前台服务 Manifest gate、模拟器安装启动和 APK/运行证据上传。APK 三 ABI；模拟器截图显示非校园网状态，不能证明真机锁屏、切网、Keystore 或真实校园认证。
 - iOS Simulator run `39013866613` 对 head `3da21dc` 全步骤 success，包括 enrollment XCTest、模拟器安装启动和 app bundle artifact 上传。产物无 Team ID、未分发签名；不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
 - 本机当前开发目录是 `/Library/Developer/CommandLineTools`；`xcodebuild` 提示需要完整 Xcode，`simctl` 与 `adb` 不可用。无法在本机完成实体 iPhone/Android 的 USB 验收；Windows 用户设备验收也没有本机证据。
