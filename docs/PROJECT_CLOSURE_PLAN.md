@@ -1,34 +1,32 @@
 # 校园网连接管家全端闭环基线
 
-更新时间：2026-10-17
+更新时间：2026-10-18
 
-本摘要核验时 PR head：`c6b6a0fc0e1beed1d1d0231595832a431a205bd8`（`codex/full-project-closure`）
+本摘要核验时 PR head：`88e48627961acb47892eb04fea5ac68b0236f360`（`codex/full-project-closure`）
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
 Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
 
 ## 目标
 
-按平台完成现有功能的开发、自动检测、构建、部署、真实设备验收和正式发布。源码、单元测试、CI 构建、安装包、已安装运行和商店上线分别记录，不能互相替代。
+按平台完成现有功能的开发、自动检测、构建、直接下载分发和真实设备验收。用户不要求应用商店上架或付费；允许采用免费的平台本地/开发签名来保证可安装运行。源码、单元测试、CI 构建、安装包、已安装运行和真实设备验收分别记录，不能互相替代。
 
 ## 平台交付矩阵
 
 | 平台 | 当前基线 | 完成条件 |
 |---|---|---|
-| Windows 桌面 | Python/Tkinter 主程序；GitHub 已发布 v5.5.0 exe | README 中的桌面功能逐项验收；当前源码通过测试；构建、签名/安全检查、安装、启动和升级验证；Release 资产及 SHA256 远端回读 |
-| macOS 桌面 | Apple Silicon 构建脚本；GitHub 已发布 v5.5.0 zip | 功能逐项验收；本机 `.app` 构建、安装、启动和升级验证；正式分发签名与公证状态明确；Release 资产回读 |
-| Android | Kivy 登录/环境检查/档案/前台保活；API 36 debug APK 与 unsigned AAB 已在 Actions 构建成功 | 后台保活通过系统前台服务实现，用户可见、可停止、可恢复；凭据存储与网络切换处理完成；Android API 36 构建；单元/打包/真实设备测试；signed AAB、Play 测试和正式发布 |
-| iOS | SwiftUI 系统 IKEv2 客户端源码已接入；Mac enrollment 输出与 unsigned simulator build workflow 已加入 | 编译/签名、真实证书安装、IKEv2 连接和双向流量、真机升级、App Store 资料与审核仍需验证 |
+| Windows 桌面 | Python/Tkinter 主程序；最新公开下载仍为 v5.5.0；v5.6.0 CI 候选在 runner 构建/启动通过 | 当前源码测试；用户设备安装、逐功能和升级；直接下载资产及 SHA256 回读。Authenticode 非免费前提，未签名警告需明确告知 |
+| macOS 桌面 | Apple Silicon 构建脚本；本机 v5.6.0 安装版进程运行，strict adhoc codesign 通过；最新公开下载仍为 v5.5.0 | 当前源码测试；用户设备安装、逐功能和升级；直接下载资产及 SHA256 回读。Developer ID/公证不作为付费目标，adhoc 包的 Gatekeeper 提示需明确告知 |
+| Android | Kivy 登录/环境检查/档案/前台保活；API 36 debug APK 在 Actions 模拟器安装启动成功 | debug APK 可免费包签名并直接下载；需真实手机验收登录、锁屏/切网、Keystore 与后台行为。模拟器不替代真机 |
+| iOS | SwiftUI 系统 IKEv2 客户端源码与 enrollment Simulator workflow；只有模拟器包 | 需要完整 Xcode、用户自己的 Apple 账号/设备做免费 Personal Team 签名与真机安装；该配置有 7 天到期限制，适用于有限设备测试，不等于面向所有用户的免续签直下载 |
 
-## 当前状态摘要（2026-10-17）
+## 当前状态摘要（2026-10-18）
 
-- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0，仍 OPEN draft。本地、origin 和 PR head 为 `c6b6a0f`；最新产品功能提交 `f9c6d73` 保留显式 HTTPS 登录并阻断 HTTPS→HTTP 降级，后续 `c6b6a0f` 只更新闭环证据。
-- `f9c6d73` 的 PR CI run `39033219351` Windows/macOS 全套检查 success；Desktop candidate run `39033219343` 两平台 build、runner launch smoke 和 artifact upload success。候选包 artifact 下载在本机遇 `SSL_ERROR_SYSCALL`，内容未回读。
-- 当前文档 head `c6b6a0f` 的 PR CI run `39033728151` success，Desktop candidate run `39033728168` detector success；因 docs-only 变更，桌面打包 job skipped。
-- Android API36 APK run `39033215828`（head `f9c6d73`）前置步骤 1–10 success；最近核验仍在 APK 编译步骤 11，Manifest/KVM/模拟器/上传 gate 尚未运行。只轮询该原 run，不重启。
-- iOS Simulator run `39015990577` 对 head `927c142` 全步骤 success：8 项 enrollment XCTest（0 failures）、unsigned Simulator build、模拟器安装启动及 app bundle artifact 上传。artifact `12095062191` 的 Actions digest 与外层下载 ZIP SHA-256 一致，为 `a0a78aedd68c57a759df29b135436cea2085c9cb66e82348eea9f80acad50742`；外层 ZIP CRC 通过，内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `3c94533bd5f0a9b24e2b6d616470ef3b298111e75e838dd8a05d42b39a74cf90`、CRC 通过。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，Simulator 二进制 x86_64/arm64，adhoc/linker 签名且无 Team ID。不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
-- 本机当前开发目录是 `/Library/Developer/CommandLineTools`；`xcodebuild` 提示需要完整 Xcode，`simctl` 与 `adb` 不可用。无法在本机完成实体 iPhone/Android 的 USB 验收；Windows 用户设备验收也没有本机证据。
-- 仍未闭环：Android 实体手机锁屏/切网/Keystore 与 Play signed AAB/测试轨道；iOS 真机签名、IKEv2 双向流量与 App Store；Windows 用户设备安装与逐功能；macOS Developer ID/公证、升级、逐功能和正式 Release 回读。当前候选与模拟器证据均不替代上述验收。
+- 本地、origin 与 PR #1 head 均为 `88e48627961acb47892eb04fea5ac68b0236f360`，工作树干净，PR OPEN draft。该 head 的 Windows/macOS 测试与静态检查 CI 成功；文档-only 桌面候选 workflow detector 成功并按规则跳过重新打包。最新公开 GitHub Release 仍是 v5.5.0，含 Windows/macOS 资产，不含公开 Android/iOS 包。
+- 本机 `python3 -m unittest discover -s tests -v`：545 passed、3 skipped。已安装 `/Applications/校园网连接管家.app` 的进程存在；bundle `com.campusnettools.campusnetmanager`、版本 5.6.0，`codesign --verify --deep --strict` 通过，签名为本地 adhoc、无 Team ID。当前 Computer Use runtime 缺失，不能借此称作控件逐项验收。
+- Android run `39042050230`（head `ffc69a0`）的 API 36 APK 构建、Manifest 前台服务 gate、runner KVM、模拟器安装/启动及 APK/运行证据上传均 success；截图为已退出加载态的登录/状态页，logcat 有 `CNM_NETWORK_STATUS_READY`，未见 FATAL/ANR/进程死亡。它是 runner 模拟器证据，不是实体手机。该 artifact 仍是 Actions 候选，不是公开 Release。
+- iOS 目前只有 Simulator XCTest/build/install/launch 包；本机仅 Command Line Tools，无完整 Xcode、`simctl` 或 provisioning profile。免费 Apple Personal Team 适用于有限真机测试，但 profile 7 天过期，需要周期重签；不能声称已有 iPhone 可安装直下载包。
+- 仍待：Android 真机锁屏/切网/Keystore；iPhone 免费签名安装、系统 VPN 授权及 IKEv2 双向流量；Windows/macOS 用户设备逐功能与升级；把当前可用的桌面/Android 资产发布为直接下载并回读。不得把模拟器、CI 或 runner smoke 作为真实设备验收。
 
 ## 初始核验基线（2026-10-16，历史记录）
 
@@ -672,15 +670,24 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 同一 logcat 仍记录 HIDAPI 动态广播接收器未指定 `RECEIVER_EXPORTED`/`RECEIVER_NOT_EXPORTED` 的异常，以及 `Unknown <android> provider` warning；两者根因及 HID/USB 功能均未验证。模拟器 smoke 不证明实体手机、Keystore、锁屏/切网后台能力、校园网络流量或 Play 接收与上架。
 - PR CI run `39042053877` Windows/macOS 检查 success、发布因 draft skipped；Desktop candidate run `39042053873` 两平台构建、runner launch smoke 和 artifact upload success。该桌面候选状态不扩展本节 Android 运行证据范围。
 
-## 用户修订直下载目标与 2026-10-17 本机验收
+## 用户修订直下载目标与 2026-10-17 本机验收（后续范围见 2026-10-18 补充）
 
-- 用户明确不要求 App Store / Play 商店上架，也不要求商店签名；分发目标调整为用户可直接下载并安装使用。公开最新 GitHub Release 仍为 v5.5.0，含 macOS 与 Windows 资产；目前未见公开 Android/iOS 安装包。PR #1 仍为 OPEN draft，HEAD `4f4e16ac942a4cc16c8d13a734e260767b756e7a`，当前提交的 Windows/macOS 检查均已完成并通过，文档提交对应的平台打包 job 按检测规则跳过。
+- 用户明确不要求 App Store / Play 商店上架；分发目标为用户可直接下载并安装使用。公开最新 GitHub Release 当时为 v5.5.0，含 macOS 与 Windows 资产；未见公开 Android/iOS 安装包。PR #1 当时 OPEN draft，HEAD `4f4e16ac942a4cc16c8d13a734e260767b756e7a`。
 - 本机 `python3 -m unittest discover -s tests -v`：545 passed、3 skipped。裸命令 `python3 -m unittest discover -v` 未递归 `tests/`，报告 0 tests，不能作为测试结果。
 - `/Applications/校园网连接管家.app` 目视标题为 v5.6.0；bundle id `com.campusnettools.campusnetmanager`，本机进程在运行；`codesign --verify --deep --strict` 通过。这是本机 bundle 完整性和运行证据，不是 Developer ID / 公证或其他用户安装验收。
 - 已检查主窗口和一个只读路由器中继说明窗口，后者已关闭；没有操作校园网登录、检测、守护、VPN、热点、路由器设置或任何会传输凭据/改变网络的控件。主界面的 Kivy 控件没有出现在 macOS 辅助功能树中，因此没有完成逐控件验收。
 - 当前 Mac 未安装 `adb`，仅有 Command Line Tools、没有完整 Xcode 的 `simctl`。iPhone 镜像当时显示影序手机协作台，未切换或操作该手机；不能据此宣称校园助手已在 iPhone 真机验收。
-- 分发签名需与商店签名区分：Android 可安装 APK 必须有包签名，iOS 真机安装需要代码签名；若“完全不签名”也包括平台本地/开发签名，则 iOS 真机直装目标无法实现。待用户确认是否只排除商店签名；不索取密码、验证码或私钥。
-- 后续需完成 Android 真机锁屏/切网/Keystore、iPhone 校园助手界面与 IKEv2 双向流量、Windows 用户设备安装/逐项验收，以及发布可直接下载的当前桌面和 Android 包。任何模拟器、Actions runner、候选包或应用自己的在线日志都不能替代这些验收。
+- 当时对是否允许系统安装必需的免费本地/开发签名尚未确认；此状态由 2026-10-18 的用户补充取代。不索取密码、验证码或私钥。
+- 当时记录的待办由下方 2026-10-18 最新范围与状态摘要更新。任何模拟器、Actions runner、候选包或应用自己的在线日志都不能替代实体设备验收。
+
+## 2026-10-18 用户补充：免费签名可用，以可运行优先
+
+- 用户确认：只要最终用户能使用且不产生费用即可；“保证运行”优先。允许 Android/iOS/macOS 为安装运行所需的免费平台本地/开发签名；仍不做 Play/App Store 上架，也不购买付费开发者身份或签名证书。
+- Android 免费 debug 包签名可用于 sideload，但系统仍可能要求用户允许安装来源；必须用实际 APK 和实体手机验证。
+- Windows 当前候选 EXE 无 Authenticode 签名；macOS 候选仅 adhoc 签名。用户可被引导手动确认来源/绕过首次运行警告，但无法承诺和付费可信签名相同的无警告体验。当前 Mac 唯一 codesign identity 为其他产品 `Smart Media Backup Developer`，不可用于本产品。
+- Apple 官方说明：免费 Personal Team 可经 Xcode 为有限个人设备签名测试，最多 3 台设备，provisioning profile 7 天过期，需定期重新签名安装；这不是面向所有 iPhone 用户的免续签公开直下载渠道。[Apple Developer account overview](https://developer.apple.com/help/account/basics/about-your-developer-account) 与 [Apple distribution overview](https://developer.apple.com/documentation/technologyoverviews/distribution) 。当前 Mac 没有完整 Xcode/`simctl` 和本项目 profile；iPhone 镜像此前正在运行影序应用，因此 iPhone 真机操作必须等设备可用，且 Apple 账号由用户在本机自行登录，不向 Codex 提供凭据。
+- 最新公开 Release 是 v5.5.0；v5.6.0 仍是 PR draft 候选。Android API 36 模拟器包、桌面候选包均未发布成当前公开下载资产；iOS 仍只有 Simulator `.app` 包，不能安装到 iPhone。下一步是在设备/工具可用时完成真机验收；发布直下载包之前必须逐一说明其平台签名级别和安装警告。
+- 验收工具现况：`adb` 不存在；`xcode-select -p` 为 `/Library/Developer/CommandLineTools`；Codex Computer Use 报 runtime app missing。shell 只能确认已安装 macOS app 进程、窗口标题、版本、bundle id 和 strict adhoc 签名，不等同于 UI 控件逐项验收。
 
 ## f8230eb 直下载范围文档提交 CI 终态
 
