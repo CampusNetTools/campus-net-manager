@@ -614,6 +614,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 本次只观察窗口和截图，没有点击登录、检测、更新、隧道、路由器或守护控件，也未保存包含档案信息的截图。macOS 原生可访问树只暴露窗口和菜单，未暴露主界面的各个 Tk 控件，因此这不是控件逐项操作验收。
 - 该结果补充已安装进程/版本的目视证据，不证明表单值正确、校园网认证或流量有效，也不证明升级、Developer ID/公证、用户 Windows 安装或正式 Release。
 
+## 23c57fe 主窗口目视记录 CI 终态（2026-10-17）
+
+- PR CI run `39036271674` 对 `23c57fef94f4ea6e83287cf6c9a48db61b448f33` 的 Windows/macOS 全套测试、静态检查、版本、页面和敏感值检查均 success；发布 job 因 PR #1 为 OPEN draft skipped。
+- Desktop candidate run `39036271681` 检测步骤 success；提交只涉及闭环 Markdown 记录，Windows/macOS 构建和 runner smoke jobs skipped。
+- 该终态仅验证文档提交的 CI 状态；不扩展前述本机 v5.6.0 主窗口目视检查的证据范围。
+
 ## 1b56c24 候选包回读文档检查终态（2026-10-17）
 
 - PR CI run `39035668964` 对 head `1b56c24ca91a62e3a9e72a4db44df25e7a7d2b5c` 的 Windows/macOS 全套测试、静态、版本、路由器工作台页面和敏感值检查均 success；发布 job 因 PR #1 仍为 OPEN draft skipped。
