@@ -415,3 +415,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Dr.COM 原有 GET/HTTP 登录格式保持不变。HTTP 明文传输、门户服务器/中间设备访问日志及真实学校门户兼容仍未解决或验证，详见 `docs/PRIVACY_DATA_INVENTORY.md`。
 - 新增两个传输回归测试：curl 的进程参数与 stdin 边界、Python 请求 Referer。使用本机 curl 对 loopback HTTP server 做了一次往返，服务端收到原始 GET 查询参数且根地址 Referer 正确；未连接校园网门户。
 - 本轮完整 unittest：`531 passed, 3 skipped`；项目 CI 同款 Ruff F/E9 检查、Python 编译和 `git diff --check` 通过。此为源码/本机测试证据，不代表远端 CI、真实校园网络、设备或商店验收。
+
+## Dr.COM HTTP 登录风险的界面披露（2026-10-17）
+
+- 桌面连接档案的校园网表单和 Android 登录页现在在认证地址附近提示：当前 Dr.COM 登录通过 HTTP 发送账号和密码，校园网络可见，建议只在可信校园网登录。README、Android README 与用户手册同步说明。
+- 新增 3 项文案回归检查。完整 unittest 为 `534 passed, 3 skipped`；Ruff F/E9、Python 编译与 `git diff --check` 通过。
+- 本地 UI 控件级渲染/小屏适配以及用户确认未完成；HTTP 明文传输风险仍存在。当前 Android run `39010565663` 对前一提交仍处于 API 36 APK 编译步骤，未重启；本次 UI 改动提交后的构建与模拟器验证待新 Actions run。

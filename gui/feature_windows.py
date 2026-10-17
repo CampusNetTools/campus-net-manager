@@ -240,6 +240,11 @@ class FeatureWindowsMixin:
             self.btn_detect = ttk.Button(authf, text="探测", style="Gray.TButton",
                                          command=self.detect_auth)
             self.btn_detect.grid(row=0, column=1, padx=(6, 0))
+            ttk.Label(
+                f,
+                text="提醒：当前 Dr.COM 方式通过 HTTP 发送账号和密码，校园网络可见；只在可信校园网登录。",
+                style="Muted.TLabel", wraplength=720, justify="left",
+            ).grid(row=11, column=0, columnspan=2, sticky="w", pady=(0, 6))
 
         # 重建后立即用当前档案值填充(填充只走控件已存在的分支, 不再 rebuild)
         self._fill_form_for_current_profile()

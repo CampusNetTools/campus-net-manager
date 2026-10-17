@@ -64,7 +64,7 @@ class Root(BoxLayout):
                              font_size="12sp", font_name=_FONT_NAME)
         self.add_widget(self.lbl_env)
 
-        form = BoxLayout(orientation="vertical", spacing=6, size_hint_y=None, height=300)
+        form = BoxLayout(orientation="vertical", spacing=6, size_hint_y=None, height=348)
         self.in_user = self._field(form, "账号（学号）")
         self.in_pass = self._field(form, "密码", password=True)
         form.add_widget(Label(text="运营商", size_hint_y=None, height=24,
@@ -75,6 +75,14 @@ class Root(BoxLayout):
                                  font_name=_FONT_NAME, option_cls=CjkSpinnerOption)
         form.add_widget(self.sp_method)
         self.in_auth = self._field(form, "认证服务器", text=auth.DEFAULT_AUTH_URL)
+        self.lbl_auth_warning = Label(
+            text="提醒：当前 Dr.COM 方式通过 HTTP 发送账号和密码，校园网络可见；只在可信校园网登录。",
+            size_hint_y=None, height=48, color=(0.95, 0.68, 0.25, 1),
+            font_size="11sp", font_name=_FONT_NAME, halign="left", valign="middle",
+        )
+        self.lbl_auth_warning.bind(size=lambda widget, size: setattr(
+            widget, "text_size", (size[0], None)))
+        form.add_widget(self.lbl_auth_warning)
         self.add_widget(form)
 
         row = BoxLayout(size_hint_y=None, height=48, spacing=8)
