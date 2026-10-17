@@ -608,6 +608,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12101361339` 外层 Actions digest 与本机 API 下载 SHA-256 一致：`2fe072316b2285e3d056535484f3ac77105a250871a9116eade8138d209933b2`，ZIP CRC 通过。内层候选 ZIP SHA-256 `777d66d51c5d2bee43db9b5d41be23a34b605fb45209a2afcff81563bf5e8de1` 与 sidecar 一致，CRC 通过；`ditto` 解包后包含 62 个 symlink，strict codesign 验证通过。bundle `com.campusnettools.campusnetmanager` v5.6.0，arm64，adhoc 签名、无 Team ID。
 - 两者均为 OPEN draft PR 的候选包和 CI runner smoke；不证明 Windows 用户设备安装/签名、macOS Developer ID/公证/升级，也不是正式 Release。
 
+## macOS v5.6.0 安装版主窗口只读目视检查（2026-10-17）
+
+- 通过本机桌面控制读取已安装 app 的主窗口：窗口标题显示 v5.6.0，主界面、档案表单和功能导航均已绘制；界面当前显示守护已运行。
+- 本次只观察窗口和截图，没有点击登录、检测、更新、隧道、路由器或守护控件，也未保存包含档案信息的截图。macOS 原生可访问树只暴露窗口和菜单，未暴露主界面的各个 Tk 控件，因此这不是控件逐项操作验收。
+- 该结果补充已安装进程/版本的目视证据，不证明表单值正确、校园网认证或流量有效，也不证明升级、Developer ID/公证、用户 Windows 安装或正式 Release。
+
 ## 1b56c24 候选包回读文档检查终态（2026-10-17）
 
 - PR CI run `39035668964` 对 head `1b56c24ca91a62e3a9e72a4db44df25e7a7d2b5c` 的 Windows/macOS 全套测试、静态、版本、路由器工作台页面和敏感值检查均 success；发布 job 因 PR #1 仍为 OPEN draft skipped。
