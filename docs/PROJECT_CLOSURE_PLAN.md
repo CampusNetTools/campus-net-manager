@@ -1,7 +1,8 @@
 # 校园网连接管家全端闭环基线
 
-更新时间：2026-10-16  
-基线提交：`57f9640e322a7525f4eb0f99967051e6256ba9bd`  
+更新时间：2026-10-17
+
+当前 PR 基线：`3501148f4c3ce48e35d6c9cd9d9cff8b3a9e784c`（`codex/full-project-closure`）
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
 Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
@@ -19,7 +20,16 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 | Android | Kivy 登录/环境检查/档案/前台保活；API 36 debug APK 与 unsigned AAB 已在 Actions 构建成功 | 后台保活通过系统前台服务实现，用户可见、可停止、可恢复；凭据存储与网络切换处理完成；Android API 36 构建；单元/打包/真实设备测试；signed AAB、Play 测试和正式发布 |
 | iOS | SwiftUI 系统 IKEv2 客户端源码已接入；Mac enrollment 输出与 unsigned simulator build workflow 已加入 | 编译/签名、真实证书安装、IKEv2 连接和双向流量、真机升级、App Store 资料与审核仍需验证 |
 
-## 已核实基线
+## 当前状态摘要（2026-10-17）
+
+- GitHub 当前 `main` 最新公开 Release 为 v5.5.0；PR #1 的候选源码版本为 v5.6.0。PR 仍为 open draft，当前 head 与本地/origin `3501148` 对齐，工作树干净。
+- 当前 head 的 PR CI run `39015100061` Windows/macOS 测试和静态检查全部 success；发布 job 因 draft skipped。Desktop candidate run `39015100047` 的检测 job success，文档-only提交跳过 Windows/macOS打包 job。最近一次实际双平台候选 build/smoke/upload 是 `bacc98b` 的 run `39014815613`，包体回读记录见下文。
+- Android API36 run `39013104353` 对 head `32c9a9e` 全步骤 success，包括前台服务 Manifest gate、模拟器安装启动和 APK/运行证据上传。APK 三 ABI；模拟器截图显示非校园网状态，不能证明真机锁屏、切网、Keystore 或真实校园认证。
+- iOS Simulator run `39013866613` 对 head `3da21dc` 全步骤 success，包括 enrollment XCTest、模拟器安装启动和 app bundle artifact 上传。产物无 Team ID、未分发签名；不能证明 iPhone 安装、VPN 授权、IKEv2 双向流量或 App Store。
+- 本机当前开发目录是 `/Library/Developer/CommandLineTools`；`xcodebuild` 提示需要完整 Xcode，`simctl` 与 `adb` 不可用。无法在本机完成实体 iPhone/Android 的 USB 验收；Windows 用户设备验收也没有本机证据。
+- 仍未闭环：Android 实体手机锁屏/切网/Keystore与 Play signed AAB/测试轨道；iOS 真机签名、IKEv2 双向流量与 App Store；Windows 用户设备安装与逐功能；macOS Developer ID/公证、升级、逐功能和正式 Release 回读。当前候选与模拟器证据均不替代上述验收。
+
+## 初始核验基线（2026-10-16，历史记录）
 
 - 当前分支 `codex/full-project-closure` 从 `main` 提交 `57f9640` 派生；开始改动前工作树干净，另有可恢复基线标签。
 - `APP_VERSION` 为 `5.5.0`。已有 Python 测试 485 项通过、3 项跳过；这些测试不能证明 UI、打包、设备或商店验收。
