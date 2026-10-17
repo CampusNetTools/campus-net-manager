@@ -238,3 +238,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 安装 bundle id `com.campusnettools.campusnetmanager`，版本 `5.6.0`，Mach-O arm64，包含 55 个符号链接；签名 adhoc、无 Team ID。进程从 `/Applications/校园网连接管家.app/Contents/MacOS/校园网连接管家` 启动，CUA 截图可见 v5.6.0 主界面。
 - 本机完成候选构建、归档、替换、启动与可视界面检查；未完成控件逐项操作、自动升级、Developer ID 签名/公证或正式 Release。截图含本机已保存档案字段，未保存、提交或转录；界面显示的“守护/网络”文案不作为网络流量验收。
 - Google Play Data safety 申报需覆盖应用及 SDK 离开设备的数据；iOS VPN App 的组织账号资格、使用前披露和隐私承诺仍待发布主体核实。数据流底稿不是最终隐私政策、Data safety 表单、Privacy Labels 或商店审核证据。
+
+## f38d885 双平台候选与 Android 首屏门禁轮询（2026-10-17）
+
+- PR CI run `39001968182` 对 head `f38d885936e957daf617d76e38ddde3f6650549c` 的 Windows/macOS 测试与检查均 success；发布 job 因 PR 仍为 draft 而 skipped。Desktop candidate run `39001968201` 的 Windows/macOS 构建、runner launch smoke 和 artifact 上传均 success。
+- Windows artifact `12089476217` 的 Actions 外层 digest 为 `a2ff90ac4b1e8dadbee59ae491bb5f2176e87be1fa711cacc11354b39a9e2e66`，直接下载 artifact ZIP 后 SHA-256 相同且 CRC 通过。内层 EXE SHA-256 `85383eaac8ccfa21df5f01d8c4c669e8fef13eb8dc532c8c2215cdbb9f51ab97` 与 sidecar 一致，格式为 PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
+- macOS artifact `12089397403` 的 Actions 外层 digest 为 `70711406547d7f5105de8f99550cfd35f24568b5f5be8c0290c3feda99444161`，直接下载 artifact ZIP 后 SHA-256 相同且 CRC 通过。内层候选 ZIP SHA-256 `afbede45481142ac5b8df71d6dbce1a571ed5bd1f305f1307477bba61b3b9c81` 与 sidecar 一致且 CRC 通过；`ditto` 解包后 strict codesign 验证通过，bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、62 个符号链接，签名 adhoc、无 Team ID。
+- Android API 36 debug APK run `39001309887`（head `c56b2c1bf77738c28e3e7521217ac17b41f106e2`）的环境准备步骤均 success，但截至本次检查仍在 APK 编译步骤；Manifest、KVM、模拟器截图门禁与 artifacts 尚未运行。该 run 持续轮询，不重启。先前 `38998932605` 的模拟器截图主体黑屏，因此静态字体和非黑屏截图门禁仍是待验证修复候选。
+- 以上桌面包仍为 OPEN draft PR 的候选，不代表正式 Release、Windows 用户设备安装、macOS Developer ID/公证或升级验收。Android API 36 模拟器也不代表实体手机、校园网流量或商店验收。
