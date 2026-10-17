@@ -370,3 +370,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - PR CI run `39006513269` 对 head `f9da3068eb345a880dae13358aad755ef66f1f1c` 的 Windows/macOS 全套测试、静态、版本、页面和敏感值检查均 success；发布 job 因 PR 为 draft skipped。Actions 对 `actions/checkout@v4` 与 `actions/setup-python@v5` 发出 Node.js 20 弃用警告，桌面候选 workflow 的 `actions/upload-artifact@v4` 也有相同警告。
 - Desktop candidate run `39006513267` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。Windows artifact `12091565156`（20,534,141 bytes）Actions digest 为 `66bf716242921530348f84891c3569f1d7e6814c0f233e4343077eaa08fa5839`；macOS artifact `12090493655`（17,992,449 bytes）Actions digest 为 `f3ebe9b32ad5ae71e9b57d6662345280507547e28aac9022e36e815f6a9e50a0`。该 digest 来自 GitHub artifact 元数据，本轮未能本机下载回读候选包内容：`gh run download` 对 Actions blob 下载返回 EOF，改用系统 Python 的 TLS 下载分别返回 EOF 与 401，达到三次下载尝试后停止。
 - 因未取得本机包体，本轮不记录内层文件哈希、Windows PE/签名或 macOS bundle/code signature 回读结果。当前证据只确认 Actions 构建、runner smoke、上传步骤与 artifact 元数据成功；仍为 draft PR 候选，不代表用户设备安装、正式发布、Developer ID/公证、升级或商店验收。
+
+## dae0f8e macOS 当前安装界面观察与 Android 构建轮询（2026-10-17）
+
+- CUA 应用清单显示本机“校园网连接管家”进程运行中；窗口标题与界面版本为 v5.6.0，主窗口可见。截图含本机档案字段，未保存或转录。此项只证明当前安装版窗口可见，不以界面状态文字代替实际校园网或 VPN 流量验证。
+- 当前可访问的无障碍树只给出标准窗口和菜单；针对可见的“新手向导”“网络控制台”按钮点击后没有观察到窗口或页面切换。因此本轮不能据此判定这些功能通过或失败，按钮级功能验收仍待完成。
+- Android API 36 debug APK run `39006870412`（head `dae0f8ede3f97cd00d71cf7e1d8a9f6e514f565b`）在本次核对时仍处于步骤 11“构建 Android API 36 debug APK”；前置环境步骤均 success，Manifest、KVM、模拟器安装启动和 APK/emulator evidence 上传仍 pending。继续只轮询该 run，不重启。
+- 这次没有保存或修改本机档案；当前窗口状态、Actions 编译及桌面候选包都不构成 Windows 用户设备、Android 真机、iOS 真机、商店或正式签名发布验收。
