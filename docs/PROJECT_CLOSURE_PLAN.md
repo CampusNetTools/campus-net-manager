@@ -506,3 +506,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - artifact `12093464420`（5,156,249 bytes）SHA-256 与 Actions digest 一致：`efb55215d65a18c5cfb83b78ebaa67a33ef208cb98302e6dd262be7df862b54d`；外层 ZIP CRC 通过。内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `fcf580d68acd1dab2e881c3179b611e3f6c1b82bd5bc430adbdbb1e9ac4a04aa`，ZIP CRC 通过且保留完整 `CampusNetCompanion.app/` 目录。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，平台为 `iPhoneSimulator`，可执行文件含 x86_64/arm64。主二进制为 adhoc linker 签名；应用 bundle 无 Team ID、未做分发签名，工作流明确 `CODE_SIGNING_ALLOWED=NO`。
 - XCTest 只验证 enrollment JSON 解码边界；模拟器包和运行不证明真实 iPhone 的 Keychain 生命周期、系统 VPN 授权、IKEv2 建连、双向流量、升级或 App Store 验收。
 - 同 head Android APK run `39013104353` 仍在 API 36 debug APK 编译步骤；job `117339606809` 最近可读日志显示 NDK 正在编译 OpenSSL x86_64。Manifest、KVM、模拟器和 APK artifact 尚未产生终态证据；只轮询该 run，不重启。
+
+## 3da21dc 双平台 CI 与桌面候选包回读（2026-10-17）
+
+- PR CI run `39013871865` 对 head `3da21dc6c51797b3df5ad74c2b86a3a0736c5e6e` 的 Windows/macOS 测试及静态检查均 success；发布 job 因 PR 仍为 draft skipped。Desktop candidate run `39013871883` 的两平台构建、runner launch smoke 与 artifact upload 均 success。
+- Windows artifact `12093857713`（20,533,986 bytes）Actions digest 与下载 ZIP SHA-256 一致：`0cbc197b3e5f1ad5004c5ff716fad0ee10c6f92c34a742d02d6e899fa6c7ed15`，ZIP CRC 通过；EXE SHA-256 `91c3a8032d8b6296af3ee351db8db57590ef9745327d0eac07e7f94fe11abdce` 与 sidecar 一致。PE 为 x86-64 PE32+，Authenticode Security Directory 为 `(0, 0)`，未签名。
+- macOS artifact `12093817948`（17,994,722 bytes）Actions digest 与下载 ZIP SHA-256 一致：`905df5c8080c86d5b5aa934cad51935215c389e779a25e7bef53b20bcc40008d`，外层 ZIP CRC 通过；内层候选 ZIP SHA-256 `dbfb81a5266de47f90771fc258e4d27eb189668575485160a0c3d35030c5677c` 与 sidecar 一致，内层 ZIP CRC 通过，含 554 个条目和 62 个 symlink。使用 `ditto` 解包后 strict codesign 验证通过；bundle `com.campusnettools.campusnetmanager`，版本 5.6.0，arm64，adhoc 签名、无 Team ID。
+- 两份都是 PR draft 候选包；runner launch smoke、包结构和签名检查不代表用户设备安装/升级、macOS Developer ID/公证或正式 Release。
