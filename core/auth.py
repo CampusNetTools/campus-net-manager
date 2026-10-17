@@ -53,15 +53,27 @@ def auth_reachable(auth_url, debounce=True):
 
 
 # ---------- 网络检测 ----------
-def http_get(url, timeout=6, physical=False):
+def http_get(url, timeout=6, physical=False, referer=None):
     """获取 URL；macOS 的校园认证请求可强制走物理网卡，避免被 VPN 路由接管。"""
     if physical and (common.IS_MACOS or common.IS_WINDOWS):
         interface = netinfo.get_physical_interface()
         if interface:
             curl = "/usr/bin/curl" if common.IS_MACOS else "curl"
             try:
+                # Legacy Dr.COM login URLs carry credentials in the query string.
+                # Keep them out of curl's process arguments while preserving GET.
+                curl_url = urllib.parse.quote(
+                    url, safe=":/?&=%#[]@!$'()*+,;~-._")
+                curl_url = curl_url.replace("\\", "\\\\").replace('"', '\\"')
+                curl_config = 'url = "%s"\n' % curl_url
+                if referer:
+                    curl_referer = urllib.parse.quote(
+                        referer, safe=":/?&=%#[]@!$'()*+,;~-._")
+                    curl_referer = curl_referer.replace("\\", "\\\\").replace('"', '\\"')
+                    curl_config += 'referer = "%s"\n' % curl_referer
                 # Windows 下 curl.exe 是控制台程序, 必须隐藏窗口, 否则每次探测都会闪黑框
                 run_kwargs = {"capture_output": True, "timeout": timeout + 2}
+                run_kwargs["input"] = curl_config.encode("ascii")
                 if common.IS_WINDOWS:
                     run_kwargs["creationflags"] = _NO_WINDOW
                 result = subprocess.run(
@@ -69,7 +81,7 @@ def http_get(url, timeout=6, physical=False):
                      "--noproxy", "*",
                      "--interface", interface, "--output", "-", "--write-out", "\n%{http_code}",
                      "--user-agent", "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",
-                     url],
+                     "--config", "-"],
                     **run_kwargs)
                 if result.returncode == 0 and b"\n" in result.stdout:
                     body, raw_status = result.stdout.rsplit(b"\n", 1)
@@ -79,7 +91,7 @@ def http_get(url, timeout=6, physical=False):
                 raise urllib.error.URLError(exc)
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-        "Referer": url,
+        "Referer": referer or url,
     })
     with _DIRECT_OPENER.open(req, timeout=timeout) as resp:
         return resp.status, resp.read()
@@ -173,7 +185,9 @@ def try_login(profile):
     ]
     url = "http://%s/drcom/login?%s" % (host, urllib.parse.urlencode(params))
     try:
-        status, body = http_get(url, timeout=15, physical=True)
+        # Avoid duplicating the credential-bearing query in the Referer header.
+        status, body = http_get(url, timeout=15, physical=True,
+                                referer="http://%s/" % host)
         return status == 200 and b"dr1003" in body
     except Exception:
         return False

@@ -408,3 +408,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 本机运行受影响的 Python profile 测试 `5 passed`；Swift 源码/测试语法解析、XcodeGen 项目 YAML、workflow YAML 与 `git diff --check` 均通过。本机 Swift 6.3.3 与 macOS 27 SDK 所需 Swift 6.4 不匹配，故本机未能 typecheck；对应 source head `80928747` 的 Actions run `39009254452` 在匹配 Xcode runner 上执行 XCTest：6 tests、0 failures，Simulator build、install、launch、package 和 artifact upload 全部 success。
 - iOS Simulator artifact `12092731306`（5,156,008 bytes）SHA-256 与 Actions digest 一致：`b0c4ee1487a575f6dfbf60d8a37662f97ca7c7f9c94236ceb450c37ae1b18f2e`，外层 ZIP CRC 通过；内层 `CampusNetCompanion-Simulator.app.zip` 有 54 项且 CRC 通过。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，主二进制为 x86_64/arm64 universal。主二进制显示 adhoc linker signature；整个 app bundle 未做分发签名、没有 Team ID，strict bundle signature verify 不通过（`CODE_SIGNING_ALLOWED=NO`）。
 - 新增 XCTest 只覆盖 enrollment 配置解析边界；Simulator install/launch 与 artifact 不证明真机凭据存储、系统 VPN 授权、IKEv2 建连或双向流量。真机签名、App Store 资格和发布仍未验收。
+
+## Dr.COM 登录客户端凭据额外暴露面收敛（2026-10-17）
+
+- `core/auth.py` 的 macOS/Windows 物理网卡请求原先把完整 URL 作为 curl 进程参数，其中 Dr.COM 登录查询串包含账号和密码。现在通过 curl 标准输入配置传递 URL，命令行不再携带登录查询串；Python HTTP 路径的登录 `Referer` 收敛到认证服务器根地址，避免重复传播凭据。
+- Dr.COM 原有 GET/HTTP 登录格式保持不变。HTTP 明文传输、门户服务器/中间设备访问日志及真实学校门户兼容仍未解决或验证，详见 `docs/PRIVACY_DATA_INVENTORY.md`。
+- 新增两个传输回归测试：curl 的进程参数与 stdin 边界、Python 请求 Referer。使用本机 curl 对 loopback HTTP server 做了一次往返，服务端收到原始 GET 查询参数且根地址 Referer 正确；未连接校园网门户。
+- 本轮完整 unittest：`531 passed, 3 skipped`；项目 CI 同款 Ruff F/E9 检查、Python 编译和 `git diff --check` 通过。此为源码/本机测试证据，不代表远端 CI、真实校园网络、设备或商店验收。
