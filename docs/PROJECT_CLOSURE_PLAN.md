@@ -702,3 +702,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - `/Applications/校园网连接管家.app` 正在运行，System Events 可读到单一窗口标题 `校园网连接管家 v5.6.0`；bundle `com.campusnettools.campusnetmanager`，strict adhoc codesign 验证通过。窗口当前非前台，Computer Use runtime app missing；因此本轮没有完成主界面逐控件操作。
 - 免费安装 Android Platform Tools 37.0.1；其 `adb` 二进制 codesign 验证通过，但最小环境调用 `adb version` 无 stdout/stderr 且子进程 exit -9，原因未知；未识别 USB Android/iOS 设备。当前只具有此前 runner API36 emulator 的启动证据。
 - 本轮未执行登录、隧道、守护、路由器、热点或网络设置操作。下一步实体设备需可用并连接；iPhone 需完整 Xcode 和用户自行完成的免费 Personal Team 设置。
+
+## 2026-10-18 Android 免费直下载发布链与版本同步
+
+- 用户确认的分发边界：不做 Play/App Store 上架、不购买付费签名或开发者身份；免费平台签名可以使用，优先保证普通用户能下载并安装运行。
+- 修复 Android 版本漂移：`mobile/buildozer.spec` 从旧 `1.0.0` 同步到 `APP_VERSION=5.6.0`；`scripts/sync_version.py --check` 现在同时校验 Android spec 与 README 的候选 badge，并新增 7 个版本同步回归。提交 `56457937f32dc8001a5449a1581cf22914913fec` 已推送，PR CI `39048995767` 和桌面候选 detector/build `39048995811` success；对应 Android API 36 APK run `39048992242` 仍处于编译步骤，尚不能宣称 APK/模拟器验证通过。
+- 为未来 `v*` GitHub Release 增加 Android reusable workflow：依赖双平台 CI 与桌面 Release job；执行当前 API 36 APK 构建、Manifest/版本检查、模拟器网络状态就绪/截图 smoke，之后发布 APK 与 SHA-256 校验文件。PR/普通手动候选仍只上传 Actions artifact，不会创建公开 Release；手动 workflow_dispatch 可显式开启同一稳定签名以验候选安装/更新；该链不接入应用商店。
+- 已在本机生成免费项目 APK 签名证书和 PKCS#12 keystore，往返解码校验通过；Actions repository secrets `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 已配置，私钥/口令仅交给 GitHub Secrets，没有写入工作树。标签发布步骤会用同一证书重签 APK 并用 `apksigner verify` 检查，从而支持同签名覆盖更新；PR 候选 APK 继续使用临时 runner debug 签名。当前证书 SHA-256 公钥指纹：`a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613`。
+- 新发布链目前只有源码与本地静态回归证据（18 项 Android 专项测试通过、ci/mobile YAML 可解析、diff check 通过）；还需 CI 实际运行 tag/reusable workflow 与 `apksigner` gate，并在 Android 实体设备验证安装、覆盖升级、锁屏/切网和 Keystore。此处不代表任何 Release 已发布或设备验收完成。

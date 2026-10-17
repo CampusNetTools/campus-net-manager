@@ -131,3 +131,13 @@ jobs:
             dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android-release:
+    name: 构建并验证 Android 直接下载 APK
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, release]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/mobile.yml
+    with:
+      sign_for_direct_download: true

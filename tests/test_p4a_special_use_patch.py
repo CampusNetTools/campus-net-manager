@@ -79,6 +79,39 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn("test -r /dev/kvm && test -w /dev/kvm", workflow[kvm_step:emulator_step])
         self.assertIn("disable-linux-hw-accel: false", workflow[emulator_step:])
 
+    def test_android_release_uses_verified_api36_apk_for_direct_download(self):
+        root = Path(__file__).parents[1]
+        mobile_workflow = (root / ".github" / "workflows" / "mobile.yml").read_text(
+            encoding="utf-8"
+        )
+        release_workflow = (root / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("workflow_call:", mobile_workflow)
+        self.assertIn("sign_for_direct_download:", mobile_workflow)
+        self.assertIn("|| inputs.sign_for_direct_download", mobile_workflow)
+        self.assertIn("aapt\" dump badging \"$apk\" | grep -F \"versionName='$app_version'\"", mobile_workflow)
+        self.assertIn("CampusNetManager-Android-${app_version}.apk", mobile_workflow)
+        self.assertIn('"$GITHUB_REF_NAME" != "v$app_version"', mobile_workflow)
+        self.assertIn("sha256sum \"$release_apk\"", mobile_workflow)
+        self.assertIn("api-level: 36", mobile_workflow)
+        self.assertIn("CNM_NETWORK_STATUS_READY:", (root / "scripts" / "android_emulator_smoke.sh").read_text(encoding="utf-8"))
+        self.assertIn("softprops/action-gh-release@v2", mobile_workflow)
+        self.assertIn("if: startsWith(github.ref, 'refs/tags/v')", mobile_workflow)
+        for secret in (
+            "ANDROID_KEYSTORE_BASE64",
+            "ANDROID_KEYSTORE_PASSWORD",
+            "ANDROID_KEY_ALIAS",
+            "ANDROID_KEY_PASSWORD",
+        ):
+            self.assertIn("secrets." + secret, mobile_workflow)
+        self.assertIn('"$build_tools/apksigner" sign', mobile_workflow)
+        self.assertIn("--ks-type PKCS12", mobile_workflow)
+        self.assertIn('"$build_tools/apksigner" verify --verbose', mobile_workflow)
+        self.assertIn("Signer #1 certificate SHA-256 digest: a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613", mobile_workflow)
+        self.assertIn("needs: [test, release]", release_workflow)
+        self.assertIn("uses: ./.github/workflows/mobile.yml", release_workflow)
+
     def test_emulator_smoke_runs_as_one_shell_script(self):
         root = Path(__file__).parents[1]
         workflow = (root / ".github" / "workflows" / "mobile.yml").read_text(

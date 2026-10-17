@@ -28,6 +28,13 @@
 
 源码和单元测试仍不等于真实手机或后台运行验收。2026-10-16 早期 run `38851368170` 在 Kivy 2.3.0 的 `cgl_gl.c` 编译时因 Clang 函数指针 const 限定不兼容而失败；spec 已改 pin Kivy 2.3.1。随后 run `38852810567` 又在 p4a 临时 Python venv 执行 `pip install -U pip` 时失败，日志为 `ImportError: cannot import name 'open_rich_spinner'`。根因推断是缓存的 build venv 残留混杂 pip 文件，与 p4a 对同版本问题的记录一致；固定 p4a patch 已在创建 venv 时使用 `--clear`。Android run `38915018182`（head `7e10c11`）现成功完成 API 36 debug APK 构建、服务 Manifest 校验、KVM 权限、模拟器安装启动与进程存活检查。artifact `12053800638` 中 APK SHA-256 为 `0e81f30e2420ee1d199dd665030a79b9321d76e20efd9c3b46c1f120f758baae`；APK ZIP CRC 通过。emulator evidence artifact `12053406639` CRC 通过，日志无 `FATAL EXCEPTION`，截图显示 UI 已启动但中文字体缺失；该观察触发了本次字体打包修复。真实 Android 手机的锁屏、切网、Keystore 和校园网登录仍未验收。
 
+### 免费直下载（非商店）
+
+- 在 `v*` 标签发布时，CI 先通过双平台测试和桌面发布构建，再调用 API 36 Android 构建；Android 必须通过 APK 版本与 Manifest 检查、模拟器启动/网络状态就绪检查后，才把 APK 和 `.sha256` 上传到同一 GitHub Release。
+- 公开下载 APK 使用项目自有、免费生成的 Android 应用签名密钥；密钥由 GitHub Actions Secrets 保存，标签构建时对 APK 签名并校验。手动触发 workflow 时可勾选“用稳定项目密钥签名候选 APK”来做安装/覆盖升级验签；普通 PR 候选仍使用 runner debug 签名，不能作为升级包发布。
+- 用户可从 GitHub Releases 下载 APK 后在 Android 系统确认安装来源。此分发不经过 Play 商店、不收费；系统可能显示“未知来源”提示。
+- APK 签名保证同一签名身份下可安装和覆盖更新，不替代真机验收。首次安装、覆盖升级、锁屏/切网后的前台保活、Keystore 行为仍需实体 Android 设备实测。
+
 APK run `38856748022`（head `cf794ed`）曾成功编译 APK，但合并 Manifest 缺少服务声明。日志中的 Buildozer 命令未带 `--service`，根因是配置键误写为 `android.services`；现已修正为 Buildozer 读取的 `[app] services` 并加入回归测试。修复后的 run `38879167090`（head `7934fb1`）成功构建 API 36 debug APK，`aapt` Manifest 校验通过：服务类 `ServiceCampusguard`、`foregroundServiceType=specialUse`、subtype property 与 `0x400` flag 均符合工作流检查。artifact `12037616953` 下载后 ZIP CRC 检查通过，含 arm64-v8a 与 armeabi-v7a；APK SHA-256 为 `0a49e56c35b734843ef2e0f3dcc2e0142afcd8252c44efab1aa637059f1822df`。该证据不代表手机安装、锁屏/切网运行、Play Console 接收或商店发布。unsigned AAB run `38856949123`（head `2c83f6b`）已完成 API 36 构建、剥除临时签名和 unsigned 校验并上传 artifact `12028181480`；ZIP CRC 检查通过、47 个条目、没有 JAR 签名文件，SHA-256 为 `45b5d9579a47bc3c6f81662f8f76044300f3e1383b0115ec54dabcb245d80dc9`。iOS run `38856309857`（head `a15e83d`）已成功完成 simulator 编译、安装、启动和 ZIP 打包；artifact `12027332700` 下载检查确认 ZIP 内含完整 `CampusNetCompanion.app/` 目录，bundle id `com.campusnettools.companion`、版本 `0.2.0 (3)`、Simulator 架构 `x86_64/arm64`、adhoc/linker 签名且无 Team ID。iOS 真机、IKEv2 连通和 App Store 发布仍未验收。
 PR CI run `38879156449` 的 Windows job 因新回归测试按 Windows 默认 cp1252 解码 UTF-8 spec 而失败（`UnicodeDecodeError`）；测试现显式以 UTF-8 读取，再解析配置。修复后的 run `38879597002`（head `077a4c6`）macOS 与 Windows 测试和静态检查均通过。
 
@@ -57,7 +64,7 @@ buildozer android debug   # 产物在 bin/*.apk
 
 ### 签名 AAB
 
-手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用 runner 上的一次性临时密钥满足 Gradle release 构建，随后移除签名块并校验 bundle 未签名，因此不能上传 Play；signed 模式会验证真实上传密钥并产出可供 Play Console 上传的 bundle。此工作流不会自动发布到 Google Play。signed 模式需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。unsigned AAB run `38856949123` 已成功构建并验证未签名状态；signed 构建和 Play 接收仍待配置真实上传密钥并在 Console 验收。
+手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用 runner 上的一次性临时密钥满足 Gradle release 构建，随后移除签名块并校验 bundle 未签名。signed 模式使用 GitHub Actions Secrets 中的免费项目 APK 签名密钥生成签名 AAB；工作流仅上传 Actions artifact，不会提交或发布到 Google Play。若用户选择直接 APK 下载，应使用 tag Release 附带的 APK 与 SHA-256，而不是 AAB。未签名 AAB run `38856949123` 已成功构建并验证未签名状态；本轮新加入的 tag APK 签名和 GitHub Release 发布链仍待实际 Actions run 验证。
 
 ## 已知限制
 
