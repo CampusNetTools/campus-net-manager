@@ -16,7 +16,7 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,ttf,txt
 
 # (str) Application versioning (method 1)
-version = 1.0.0
+version = 5.6.0
 
 # (list) Application requirements
 # 纯 python 依赖; 显式 pin Python/Kivy 以固定 Android 可复现构建输入
