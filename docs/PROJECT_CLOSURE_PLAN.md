@@ -620,6 +620,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Desktop candidate run `39036271681` 检测步骤 success；提交只涉及闭环 Markdown 记录，Windows/macOS 构建和 runner smoke jobs skipped。
 - 该终态仅验证文档提交的 CI 状态；不扩展前述本机 v5.6.0 主窗口目视检查的证据范围。
 
+## Android 档案持久化失败时阻止启动后台保活（2026-10-17）
+
+- 源码检查发现 `mobile/main.py` 的 `_save_profile()` 只记录异常、不返回成功状态；Android 开启前台保活时即使 Keystore 加密/档案持久化失败，仍继续请求通知权限并启动服务。若应用目录已有旧档案，服务可能继续读取旧凭据。
+- `_save_profile()` 现明确返回布尔结果；Android 启动保活前要求本次档案写入成功，否则显示“档案保存失败，后台保活未开启”并立即退出，不调用服务启动流程。桌面手动登录/现有前台守护路径保持当前行为。
+- 新增 `tests/test_mobile_guard_save_gate.py` 两项源码门禁，检查保存失败分支先于通知权限/服务启动返回，以及保存成功/失败均返回明确结果。新专项 2 项与线程安全专项 1 项通过；全套 unittest `540 passed, 3 skipped`；`py_compile` 与 `git diff --check` 通过。当前机器未安装 Ruff，F/E9 规则须由后续 PR CI 确认。
+- 这是源码与本机自动测试证据；尚未证明 Android Keystore 故障注入、实体手机上的旧档案隔离，或 Play 审核结果。
+
 ## 1b56c24 候选包回读文档检查终态（2026-10-17）
 
 - PR CI run `39035668964` 对 head `1b56c24ca91a62e3a9e72a4db44df25e7a7d2b5c` 的 Windows/macOS 全套测试、静态、版本、路由器工作台页面和敏感值检查均 success；发布 job 因 PR #1 仍为 OPEN draft skipped。

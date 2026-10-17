@@ -178,8 +178,10 @@ class CampusNetMobile(App):
         try:
             from guard_service import write_profile
             write_profile(self._cfg_path, self._form_data())
+            return True
         except Exception:
             self.root.log("档案保存失败:\n" + traceback.format_exc(limit=1))
+            return False
 
     def _form_data(self):
         method = "cmcc"
@@ -239,7 +241,9 @@ class CampusNetMobile(App):
                 if not data["username"] or not data["password"]:
                     self.root.set_status("请先填写账号和密码", ok=False)
                     return
-                self._save_profile()
+                if not self._save_profile():
+                    self.root.set_status("档案保存失败，后台保活未开启", ok=False)
+                    return
                 self._request_notification_permission(self._start_android_guard)
             return
         if self._guard_event:
