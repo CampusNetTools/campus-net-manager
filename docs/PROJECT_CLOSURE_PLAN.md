@@ -299,3 +299,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Actions run 与 job 元数据在 `05:07Z` 仍显示 `in_progress`，当前步骤为“构建 Android API 36 debug APK”；前序环境准备全部成功，Manifest、KVM、emulator 与 artifact 步骤仍 pending。
 - 通过 GitHub job-log endpoint 下载到约 31.5 MB UTF-8 文本日志，尾部时间戳到 `05:06:13Z`，内容仍在执行 Android NDK clang 编译 SDL2 组件（armeabi-v7a）。因此该编译步骤仍有日志活动；run 的 `updated_at` 未变化不等于进程停止。
 - 这只是源码候选的持续编译证据；尚未通过 APK Manifest gate，也没有模拟器首屏 readiness marker、截图、APK artifact 或实体手机验收。继续轮询原 run `39003633514`，不重启。
+
+## cdda9a0 CI 与桌面候选包回读（2026-10-17）
+
+- PR CI run `39005194623` 对 head `cdda9a081726ae1feabfff9d1df59c7b96088c28` 的 Windows/macOS 全套测试、静态检查、版本、页面和敏感值检查均 success；发布 job 因 PR 仍为 draft 而 skipped。
+- Desktop candidate run `39005194650` 的 Windows 与 macOS 构建、runner 启动 smoke 和 artifact 上传均 success。Windows artifact `12090642606` 的外层 SHA-256 为 `17eb5ffcba47846eaa6dbe340521ca442a2d57788d0ec004576cec69c2b926e9`，与 Actions digest 相同且 ZIP CRC 通过；EXE SHA-256 `2ad6b9a8573689a5043aa09dea3d1b95fdf8441df3e56d7d0a8b42328cfd2700` 与 sidecar 一致，文件为 PE32+ GUI x86-64，PE 证书表大小为 0（未签名）。此证据不含用户 Windows 设备安装。
+- macOS artifact `12090717136` 外层 SHA-256 为 `3cf1a3a4e84360e409db04eadad6bd95a96394c7a5512a277d6ae912b47a3d70`，与 Actions digest 相同且 ZIP CRC 通过；内层候选 ZIP SHA-256 `e85e9b9c641c01fdc8829c73ed10cd96d4bed01266bd5d91d3d8705315f6d461` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 验证通过，bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`，62 个符号链接；签名 adhoc、无 Team ID。
+- Android run `39003633514`（head `794d69ddb936277561d6debc71c57fd22d6a28e6`）仍在 APK 编译步骤 11；其 Manifest、KVM、模拟器首屏 readiness、安装/启动及 artifact 步骤均未开始。job-log connector 此次仍返回 `Transport closed`，没有新的编译尾日志证据；不将其解释为 run 已停止，继续只轮询原 run。
+- 桌面候选包和 Actions runner smoke 不是正式 Release 或用户设备安装/升级验收；macOS adhoc 包也不是公证发行包。Android run 尚无新设备或包验收结论。
