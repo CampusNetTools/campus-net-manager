@@ -429,3 +429,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12092439261` 的 Actions digest 为 `e8cb846e6fc790a0d26797e461e42e3052d0bdb357d7dc7ab244df0ec45bbdeb`。本机 artifact 下载遭 GitHub API EOF 和 `SSL_ERROR_SYSCALL`；达到重试上限后停止，未独立回读 Windows ZIP/sidecar/EXE。不得据此推断产物损坏或已通过本机哈希复核。
 - Android run `39010565663`（head `20f58f5`）和新 UI 提示提交 run `39010889130`（head `fd22a47`）在最近检查时仍处于 API 36 APK 编译步骤 11。两者仅轮询，不重启；新 head 的 APK、Manifest、模拟器首屏与运行 artifact 尚待终态验证。
 - 桌面候选包与 runner smoke 不代表 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 Release；Android API36 runner 也不代表实体手机、锁屏/切网、Keystore 或商店验收。
+
+## 5655974 登录风险文档提交的 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39011120295` 对 head `5655974ea4c89f8a8efe2e069f7eb84ceda96260` 的 Windows/macOS 全套测试、静态检查、版本、页面与敏感值检查均 success；release job 按 draft PR 规则 skipped。Desktop candidate run `39011120308` 两平台构建、runner 启动 smoke 与 artifact 上传均 success。
+- macOS artifact `12092662448`（17,994,953 bytes）Actions digest 为 `19254d1369d1ed6b6c9cdd7c1cb586ea04c6029bdd1b910a723429dcd061c11a`。下载出的候选 ZIP SHA-256 `de1ef14109bd1d9306d19afb971975676e5e42b9ef6982bd7c62ef3435dc52c3` 与 sidecar 一致，ZIP CRC 通过；含 62 个符号链接。用 `ditto` 解包后 strict codesign 通过，bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64；adhoc 签名、无 Team ID。
+- Windows artifact `12092778275`（20,535,286 bytes）Actions digest 为 `a04c318f493c21430af597327d67a12d2bf89617db433144bf56ef831a644420`。下载出的 EXE SHA-256 `2089a865cd14b93836b8f493ba3f5bfac1f5a530022d8b9dd6c7d124da12e22d` 与 sidecar 一致；文件为 PE32+ GUI x86-64，PE Security Directory offset/size 均为 0，未签名。
+- Android API 36 APK run `39010565663`（head `20f58f5`）与 `39010889130`（head `fd22a47`）最近仍为 in progress、停在 APK 编译步骤 11；后者日志尾部显示 NDK 正在编译 OpenSSL x86_64。前者 job log 下载返回 Transport closed，原因未确认。只轮询原 run，不重启；Manifest、模拟器、artifact 均待后续步骤完成。
+- 桌面候选与 runner smoke 不证明 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 Release；Android runner 也不代表实体手机、锁屏/切网、Keystore 或商店验收。
