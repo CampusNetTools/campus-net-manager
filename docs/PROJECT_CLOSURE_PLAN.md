@@ -230,4 +230,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12089227597` 外层 SHA-256 `b63c9e15dcff83c56e51b2f94b85145669740b24c15a3e902a1a743051769b10` 与 Actions digest 一致，ZIP CRC 通过。EXE SHA-256 `084cc8c6eefaf2e0bb1a879655ae4c559d1298de9f8888e4ad3c8f947c200cbe` 与 sidecar 一致；文件为 PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
 - macOS artifact `12089136867` 外层 SHA-256 `b687f6363036f0cd789d322eafe765a0b2b70919ddbae3d4fc1dcb961e6b5ac0` 与 Actions digest 一致，ZIP CRC 通过。内层候选 ZIP SHA-256 `1d654ec8df61f417e2d4c2115b07be487b4cd031d4285d1ef79e8cef33debab8` 与 sidecar 一致且 CRC 通过；ditto 解包后的 bundle `com.campusnettools.campusnetmanager` v5.6.0 通过 strict codesign，arm64、62 个 symlink、adhoc 签名、无 Team ID。
 - 以上仍是 draft PR 候选与 GitHub runner smoke，不代表 Windows 用户设备安装、macOS Developer ID/公证/升级或正式 Release。
+
+## macOS 本机安装 v5.6.0 候选（2026-10-17）
+
+- 使用项目 `.venv` 的 Python 3.13.12 / PyInstaller 6.22.2 执行 `PYTHON_BIN=.venv/bin/python ./scripts/build_macos.sh`，本机 arm64 `.app` 构建成功。
+- 替换前用 `ditto` 备份 `/Applications/校园网连接管家.app` 与 `dist/macos/校园网连接管家.app` 至 `archives/installed-macos-5.5.0-before-v5.6.0-2026-10-17/` 和 `archives/dist-macos-5.5.0-before-v5.6.0-2026-10-17/`，并保存恢复说明。安装前后 `.app` 均通过 `codesign --verify --deep --strict`。
+- 安装 bundle id `com.campusnettools.campusnetmanager`，版本 `5.6.0`，Mach-O arm64，包含 55 个符号链接；签名 adhoc、无 Team ID。进程从 `/Applications/校园网连接管家.app/Contents/MacOS/校园网连接管家` 启动，CUA 截图可见 v5.6.0 主界面。
+- 本机完成候选构建、归档、替换、启动与可视界面检查；未完成控件逐项操作、自动升级、Developer ID 签名/公证或正式 Release。截图含本机已保存档案字段，未保存、提交或转录；界面显示的“守护/网络”文案不作为网络流量验收。
 - Google Play Data safety 申报需覆盖应用及 SDK 离开设备的数据；iOS VPN App 的组织账号资格、使用前披露和隐私承诺仍待发布主体核实。数据流底稿不是最终隐私政策、Data safety 表单、Privacy Labels 或商店审核证据。
