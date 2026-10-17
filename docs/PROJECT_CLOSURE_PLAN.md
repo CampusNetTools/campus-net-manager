@@ -671,3 +671,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 复验 logcat 不再出现前次 `Error when copying logo directory` / `Permission denied`，支持“首次导入 Kivy 前预建默认空 icon 目录”消除该可选图标复制警告的 Android API 36 模拟器证据。该结论只限本次 runner 镜像和启动路径，不代表所有设备/环境均无权限问题。
 - 同一 logcat 仍记录 HIDAPI 动态广播接收器未指定 `RECEIVER_EXPORTED`/`RECEIVER_NOT_EXPORTED` 的异常，以及 `Unknown <android> provider` warning；两者根因及 HID/USB 功能均未验证。模拟器 smoke 不证明实体手机、Keystore、锁屏/切网后台能力、校园网络流量或 Play 接收与上架。
 - PR CI run `39042053877` Windows/macOS 检查 success、发布因 draft skipped；Desktop candidate run `39042053873` 两平台构建、runner launch smoke 和 artifact upload success。该桌面候选状态不扩展本节 Android 运行证据范围。
+
+## 用户修订直下载目标与 2026-10-17 本机验收
+
+- 用户明确不要求 App Store / Play 商店上架，也不要求商店签名；分发目标调整为用户可直接下载并安装使用。公开最新 GitHub Release 仍为 v5.5.0，含 macOS 与 Windows 资产；目前未见公开 Android/iOS 安装包。PR #1 仍为 OPEN draft，HEAD `4f4e16ac942a4cc16c8d13a734e260767b756e7a`，当前提交的 Windows/macOS 检查均已完成并通过，文档提交对应的平台打包 job 按检测规则跳过。
+- 本机 `python3 -m unittest discover -s tests -v`：545 passed、3 skipped。裸命令 `python3 -m unittest discover -v` 未递归 `tests/`，报告 0 tests，不能作为测试结果。
+- `/Applications/校园网连接管家.app` 目视标题为 v5.6.0；bundle id `com.campusnettools.campusnetmanager`，本机进程在运行；`codesign --verify --deep --strict` 通过。这是本机 bundle 完整性和运行证据，不是 Developer ID / 公证或其他用户安装验收。
+- 已检查主窗口和一个只读路由器中继说明窗口，后者已关闭；没有操作校园网登录、检测、守护、VPN、热点、路由器设置或任何会传输凭据/改变网络的控件。主界面的 Kivy 控件没有出现在 macOS 辅助功能树中，因此没有完成逐控件验收。
+- 当前 Mac 未安装 `adb`，仅有 Command Line Tools、没有完整 Xcode 的 `simctl`。iPhone 镜像当时显示影序手机协作台，未切换或操作该手机；不能据此宣称校园助手已在 iPhone 真机验收。
+- 分发签名需与商店签名区分：Android 可安装 APK 必须有包签名，iOS 真机安装需要代码签名；若“完全不签名”也包括平台本地/开发签名，则 iOS 真机直装目标无法实现。待用户确认是否只排除商店签名；不索取密码、验证码或私钥。
+- 后续需完成 Android 真机锁屏/切网/Keystore、iPhone 校园助手界面与 IKEv2 双向流量、Windows 用户设备安装/逐项验收，以及发布可直接下载的当前桌面和 Android 包。任何模拟器、Actions runner、候选包或应用自己的在线日志都不能替代这些验收。
