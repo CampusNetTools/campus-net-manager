@@ -10,8 +10,20 @@ targets:
     type: application
     platform: iOS
     sources: [App, Shared]
+    scheme:
+      testTargets:
+        - CampusNetCompanionTests
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.campusnettools.companion
         INFOPLIST_FILE: Resources/App-Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/App.entitlements
+  CampusNetCompanionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: CampusNetCompanion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.campusnettools.companion.tests

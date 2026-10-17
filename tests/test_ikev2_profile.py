@@ -52,3 +52,25 @@ class IKEv2ProfileTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(IKEv2GatewayNotReady, "CA 证书"):
             controller.create_device_profile("my_iphone")
+
+    def test_rejects_malformed_numeric_addresses_instead_of_treating_them_as_hosts(self):
+        for host in ("999.1.1.1", "1..2.3", "2001::gg", "2001:db8::1%en0"):
+            controller = IKEv2ProfileController(
+                host, "vpn.campusnet.local", b"der-ca-certificate",
+                gateway_ready=True, swanctl_available=True,
+            )
+            with self.subTest(host=host):
+                self.assertFalse(controller.readiness()[0])
+
+    def test_accepts_ipv6_and_rejects_non_ascii_dns_names(self):
+        valid_controller = IKEv2ProfileController(
+            "2001:db8::42", "vpn.campusnet.local", b"der-ca-certificate",
+            gateway_ready=True, swanctl_available=True,
+        )
+        invalid_controller = IKEv2ProfileController(
+            "10.12.72.55", "vṕn.campusnet.local", b"der-ca-certificate",
+            gateway_ready=True, swanctl_available=True,
+        )
+
+        self.assertTrue(valid_controller.readiness()[0])
+        self.assertFalse(invalid_controller.readiness()[0])

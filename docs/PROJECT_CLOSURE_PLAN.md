@@ -398,4 +398,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - PR CI run `39008571202` 对 head `c251e32a7cf62549c4fa7614a6637e4f9cc3f573` 的 Windows/macOS 全套检查均 success，发布 job 因 PR 为 draft skipped。Desktop candidate run `39008571404` Windows/macOS build、runner launch smoke 与 artifact upload 均 success。
 - macOS artifact `12091827800`（17,995,078 bytes）外层 SHA-256 与 Actions digest 一致：`d40cf6384f61790f82a3adc8dc70afb84ed274ab4de4b5c4b629c0207801bdb7`，ZIP CRC 通过。内层候选 ZIP SHA-256 `79c0bee4bd288fba945d7fb586c9a791c984817f92c8bdc244b672071624af97` 与 sidecar 匹配，ZIP CRC 通过；ditto 解包后 strict codesign 通过，app bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、62 个 symlink、adhoc 签名、无 Team ID。
 - Windows artifact `12091698073`（20,534,303 bytes）外层 SHA-256 与 Actions digest 一致：`1bd0f323dfb30d0662d9821c7e6d96cbd03234014c4e338af0ac8e46b6a8a6c3`，ZIP CRC 通过。EXE SHA-256 `f5c0a67a90699b2d47766535a314cf8ac6788e2a80b91177bd8cf704a22557ec` 与 sidecar 匹配，文件为 PE32+ GUI x86-64；PE Security Directory offset/size 均为 0，未签名。
-- 两份为 draft PR 候选，构建和 runner smoke 不证明真实 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 release。Android APK artifact 在同一轮仍未能下载回读，参见上一节。
+- 两份为 draft PR 候选，构建和 runner smoke 不证明真实 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 release。Android APK 的后续本机回读结果见上一节。
+
+## iOS IKEv2 enrollment 校验与 XCTest 自动检测（2026-10-17）
+
+- 加强 Swift enrollment 导入校验：IPv4/IPv6 使用系统地址解析器检查，DNS 标签限制为 ASCII 字母/数字/连字符；拒绝畸形地址、带 scope 的 IPv6、含空白主机名和无效 DNS 标签。Mac 侧 profile generator 使用同一主机名边界，避免导出后被 iOS App 拒绝。
+- 新增 `CampusNetCompanionTests` XCTest target，覆盖生成格式、IPv6、畸形 IPv4/IPv6、无效服务器标识、空凭据及未知版本；iOS Simulator workflow 在安装启动 app 前执行 `xcodebuild test`。
+- 本机运行受影响的 Python profile 测试 `5 passed`；Swift 源码/测试语法解析、XcodeGen 项目 YAML、workflow YAML 与 `git diff --check` 均通过。当前本机 Swift 6.3.3 与已安装 macOS 27 SDK 所需 Swift 6.4 不匹配，完整 Xcode 不可用，故未能本机 Swift typecheck 或执行 XCTest；等待 Actions 的匹配 Xcode runner 验证。
+- 新增 XCTest 和模拟器 workflow 检查只覆盖配置文件解析边界，不证明真机凭据存储、系统 VPN 授权、IKEv2 建连或双向网络流量；真机签名、App Store 资格和发布仍未验收。

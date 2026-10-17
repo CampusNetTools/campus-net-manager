@@ -20,15 +20,22 @@ class IKEv2GatewayNotReady(RuntimeError):
 
 
 def _valid_host(value):
-    if not value or len(value) > 253:
+    if (not isinstance(value, str) or not value or len(value) > 253
+            or any(char.isspace() for char in value) or "%" in value):
         return False
     try:
         ipaddress.ip_address(value)
         return True
     except ValueError:
+        if "." in value and all(char.isdigit() or char == "." for char in value):
+            return False
         labels = value.split(".")
-        return all(label and len(label) <= 63 and label.replace("-", "").isalnum()
-                   and not label.startswith("-") and not label.endswith("-") for label in labels)
+        return all(
+            label and len(label) <= 63 and label.isascii()
+            and label[0].isalnum() and label[-1].isalnum()
+            and all(char.isalnum() or char == "-" for char in label)
+            for label in labels
+        )
 
 
 @dataclass(frozen=True)
