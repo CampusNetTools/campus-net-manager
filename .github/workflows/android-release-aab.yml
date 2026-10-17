@@ -1,0 +1,177 @@
+name: Android release AAB
+
+on:
+  workflow_dispatch:
+    inputs:
+      signing:
+        description: "Build an unsigned review bundle or a signed Play upload bundle"
+        type: choice
+        options: [unsigned, signed]
+        default: unsigned
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-aab:
+    name: Build and verify Android App Bundle
+    runs-on: ubuntu-22.04
+    env:
+      SIGNING_MODE: ${{ inputs.signing }}
+      P4A_RELEASE_KEYSTORE_PASSWD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      P4A_RELEASE_KEYALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      P4A_RELEASE_KEYALIAS_PASSWD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Assemble mobile package
+        run: |
+          mkdir -p build_mobile
+          cp mobile/main.py mobile/buildozer.spec build_mobile/
+          cp mobile/startup_status.py build_mobile/
+          cp mobile/guard_service.py build_mobile/
+          cp -r mobile/services build_mobile/
+          cp -r mobile/java build_mobile/
+          cp -r core build_mobile/
+
+      - name: Prepare pinned python-for-android source
+        run: |
+          git clone --depth 1 --branch v2026.05.09 \
+            https://github.com/kivy/python-for-android.git "$GITHUB_WORKSPACE/python-for-android"
+          python scripts/patch_p4a_special_use.py "$GITHUB_WORKSPACE/python-for-android"
+
+      - name: Cache Android build dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('mobile/buildozer.spec') }}
+          restore-keys: buildozer-${{ runner.os }}-
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential zip unzip autoconf automake libtool pkg-config \
+            autoconf-archive gettext autopoint
+          python -m pip install buildozer==1.6.0 cython==0.29.36
+
+      - name: Prepare SDK, release artifact format, and upload key
+        run: |
+          P4A_RELEASE_KEYSTORE="$RUNNER_TEMP/campusnet-upload.jks"
+          echo "P4A_RELEASE_KEYSTORE=$P4A_RELEASE_KEYSTORE" >> "$GITHUB_ENV"
+          if [ "$SIGNING_MODE" = signed ]; then
+            test -n "$ANDROID_KEYSTORE_BASE64" || { echo "::error::Set ANDROID_KEYSTORE_BASE64 in repository secrets."; exit 1; }
+            test -n "$P4A_RELEASE_KEYSTORE_PASSWD" || { echo "::error::Set ANDROID_KEYSTORE_PASSWORD in repository secrets."; exit 1; }
+            test -n "$P4A_RELEASE_KEYALIAS" || { echo "::error::Set ANDROID_KEY_ALIAS in repository secrets."; exit 1; }
+            test -n "$P4A_RELEASE_KEYALIAS_PASSWD" || { echo "::error::Set ANDROID_KEY_PASSWORD in repository secrets."; exit 1; }
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$P4A_RELEASE_KEYSTORE"
+            chmod 600 "$P4A_RELEASE_KEYSTORE"
+          elif [ "$SIGNING_MODE" = unsigned ]; then
+            # Buildozer's AAB release path still asks Gradle to sign. Use a
+            # runner-only key, then strip its JAR signature files below.
+            temp_password=$(openssl rand -hex 24)
+            echo "::add-mask::$temp_password"
+            keytool -genkeypair -noprompt \
+              -keystore "$P4A_RELEASE_KEYSTORE" \
+              -storepass "$temp_password" -keypass "$temp_password" \
+              -alias campusnet-review -keyalg RSA -keysize 2048 -validity 1 \
+              -dname "CN=CampusNetManager Temporary Review"
+            {
+              echo "P4A_RELEASE_KEYSTORE_PASSWD=$temp_password"
+              echo "P4A_RELEASE_KEYALIAS=campusnet-review"
+              echo "P4A_RELEASE_KEYALIAS_PASSWD=$temp_password"
+            } >> "$GITHUB_ENV"
+          elif [ "$SIGNING_MODE" != unsigned ]; then
+            echo "::error::Unsupported signing mode: $SIGNING_MODE"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import os
+          path = 'build_mobile/buildozer.spec'
+          text = open(path, encoding='utf-8').read()
+          assert 'android.sdk_path' not in text
+          text = text.replace('[app]', '[app]\nandroid.release_artifact = aab', 1)
+          text = text.replace('[app]', '[app]\nandroid.sdk_path = ' + os.environ['ANDROID_HOME']
+                            + '\np4a.source_dir = ' + os.path.join(os.environ['GITHUB_WORKSPACE'], 'python-for-android'), 1)
+          open(path, 'w', encoding='utf-8').write(text)
+          PY
+          mkdir -p "$ANDROID_HOME/tools/bin"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "$ANDROID_HOME/tools/bin/sdkmanager"
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" "$ANDROID_HOME/tools/bin/avdmanager" || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null || true
+
+      - name: Build API 36 AAB
+        working-directory: build_mobile
+        run: buildozer android release
+
+      - name: Remove temporary review signature
+        if: inputs.signing == 'unsigned'
+        run: |
+          mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1
+          python3 - "${bundles[0]}" <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          bundle = Path(sys.argv[1])
+          temporary = bundle.with_suffix(bundle.suffix + '.unsigned')
+          signatures = ('.SF', '.RSA', '.DSA', '.EC')
+          removed = []
+          with ZipFile(bundle) as source, ZipFile(temporary, 'w') as target:
+              for item in source.infolist():
+                  name = item.filename.upper()
+                  is_signature = (
+                      name.startswith('META-INF/')
+                      and '/' not in name[len('META-INF/'):]
+                      and name.endswith(signatures)
+                  )
+                  if is_signature:
+                      removed.append(item.filename)
+                      continue
+                  target.writestr(item, source.read(item.filename))
+          if not removed:
+              temporary.unlink(missing_ok=True)
+              raise SystemExit('Expected the temporary review signature, found none.')
+          os.replace(temporary, bundle)
+          print('Removed temporary review signatures: ' + ', '.join(removed))
+          PY
+
+      - name: Verify signed AAB
+        if: inputs.signing == 'signed'
+        run: |
+          mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1
+          unzip -t "${bundles[0]}"
+          jarsigner -verify "${bundles[0]}"
+
+      - name: Verify unsigned AAB is clearly unsigned
+        if: inputs.signing == 'unsigned'
+        run: |
+          mapfile -t bundles < <(find build_mobile/bin -maxdepth 1 -type f -name '*.aab' -print)
+          test "${#bundles[@]}" -eq 1
+          unzip -t "${bundles[0]}"
+          if unzip -Z1 "${bundles[0]}" | grep -E '^META-INF/[^/]+\.(SF|RSA|DSA|EC)$'; then
+            echo "::error::Unsigned bundle unexpectedly contains signature entries."
+            exit 1
+          fi
+
+      - name: Upload AAB artifact for review
+        uses: actions/upload-artifact@v7
+        with:
+          name: campusnet-android-api36-${{ inputs.signing }}-aab
+          path: build_mobile/bin/*.aab
+          if-no-files-found: error
+          retention-days: 30

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import plistlib
 import secrets
 import shutil
@@ -19,15 +20,22 @@ class IKEv2GatewayNotReady(RuntimeError):
 
 
 def _valid_host(value):
-    if not value or len(value) > 253:
+    if (not isinstance(value, str) or not value or len(value) > 253
+            or any(char.isspace() for char in value) or "%" in value):
         return False
     try:
         ipaddress.ip_address(value)
         return True
     except ValueError:
+        if "." in value and all(char.isdigit() or char == "." for char in value):
+            return False
         labels = value.split(".")
-        return all(label and len(label) <= 63 and label.replace("-", "").isalnum()
-                   and not label.startswith("-") and not label.endswith("-") for label in labels)
+        return all(
+            label and len(label) <= 63 and label.isascii()
+            and label[0].isalnum() and label[-1].isalnum()
+            and all(char.isalnum() or char == "-" for char in label)
+            for label in labels
+        )
 
 
 @dataclass(frozen=True)
@@ -36,6 +44,8 @@ class IKEv2DeviceProfile:
     username: str
     password: str = field(repr=False)
     mobileconfig: bytes = field(repr=False)
+    ca_mobileconfig: bytes = field(repr=False)
+    app_configuration: bytes = field(repr=False)
     swanctl_secret: str = field(repr=False)
 
 
@@ -71,6 +81,14 @@ class IKEv2ProfileController:
         username = "iphone-" + secrets.token_hex(8)
         password = secrets.token_urlsafe(32)
         profile = self._profile(device_name, username, password)
+        app_configuration = {
+            "version": 1,
+            "deviceName": device_name,
+            "serverAddress": self.server_host,
+            "serverIdentifier": self.server_identifier,
+            "username": username,
+            "password": password,
+        }
         secret = "\n".join((
             "# CampusNet iPhone: " + device_name,
             "secrets {",
@@ -81,8 +99,36 @@ class IKEv2ProfileController:
             "}",
             "",
         ))
-        return IKEv2DeviceProfile(device_name, username, password,
-                                  plistlib.dumps(profile, fmt=plistlib.FMT_XML, sort_keys=True), secret)
+        return IKEv2DeviceProfile(
+            device_name, username, password,
+            plistlib.dumps(profile, fmt=plistlib.FMT_XML, sort_keys=True),
+            plistlib.dumps(self._ca_profile(), fmt=plistlib.FMT_XML, sort_keys=True),
+            json.dumps(app_configuration, ensure_ascii=False,
+                       separators=(",", ":")).encode("utf-8"),
+            secret,
+        )
+
+    def _ca_profile(self):
+        root_uuid = str(uuid.uuid4()).upper()
+        profile_uuid = str(uuid.uuid4()).upper()
+        certificate = {
+            "PayloadType": "com.apple.security.root",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": "com.campusnettools.ikev2.ca." + root_uuid.lower(),
+            "PayloadUUID": root_uuid,
+            "PayloadDisplayName": "校园网连接管家 IKEv2 网关证书",
+            "PayloadCertificateFileName": "campusnet-ikev2-ca.cer",
+            "PayloadContent": self.ca_certificate_der,
+        }
+        return {
+            "PayloadType": "Configuration",
+            "PayloadVersion": 1,
+            "PayloadIdentifier": "com.campusnettools.ikev2.ca-profile." + profile_uuid.lower(),
+            "PayloadUUID": profile_uuid,
+            "PayloadDisplayName": "校园网连接管家 IKEv2 根证书",
+            "PayloadDescription": "仅安装用于验证校园网 IKEv2 网关身份的根证书，不含 VPN 账号或密码。",
+            "PayloadContent": [certificate],
+        }
 
     def _profile(self, device_name, username, password):
         root_uuid = str(uuid.uuid4()).upper()
@@ -101,11 +147,11 @@ class IKEv2ProfileController:
             "RemoteAddress": self.server_host,
             "RemoteIdentifier": self.server_identifier,
             "LocalIdentifier": username,
-            # Apple 的 IKEv2 描述文件在服务端使用 X.509 证书、客户端使用
-            # EAP-MSCHAPv2 时，必须以 Certificate 认证 IKE 服务器；不能用
-            # None 绕过服务器身份校验。未设置客户端 PayloadCertificateUUID 时，
-            # ExtendedAuthEnabled 会使用下方的独立 EAP 凭据。
-            "AuthenticationMethod": "Certificate",
+            # Apple requires None + ExtendedAuthEnabled for EAP-only
+            # authentication. The installed CA and explicit server CN still
+            # validate the IKE server identity.
+            "AuthenticationMethod": "None",
+            "ServerCertificateCommonName": self.server_identifier,
             "ExtendedAuthEnabled": 1,
             "AuthName": username,
             "AuthPassword": password,

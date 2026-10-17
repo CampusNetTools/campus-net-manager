@@ -22,8 +22,8 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: 安装依赖
@@ -69,8 +69,8 @@ jobs:
           - { os: windows-latest, target: windows }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: 安装依赖
@@ -84,7 +84,10 @@ jobs:
           # 资产名/包内名都 ASCII: 中文经 actions/glob 上传被剥前导"-", 且 zip 中文条目名
           # 在部分解压器(python zipfile)会乱码
           mv "校园网连接管家.app" CampusNetManager.app
-          zip -rq "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip" CampusNetManager.app
+          ditto -c -k --sequesterRsrc --keepParent \
+            CampusNetManager.app "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip"
+          python ../../scripts/verify_macos_symlinks.py CampusNetManager.app \
+            "CampusNetManager-macOS-arm64-${GITHUB_REF_NAME}.zip"
           mv CampusNetManager.app "校园网连接管家.app"
           # SHA256 校验和资产: 客户端下载后先校验再替换(updater.resolve_expected_sha256)
           python ../../scripts/make_checksum.py \
@@ -128,3 +131,14 @@ jobs:
             dist/windows/CampusNetManager-${{ github.ref_name }}-win64.exe.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android-release:
+    name: 构建并验证 Android 直接下载 APK
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, release]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/mobile.yml
+    with:
+      sign_for_direct_download: true
+    secrets: inherit

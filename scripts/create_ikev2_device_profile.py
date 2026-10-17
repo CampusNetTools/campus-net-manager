@@ -25,6 +25,8 @@ except (AttributeError, ValueError):
 
 def write_private(path: Path, payload: bytes) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    if hasattr(os, "fchmod"):
+        os.fchmod(descriptor, 0o600)
     with os.fdopen(descriptor, "wb") as target:
         target.write(payload)
 
@@ -51,8 +53,12 @@ def main() -> int:
     profiles.mkdir(mode=0o700, exist_ok=True)
     devices.mkdir(mode=0o700, exist_ok=True)
     write_private(profiles / f"{args.device_name}.mobileconfig", profile.mobileconfig)
+    write_private(profiles / f"{args.device_name}-ca.mobileconfig", profile.ca_mobileconfig)
+    write_private(profiles / f"{args.device_name}.ikev2.json", profile.app_configuration)
     write_private(devices / f"{args.device_name}.conf", profile.swanctl_secret.encode("utf-8"))
     print(f"已创建设备配置：{profiles / (args.device_name + '.mobileconfig')}")
+    print(f"已创建 iPhone App 专用配置：{profiles / (args.device_name + '.ikev2.json')}（含敏感凭据，仅限本机 AirDrop/USB 传输）")
+    print(f"已创建仅含根证书的安装文件：{profiles / (args.device_name + '-ca.mobileconfig')}")
     print(f"已创建服务端凭据：{devices / (args.device_name + '.conf')}")
     return 0
 
