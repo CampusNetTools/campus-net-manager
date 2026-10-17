@@ -293,3 +293,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12090346511` 外层 SHA-256 与 Actions digest 一致，为 `e11e4e692b37b70de87e25795fee74b09bae73b3e72d0805c5bc9f6f5ed9c0cc`，ZIP CRC 通过。EXE SHA-256 `626d1f5a74739adf6ed63b1295fbfb876af8794a166636f960683b105765cfe8` 与 sidecar 一致，PE32+ x86-64；Authenticode security directory size 为 0，未签名。
 - Android API 36 APK run `39003633514`（head `794d69ddb936277561d6debc71c57fd22d6a28e6`）截至记录仍在 APK 编译步骤 11；Manifest、KVM、模拟器首屏状态门禁与 artifact 步骤均未开始，无 artifact。日志读取接口曾返回 Transport closed；不推断其根因，继续只轮询原 run。
 - 桌面包仍是 draft PR 候选和 Actions runner smoke，不代表正式 Release 或用户 Windows/macOS 安装验收。Android 模拟器运行也不代表实体手机、真实校园网、锁屏/切网、Keystore 或 Play 验收。
+
+## Android run 39003633514 编译日志活跃度复核（2026-10-17）
+
+- Actions run 与 job 元数据在 `05:07Z` 仍显示 `in_progress`，当前步骤为“构建 Android API 36 debug APK”；前序环境准备全部成功，Manifest、KVM、emulator 与 artifact 步骤仍 pending。
+- 通过 GitHub job-log endpoint 下载到约 31.5 MB UTF-8 文本日志，尾部时间戳到 `05:06:13Z`，内容仍在执行 Android NDK clang 编译 SDL2 组件（armeabi-v7a）。因此该编译步骤仍有日志活动；run 的 `updated_at` 未变化不等于进程停止。
+- 这只是源码候选的持续编译证据；尚未通过 APK Manifest gate，也没有模拟器首屏 readiness marker、截图、APK artifact 或实体手机验收。继续轮询原 run `39003633514`，不重启。
