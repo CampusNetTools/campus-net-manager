@@ -2,7 +2,7 @@
 
 更新时间：2026-10-18
 
-本摘要核验时 PR head：`88e48627961acb47892eb04fea5ac68b0236f360`（`codex/full-project-closure`）
+本摘要核验时 PR head：`964b88bdf05de8710453daab4fd1c76078278654`（`codex/full-project-closure`）
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
 
 Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
@@ -22,7 +22,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 当前状态摘要（2026-10-18）
 
-- 本地、origin 与 PR #1 head 均为 `88e48627961acb47892eb04fea5ac68b0236f360`，工作树干净，PR OPEN draft。该 head 的 Windows/macOS 测试与静态检查 CI 成功；文档-only 桌面候选 workflow detector 成功并按规则跳过重新打包。最新公开 GitHub Release 仍是 v5.5.0，含 Windows/macOS 资产，不含公开 Android/iOS 包。
+- 本地、origin 与 PR #1 head 均为 `964b88bdf05de8710453daab4fd1c76078278654`，工作树干净，PR OPEN draft。该 head 的 PR CI run `39048160885` Windows/macOS 测试与静态检查 success；文档-only Desktop candidate run `39048161051` detector success、打包 job 按规则 skipped。最新公开 GitHub Release 仍是 v5.5.0，含 Windows/macOS 资产，不含公开 Android/iOS 包。
 - 本机 `python3 -m unittest discover -s tests -v`：545 passed、3 skipped。已安装 `/Applications/校园网连接管家.app` 的进程存在；bundle `com.campusnettools.campusnetmanager`、版本 5.6.0，`codesign --verify --deep --strict` 通过，签名为本地 adhoc、无 Team ID。当前 Computer Use runtime 缺失，不能借此称作控件逐项验收。
 - Android run `39042050230`（head `ffc69a0`）的 API 36 APK 构建、Manifest 前台服务 gate、runner KVM、模拟器安装/启动及 APK/运行证据上传均 success；截图为已退出加载态的登录/状态页，logcat 有 `CNM_NETWORK_STATUS_READY`，未见 FATAL/ANR/进程死亡。它是 runner 模拟器证据，不是实体手机。该 artifact 仍是 Actions 候选，不是公开 Release。
 - iOS 目前只有 Simulator XCTest/build/install/launch 包；本机仅 Command Line Tools，无完整 Xcode、`simctl` 或 provisioning profile。免费 Apple Personal Team 适用于有限真机测试，但 profile 7 天过期，需要周期重签；不能声称已有 iPhone 可安装直下载包。
@@ -685,7 +685,7 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 用户确认：只要最终用户能使用且不产生费用即可；“保证运行”优先。允许 Android/iOS/macOS 为安装运行所需的免费平台本地/开发签名；仍不做 Play/App Store 上架，也不购买付费开发者身份或签名证书。
 - Android 免费 debug 包签名可用于 sideload，但系统仍可能要求用户允许安装来源；必须用实际 APK 和实体手机验证。
 - Windows 当前候选 EXE 无 Authenticode 签名；macOS 候选仅 adhoc 签名。用户可被引导手动确认来源/绕过首次运行警告，但无法承诺和付费可信签名相同的无警告体验。当前 Mac 唯一 codesign identity 为其他产品 `Smart Media Backup Developer`，不可用于本产品。
-- Apple 官方说明：免费 Personal Team 可经 Xcode 为有限个人设备签名测试，最多 3 台设备，provisioning profile 7 天过期，需定期重新签名安装；这不是面向所有 iPhone 用户的免续签公开直下载渠道。[Apple Developer account overview](https://developer.apple.com/help/account/basics/about-your-developer-account) 与 [Apple distribution overview](https://developer.apple.com/documentation/technologyoverviews/distribution) 。当前 Mac 没有完整 Xcode/`simctl` 和本项目 profile；iPhone 镜像此前正在运行影序应用，因此 iPhone 真机操作必须等设备可用，且 Apple 账号由用户在本机自行登录，不向 Codex 提供凭据。
+- Apple 官方说明：免费 Personal Team 可经 Xcode 为有限个人设备签名测试，最多 3 台设备，provisioning profile 7 天过期，需定期重新签名安装；这不是面向所有 iPhone 用户的免续签公开直下载渠道。[Apple Developer account overview](https://developer.apple.com/help/account/basics/about-your-developer-account) 与 [Apple distribution overview](https://developer.apple.com/documentation/technologyoverviews/distribution) 。当前 Mac 没有完整 Xcode/`simctl` 和本项目 profile。为准备 Android 真机连接，本轮用 Homebrew 免费安装 Android Platform Tools 37.0.1；`adb` 在最小环境中调用后无输出并以 exit -9 结束，原因未知，且没有检测到 USB 手机。iPhone 镜像此前正在运行影序应用，因此 iPhone 真机操作必须等设备可用，且 Apple 账号由用户在本机自行登录，不向 Codex 提供凭据。
 - 最新公开 Release 是 v5.5.0；v5.6.0 仍是 PR draft 候选。Android API 36 模拟器包、桌面候选包均未发布成当前公开下载资产；iOS 仍只有 Simulator `.app` 包，不能安装到 iPhone。下一步是在设备/工具可用时完成真机验收；发布直下载包之前必须逐一说明其平台签名级别和安装警告。
 - 验收工具现况：`adb` 不存在；`xcode-select -p` 为 `/Library/Developer/CommandLineTools`；Codex Computer Use 报 runtime app missing。shell 只能确认已安装 macOS app 进程、窗口标题、版本、bundle id 和 strict adhoc 签名，不等同于 UI 控件逐项验收。
 
@@ -694,3 +694,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - PR CI run `39046430189` 对提交 `f8230ebf52b9d21ca46833a57b04ebf673e4c290` 的 Windows/macOS 测试与版本检查均 success；release jobs 因 PR #1 仍为 OPEN draft skipped。
 - Desktop candidate run `39046430201` 变更检测 success；该提交仅更新闭环文档，Windows/macOS build 与 runner launch smoke jobs skipped。
 - 这些检查只验证该文档提交的 CI 状态，不扩大本机 GUI 操作、真实手机/Windows 设备或当前公开下载包的验收证据。
+
+
+## 2026-10-18 工具与本机验收状态刷新
+
+- 本机全套 unittest `545 passed, 3 skipped`；提交 `964b88b` 的 PR CI run `39048160885` Windows/macOS 全套测试、ruff、版本、路由器页面和敏感值检查均 success；Desktop candidate run `39048161051` detector success，docs-only 构建/runner smoke 按规则 skipped。
+- `/Applications/校园网连接管家.app` 正在运行，System Events 可读到单一窗口标题 `校园网连接管家 v5.6.0`；bundle `com.campusnettools.campusnetmanager`，strict adhoc codesign 验证通过。窗口当前非前台，Computer Use runtime app missing；因此本轮没有完成主界面逐控件操作。
+- 免费安装 Android Platform Tools 37.0.1；其 `adb` 二进制 codesign 验证通过，但最小环境调用 `adb version` 无 stdout/stderr 且子进程 exit -9，原因未知；未识别 USB Android/iOS 设备。当前只具有此前 runner API36 emulator 的启动证据。
+- 本轮未执行登录、隧道、守护、路由器、热点或网络设置操作。下一步实体设备需可用并连接；iPhone 需完整 Xcode 和用户自行完成的免费 Personal Team 设置。
