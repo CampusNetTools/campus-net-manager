@@ -437,3 +437,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12092778275`（20,535,286 bytes）Actions digest 为 `a04c318f493c21430af597327d67a12d2bf89617db433144bf56ef831a644420`。下载出的 EXE SHA-256 `2089a865cd14b93836b8f493ba3f5bfac1f5a530022d8b9dd6c7d124da12e22d` 与 sidecar 一致；文件为 PE32+ GUI x86-64，PE Security Directory offset/size 均为 0，未签名。
 - Android API 36 APK run `39010565663`（head `20f58f5`）与 `39010889130`（head `fd22a47`）最近仍为 in progress、停在 APK 编译步骤 11；后者日志尾部显示 NDK 正在编译 OpenSSL x86_64。前者 job log 下载返回 Transport closed，原因未确认。只轮询原 run，不重启；Manifest、模拟器、artifact 均待后续步骤完成。
 - 桌面候选与 runner smoke 不证明 Windows 用户设备安装、macOS Developer ID/公证、升级或正式 Release；Android runner 也不代表实体手机、锁屏/切网、Keystore 或商店验收。
+
+## de0d5ef 桌面候选回读与本机运行界面观察（2026-10-17）
+
+- PR CI run `39011344762` 对 head `de0d5ef557b55cb5cfd5977da38b7d6aa2970e9a` 的 Windows/macOS 全套检查 success；Desktop candidate run `39011344664` 两平台构建、runner 启动 smoke 和上传 success。
+- Windows artifact `12093340150`（20,535,406 bytes）Actions digest 与下载的 artifact ZIP SHA-256 均为 `d16a0c6a4871be05bfa92c2e24f1c25812d7f800f5243875a1663470338734d1`，外层 ZIP CRC 通过；EXE SHA-256 `a7aa4606638066531c21d69467978bf08aecf1b62749266a868c19edfb0224a4` 与 sidecar 一致，文件为 PE32+ GUI x86-64，Security Directory offset/size 均为 0，未签名。
+- macOS artifact `12092782296`（17,995,218 bytes）Actions digest 与下载的 artifact ZIP SHA-256 均为 `69996739b50dfe0ace2ab860d4570fe6d3190353feb30d9de336f6d0e287fbba`，外层 ZIP CRC 通过；候选 ZIP SHA-256 `3176d4897518e014c60283a994c3ab5f1ade02846044b9f127bc403e08a34d1b` 与 sidecar 一致、CRC 通过，含 62 个符号链接。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64；adhoc 签名、无 Team ID。
+- 本机已安装应用窗口标题显示 v5.6.0；主页显示“守护：运行中”和“VPN 与校园网在线”。这是界面状态观察，不等于隧道双向流量或网络可达性验收；未读取或记录账号字段，也未修改配置或停止服务。当前自动化未获得应用画布内部控件的可访问树，不能据此判定各功能按钮通过。
+- 截至 2026-10-17 06:53 UTC，Android APK runs `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）仍为 in progress，尚无终态或 artifact；两次 Actions job log 获取均返回 `Transport closed`，不据此推断构建失败或停滞。只轮询原 run，不重启。
+- Desktop packages 是 draft PR 候选与 runner smoke，不证明用户设备安装、Developer ID/公证、升级或正式 Release。Android runner 也不代表实体手机、锁屏/切网、Keystore 或商店验收。
