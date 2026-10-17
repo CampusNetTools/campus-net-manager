@@ -144,14 +144,13 @@ class CampusNetMobile(App):
 
     def _load_profile(self):
         try:
-            from guard_service import (load_profile_data_if_present,
-                                       load_profile_data, write_profile)
+            from guard_service import load_android_profile, load_profile_data_if_present
             legacy_path = os.path.join(self.user_data_dir, "profile.json")
             source_path = self._cfg_path
-            if not os.path.exists(source_path) and self._is_android() and os.path.exists(legacy_path):
-                data = load_profile_data(legacy_path)
-                write_profile(source_path, data)
-                os.remove(legacy_path)
+            if self._is_android():
+                data, cleanup_pending = load_android_profile(source_path, legacy_path)
+                if cleanup_pending:
+                    self.root.log("加密档案已加载，但旧明文档案暂时无法删除；请检查应用存储权限后重试。")
             else:
                 data = load_profile_data_if_present(source_path)
             self.root.in_user.text = data.get("username", "")

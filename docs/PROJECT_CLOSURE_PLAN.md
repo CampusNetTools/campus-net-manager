@@ -193,3 +193,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12069981509` 外层 SHA-256 `dd64fcc65ca9d86f198f7ae94e913f94d527c568b3d4f84c63bec18e6cab844e` 与 GitHub digest 一致、CRC 通过；内层候选 ZIP SHA-256 `7f1edb33d7c5ee8b387369c9467bf3a8062ebb62c3f61ca1ba526db4d1c90807` 与 sidecar 一致、CRC 通过，含 62 个 symlink。解包 bundle `com.campusnettools.campusnetmanager` 版本 `5.6.0` 通过 strict codesign，签名 adhoc、无 Team ID。
 - Windows artifact `12070110950` 外层 SHA-256 `2dee5556852d87548e2acedd1bdaf0b785721376b27a74fd204a3dc634ae128f` 与 GitHub digest 一致、CRC 通过；EXE SHA-256 `e873102ea916a635018c99ca78b8ce98e378b5823d4f6cb0c1289716c7754d62` 与 sidecar 一致，PE32+ GUI x86-64，Authenticode security directory size 为 0（未签名）。
 - `v5.6.0` 目前只是候选版本准备和 runner 构建验证，不是正式 Release。仍需 Windows 用户设备安装、macOS Developer ID/公证/升级、Android/iOS 真机签名与测试及商店审核；当前没有任何商店提交或审核通过证据。
+
+## Android 旧明文档案迁移恢复（2026-10-17）
+
+- 代码复核发现 Android 档案迁移在“加密文件已落盘、删除旧 `profile.json` 前应用退出”后，不会再尝试删除遗留明文；旧明文档案会一直保留。
+- `mobile/guard_service.py` 现在无论加密档案是否已存在，都会重试清理旧文件；清理暂时失败时仍返回可解密档案并提示用户，避免将有效档案当作空档案载入。首次迁移仍先原子写入加密文件，再清理明文。
+- 新增回归检查覆盖首次迁移、加密文件已存在时重试清理，以及删除失败时档案仍可用。完整本机套件 `python3 -m unittest discover -s tests -v`：514 passed、3 skipped；相关文件 Ruff、Python 编译与 `git diff --check` 均通过。
+- 此为源码、自动测试和静态检查证据；尚未在 Android 真机验证 Keystore 和文件系统行为，也不构成商店验收。

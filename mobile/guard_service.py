@@ -54,6 +54,30 @@ def load_profile_data_if_present(path):
         return {}
 
 
+def load_android_profile(encrypted_path, legacy_path):
+    """Load the encrypted profile, migrate legacy plaintext, and retry its cleanup.
+
+    A previous launch may have written the encrypted profile but exited before
+    removing the plaintext source. Always retry that cleanup when both files
+    exist. A cleanup error must not hide the valid encrypted profile from the UI.
+    """
+    if os.path.exists(encrypted_path):
+        data = load_profile_data(encrypted_path)
+    elif os.path.exists(legacy_path):
+        data = load_profile_data(legacy_path)
+        write_profile(encrypted_path, data)
+    else:
+        return {}, False
+
+    cleanup_pending = False
+    if os.path.exists(legacy_path):
+        try:
+            os.remove(legacy_path)
+        except OSError:
+            cleanup_pending = True
+    return data, cleanup_pending
+
+
 def write_profile(path, profile):
     """Atomically update the private profile so the service never reads half a file."""
     path = os.path.abspath(path)

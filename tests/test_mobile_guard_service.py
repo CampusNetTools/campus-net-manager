@@ -82,6 +82,65 @@ class MobileGuardServiceTests(unittest.TestCase):
         decrypt.assert_called_once_with("v1:opaque-ciphertext")
         self.assertEqual(profile["username"], "student@example")
 
+    def test_android_profile_migration_retries_legacy_cleanup_after_encrypted_write(self):
+        from unittest.mock import patch
+        from mobile.guard_service import load_android_profile
+        encrypted_path = os.path.join(self.tmp.name, "profile.enc")
+        legacy_path = os.path.join(self.tmp.name, "profile.json")
+        profile = {"username": "student@example", "password": "secret-value"}
+        with open(encrypted_path, "w", encoding="utf-8") as stream:
+            stream.write("v1:opaque-ciphertext")
+        with open(legacy_path, "w", encoding="utf-8") as stream:
+            json.dump(profile, stream)
+
+        with patch("mobile.guard_service._android_decrypt",
+                   return_value=json.dumps(profile)):
+            loaded, cleanup_pending = load_android_profile(encrypted_path, legacy_path)
+
+        self.assertEqual(loaded, profile)
+        self.assertFalse(cleanup_pending)
+        self.assertFalse(os.path.exists(legacy_path))
+
+    def test_android_profile_migrates_legacy_plaintext_to_encrypted_path(self):
+        from unittest.mock import patch
+        from mobile.guard_service import load_android_profile
+        encrypted_path = os.path.join(self.tmp.name, "profile.enc")
+        legacy_path = os.path.join(self.tmp.name, "profile.json")
+        profile = {"username": "student@example", "password": "secret-value"}
+        with open(legacy_path, "w", encoding="utf-8") as stream:
+            json.dump(profile, stream)
+
+        with patch("mobile.guard_service._android_encrypt",
+                   return_value="v1:opaque-ciphertext") as encrypt:
+            loaded, cleanup_pending = load_android_profile(encrypted_path, legacy_path)
+
+        encrypt.assert_called_once_with(json.dumps(profile, ensure_ascii=False))
+        self.assertEqual(loaded, profile)
+        self.assertFalse(cleanup_pending)
+        with open(encrypted_path, encoding="utf-8") as stream:
+            self.assertEqual(stream.read(), "v1:opaque-ciphertext")
+        self.assertFalse(os.path.exists(legacy_path))
+
+    def test_android_profile_migration_keeps_profile_available_if_cleanup_fails(self):
+        from unittest.mock import patch
+        from mobile.guard_service import load_android_profile
+        encrypted_path = os.path.join(self.tmp.name, "profile.enc")
+        legacy_path = os.path.join(self.tmp.name, "profile.json")
+        profile = {"username": "student@example", "password": "secret-value"}
+        with open(encrypted_path, "w", encoding="utf-8") as stream:
+            stream.write("v1:opaque-ciphertext")
+        with open(legacy_path, "w", encoding="utf-8") as stream:
+            json.dump(profile, stream)
+
+        with patch("mobile.guard_service._android_decrypt",
+                   return_value=json.dumps(profile)), \
+             patch("mobile.guard_service.os.remove", side_effect=PermissionError):
+            loaded, cleanup_pending = load_android_profile(encrypted_path, legacy_path)
+
+        self.assertEqual(loaded, profile)
+        self.assertTrue(cleanup_pending)
+        self.assertTrue(os.path.exists(legacy_path))
+
     def test_online_status_does_not_write_credentials(self):
         client = Mock(auth_reachable=Mock(return_value=True),
                       check_auth=Mock(return_value=True),
