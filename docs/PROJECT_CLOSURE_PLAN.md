@@ -263,3 +263,12 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 以当前仓库源码实时查询 GitHub 最新 Release，应用版本 `5.6.0` 得到 `ahead`，公开版本 `v5.5.0`；这仅是本轮源码功能调用的联网证据，不代表已安装应用包含该修复或已发布新版本。
 - `tests.test_updater` 30 项通过（1 项 Windows-only 跳过）；完整 unittest 519 项通过、3 项跳过。CI 同款 Ruff F/E9 规则、Python 编译和 `git diff --check` 通过。测试输出另有既存 ResourceWarning，未据此推断本次代码失败。
 - 更新检查 UI 的可视点击验收尚未形成证据；本机安装包需在后续构建后复核。功能修复仍需最新 PR CI 与桌面候选构建验证。
+
+## 15ca386 更新器回归与 macOS 安装包复核（2026-10-17）
+
+- 新增 `tests/test_update_ui_states.py`，覆盖更新检查失败、当前候选高于公开版、版本与公开版相同三种结果在主界面和偏好页的提示及按钮状态；3 项专项测试通过。初始测试夹具误读了已销毁后置空的按钮成员，修正为保留原按钮引用后检查销毁状态。
+- PR CI run `39002957568` 对 head `15ca386f2b7b412a0772258737c5435a5b90ed7b` 的 Windows/macOS 全套测试、静态、版本、页面和敏感值检查均 success；发布 job 因 PR 仍为 draft 而 skipped。Desktop candidate run `39002957566` 两平台构建、runner 启动 smoke 和 artifact 上传均 success。
+- macOS artifact `12090012105` 的 Actions digest 为 `9039c4f338bd17a54e5098751cb657d58e60aade728e81f42a827f57a0f3fafc`；候选包 `CampusNetManager-macOS-arm64-candidate.zip` SHA-256 `87db7bda4afbcca35015cce5690b01a8755f72697c7def91494d8f1bf78f6c9a`，sidecar 与 ZIP CRC 校验通过。`ditto` 解包后的 app 通过 strict codesign，bundle id `com.campusnettools.campusnetmanager`，版本 `5.6.0`，arm64，含 62 个符号链接，adhoc 签名且无 Team ID。
+- Windows artifact `12088979506` 中 EXE sidecar 校验通过，格式为 PE32+ GUI x86-64；PE security directory size 为 0（未签名）。该包为 PR 候选和 runner smoke，不代表 Windows 用户设备安装验收。
+- 使用 `.venv` / PyInstaller 6.22.2 从当前源码构建 macOS arm64 app；替换前将 `/Applications` 原安装版与 `dist/macos` 原构建各自备份到 `archives/installed-macos-v5.6.0-before-updater-ui-2026-10-17/` 与 `archives/dist-macos-v5.6.0-before-updater-ui-2026-10-17/`。新包安装到 `/Applications/校园网连接管家.app` 后 bundle id、版本与签名验证通过，安装版与 dist 主可执行文件 SHA-256 均为 `57746e0d4e8bb0d6f0668cf079f722de767a3a101abebbec8755bc5db7854b2b`；进程从安装路径运行，CUA 窗口标题显示 v5.6.0。
+- 安装包构建、替换、启动已核实；更新检查控件的运行时点击及错误状态的可视呈现仍未验收。当前签名为 adhoc、无 Team ID；Developer ID、公证、用户升级和正式 Release 尚未完成。
