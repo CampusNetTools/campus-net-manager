@@ -88,6 +88,8 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 ## 外部发布门槛
 
+- 商店隐私申报需以实际出站数据流为准。当前源码盘点见 [`PRIVACY_DATA_INVENTORY.md`](PRIVACY_DATA_INVENTORY.md)；它是未签核的审核底稿，不能直接当作面向用户的最终隐私政策或控制台声明。
+
 - 截至 2026-10-16，Google Play 官方政策规定：从 2026-08-31 起，新应用和更新须 target Android 16/API 36 或更高；本项目 API 36 是必要条件，但构建通过不等于 Play 接收。[Target API level requirements](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en)
 - 若 Play Console 个人开发者账号创建于 2023-11-13 之后，申请生产访问前需完成封闭测试，至少 12 名测试者连续 opt-in 满 14 天，并提交测试反馈及生产准备情况；组织账号不适用这项个人账号门槛。[App testing requirements](https://support.google.com/googleplay/android-developer/answer/14151465?hl=en)
 - 若 iOS 版本提供 VPN 服务，Apple App Review Guideline 5.4 要求使用 `NEVPNManager`，仅允许组织开发者账号提交，并在使用前清楚披露收集/使用的数据；还要求承诺不出售、使用或向第三方披露用户数据，并写入隐私政策。[App Review Guidelines 5.4](https://developer.apple.com/app-store/review/guidelines/uk/)
@@ -207,4 +209,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12088595887` 的外层 SHA-256 `61a766cd2d185a32e3dd85d766c77c7dcafe9140d80ae2b7c8394a97e499292f` 与 Actions digest 一致且 ZIP CRC 通过。EXE SHA-256 `34d377f8e4fb2d37566ae642ce7e067a3f889e061bdbb4f4b41b77a9dd62346d` 与包内 sidecar 一致；文件为 PE32+ GUI x86-64，未在用户 Windows 设备安装验收。
 - macOS artifact `12088406849` 的外层 SHA-256 `c270690302438e34540db868b4531727ea0ff4d5aa7b3efe62b0604db51c71b1` 与 Actions digest 一致且外层 CRC 通过。内层候选 ZIP SHA-256 `2ca6df45ac9069e55a100abe58108b9999cf561c840239e75561e9a887f49910` 与 sidecar 一致、CRC 通过；`ditto` 解包后 strict codesign 验证通过，bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、62 个符号链接。签名为 adhoc、无 Team ID。
 - 当前 Mac 上运行的安装版窗口仍显示 v5.5.0；本轮未安装候选包。上述候选仅为 PR artifact 与 runner smoke，不代表用户安装/升级、Developer ID 公证或正式 Release。
-- Android API 36 APK run `38998932605`（同 head）复核时仍在 APK 编译步骤；Manifest、模拟器与 artifact 步骤尚未开始，故本轮不据此声称 Android 包或模拟器验收已完成。
+- Android API 36 APK run `38998932605`（head `19cb82f`）已通过 APK 编译、前台服务 Manifest 校验和 KVM 权限步骤；当前正在 API 36 模拟器安装/启动，APK 与运行证据 artifact 尚未上传。该 run 仍在进行，后续只轮询此 run，不重启。
+
+## 商店隐私数据流预审（2026-10-17）
+
+- 新增 [`PRIVACY_DATA_INVENTORY.md`](PRIVACY_DATA_INVENTORY.md)，按桌面、Android 和 iOS 源码列出本地存储、登录凭据、联网探测、测速、更新、用户自选订阅/路由器/NAS 与 iOS IKEv2 网关的数据流，并标注商店申报前待确认事项。
+- 本次源码检索未发现常见分析、广告或崩溃上报 SDK/接口；这不是对最终依赖、构建二进制或实际网络流量的完整证明。Dr.COM 登录源码将用户名和密码放入 HTTP URL 查询参数，是需要在上架前评估并向用户清楚披露的传输风险。
+- PR #1 仍为 OPEN draft，head `dee232b4ddf813fb00f3376af25069f342c43676`；Android run `38998932605` 针对其前一源码 head `19cb82f`，APK 编译、Manifest 与 KVM 步骤通过，模拟器安装/启动仍在进行，artifact 尚未上传。本轮未重启该 run。
+- Google Play Data safety 申报需覆盖应用及 SDK 离开设备的数据；iOS VPN App 的组织账号资格、使用前披露和隐私承诺仍待发布主体核实。数据流底稿不是最终隐私政策、Data safety 表单、Privacy Labels 或商店审核证据。
