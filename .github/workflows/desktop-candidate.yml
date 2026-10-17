@@ -1,7 +1,12 @@
 name: Desktop candidate packages
 
 on:
+  # Package builds are unchanged by documentation-only edits. Keep PR CI as the
+  # validation path for docs while avoiding redundant native desktop builds.
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:

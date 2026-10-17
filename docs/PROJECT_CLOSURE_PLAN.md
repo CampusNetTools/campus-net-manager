@@ -521,3 +521,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12094326845`（17,995,805 bytes）Actions digest 与下载 ZIP SHA-256 一致：`043ced6dd286ca087e6e7ac055450faabb444021c618d7997acfe195d7505608`，外层 CRC 通过；内层候选 ZIP SHA-256 `bf6197840149675483df331ddfb7ebf8acd1bf656c649294429839878fb5aa55` 与 sidecar 一致，CRC 通过。ditto 解包后 strict codesign 通过；app bundle 含 62 个 symlink，bundle `com.campusnettools.campusnetmanager` v5.6.0 arm64、adhoc、无 Team ID。
 - 当前 Android run `39013104353`（head `32c9a9e`）仍在 API36 APK build step，job log 暂不可读；iOS run `39013866613`（head `3da21dc`）仍在 enrollment XCTest step，日志资源暂不可读。两者状态仍为 in_progress，只轮询原 run，不重启。
 - 本次 Windows/macOS 包为 PR draft 候选与 runner smoke，不证明用户设备安装、Windows Authenticode、macOS Developer ID/公证、升级或正式 Release。
+
+## e5158ce 当前 head 的 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39014217925` 对 head `e5158ce242d91895896480604dd04b5c35517af2` 的 Windows/macOS 全套检查均 success，Release job 因 PR 仍为 draft skipped。Desktop candidate run `39014217930` 两个平台的构建、runner 10 秒启动 smoke 与 artifact 上传均 success。
+- Windows artifact `12094057852` Actions digest 与下载 ZIP SHA-256 一致：`bf4a1d36324177c824f7959a3e5e0cb05b6286c72202ad2a080afa8cea4e13df`，ZIP CRC 通过。EXE SHA-256 `2c8a3f64ca5d3e5166c0d56c6d6367063c266dbd83fe88ed9d5648152df416e3` 与 sidecar 一致；PE32+ GUI x86-64，Authenticode Security Directory 为 `(0, 0)`，未签名。
+- macOS artifact `12093842212` Actions digest 与下载 ZIP SHA-256 一致：`cf9457c8036c1953be8da978caaa7fc652e96dd2aed99ca8d87dd3d4997252e6`，外层 ZIP CRC 通过。内层候选 ZIP SHA-256 `874bdf5f3a5c4811b3827510f025b4d85ebe934d7cf61d0d5dcefe50f7f2e03c` 与 sidecar 一致、CRC 通过，含 554 项和 62 个 symlink；`ditto` 解包后 strict codesign 通过，bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、adhoc 签名、无 Team ID。
+- 同期 Android run `39013104353`（head `32c9a9e`）仍在 API 36 APK 编译步骤；iOS run `39013866613`（head `3da21dc`）的 enrollment XCTest 已成功、Simulator 安装/启动步骤仍运行中。Android job log 返回 `Transport closed`、iOS job log 返回 `BlobNotFound`；两者只是日志下载问题，run 均以 Actions job metadata 标记为 in progress，未重启。
+- 本次桌面候选仍不证明用户设备安装、逐功能验收、Windows Authenticode、macOS Developer ID/公证、升级或正式 Release。为避免文档记录触发重复桌面打包，桌面候选 workflow 对纯 Markdown/docs 变更加 `paths-ignore`；PR CI 仍会运行。
