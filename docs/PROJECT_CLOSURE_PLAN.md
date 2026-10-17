@@ -479,6 +479,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Android run `39010565663`（head `20f58f5`）已成功完成 API36 APK build、前台服务 Manifest 校验与 KVM 权限步骤，当前进入模拟器安装/启动步骤 14，尚无 APK/运行证据 artifact；步骤日志仍不可下载。另一个 run `39010889130`（head `fd22a47`）仍在 APK 编译步骤 11。Actions metadata 将两者标为 in progress；日志工具返回 `Transport closed`、CLI 查询提示 in progress 时日志暂不可用。只轮询原 run，不重启。
 - 桌面候选与 runner smoke 不证明真实 Windows 安装、macOS Developer ID/公证、升级或正式 Release；Android 模拟器也不代表实体手机、校园网连接或商店验收。
 
+## 392aa61 双平台 CI 与桌面候选 artifact 回读（2026-10-17）
+
+- PR CI run `39012528736` 对 head `392aa614ac9a7647064f30ea93ae338a1b3efb11` 的 Windows/macOS 测试、静态、版本、页面与敏感值检查均 success；Release job 因 PR 仍为 draft skipped。Desktop candidate run `39012528746` 两平台 build、runner launch smoke 与 artifact 上传均 success。
+- Windows artifact `12092718962`（20,535,565 bytes）下载 SHA-256 与 Actions digest 一致：`b0e8ff1dcfc268c454c803acca2846ea39c7146cdb6b66b4e68ee27a5f4ad916`，ZIP CRC 通过。EXE SHA-256 `872934a0573d69f20a63587a4f7e91471c78e605a1176d52f0d4bc53d75b3645` 与 sidecar 相符；PE32+ GUI x86-64，PE Security Directory offset/size 均为 0，未签名。
+- macOS artifact `12093059485`（17,993,841 bytes）下载 SHA-256 与 Actions digest 一致：`16acfcedcea766ebfa182bc85cdb8452d2e1fa7ec258487b0ea72695d3d17fb0`，外层 ZIP CRC 通过。内层候选 ZIP SHA-256 `aeebc646b3a7ca493adbc5029add69a644e63bff7d3f363a17b62f58ca9e87eb` 与 sidecar 相符；ZIP CRC 通过，554 项、62 个 symlink。用 `ditto` 解包后 strict codesign 通过；bundle id `com.campusnettools.campusnetmanager`、v5.6.0、arm64；adhoc 签名、无 Team ID。
+- 该提交只改文档。候选包及 CI runner smoke 不证明用户设备安装、逐功能验收、Windows Authenticode、macOS Developer ID/公证、升级或正式 Release。
+
 ## 20f58f5 Android API36 模拟器运行完成（2026-10-17）
 
 - 修正前文当时状态：run `39010565663`（head `20f58f54f4789fd8d633bb812d32e054489ef25c`）最终 completed/success。APK 构建、合并 Manifest 前台服务声明校验、KVM 权限、API36 模拟器安装启动、APK artifact 上传与模拟器证据上传步骤均 success。
