@@ -307,3 +307,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12090717136` 外层 SHA-256 为 `3cf1a3a4e84360e409db04eadad6bd95a96394c7a5512a277d6ae912b47a3d70`，与 Actions digest 相同且 ZIP CRC 通过；内层候选 ZIP SHA-256 `e85e9b9c641c01fdc8829c73ed10cd96d4bed01266bd5d91d3d8705315f6d461` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 验证通过，bundle id `com.campusnettools.campusnetmanager`、版本 `5.6.0`，62 个符号链接；签名 adhoc、无 Team ID。
 - Android run `39003633514`（head `794d69ddb936277561d6debc71c57fd22d6a28e6`）仍在 APK 编译步骤 11；其 Manifest、KVM、模拟器首屏 readiness、安装/启动及 artifact 步骤均未开始。job-log connector 此次仍返回 `Transport closed`，没有新的编译尾日志证据；不将其解释为 run 已停止，继续只轮询原 run。
 - 桌面候选包和 Actions runner smoke 不是正式 Release 或用户设备安装/升级验收；macOS adhoc 包也不是公证发行包。Android run 尚无新设备或包验收结论。
+
+## e686eb5 CI 与桌面候选回读、Android 模拟器门禁推进（2026-10-17）
+
+- PR CI run `39005384714` 对 head `e686eb51776b6569e1e132e321f3e13168344384` 的 Windows/macOS 测试与静态、版本、页面、敏感值检查均 success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39005384708` 的 Windows/macOS 构建、runner launch smoke 和 artifact 上传均 success。
+- macOS artifact `12090712491` 外层 SHA-256 与 Actions digest 一致：`4cfbce577e12e0967217de58a247df590fdbb5235874979c052c3f611ec814fd`，外层 ZIP CRC 通过；内层候选 ZIP SHA-256 `a294c608253482d0c49f662bc75c9b8cbe7d0abb983199dc11a8113e8853d0aa` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager`、v5.6.0、arm64、62 个符号链接、adhoc 签名且无 Team ID。
+- Windows artifact `12091000717` 外层 SHA-256 与 Actions digest 一致：`d53aad1fca28a75f4c9a18a8325e6e0e8a7da7a532d217913e95ab89af8fe8fe`，外层 ZIP CRC 通过；EXE SHA-256 `d991f11c35edf8094397bfd64aace31883f6096ee21ce2cae49fe222eaade802` 与 sidecar 一致，文件为 PE32+ GUI x86-64，PE 证书表大小为 0（未签名）。两项 artifact 均是 PR 候选。
+- Android API 36 APK run `39003633514`（源码 head `794d69d`）已完成 APK 编译、前台服务 Manifest gate 和 KVM 权限步骤；截至本次轮询，模拟器安装并启动步骤 14 正在运行，APK 与 emulator evidence 上传仍 pending。尚无新的 readiness marker、截图、运行证据或 APK artifact 结论；继续只轮询此原 run。
+- 本次只核实 Actions runner 与候选包；不能据此声称用户 Windows/macOS 安装、正式 Release、公证、Android 真机、真实校园网或商店验收完成。
