@@ -513,3 +513,11 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Windows artifact `12093857713`（20,533,986 bytes）Actions digest 与下载 ZIP SHA-256 一致：`0cbc197b3e5f1ad5004c5ff716fad0ee10c6f92c34a742d02d6e899fa6c7ed15`，ZIP CRC 通过；EXE SHA-256 `91c3a8032d8b6296af3ee351db8db57590ef9745327d0eac07e7f94fe11abdce` 与 sidecar 一致。PE 为 x86-64 PE32+，Authenticode Security Directory 为 `(0, 0)`，未签名。
 - macOS artifact `12093817948`（17,994,722 bytes）Actions digest 与下载 ZIP SHA-256 一致：`905df5c8080c86d5b5aa934cad51935215c389e779a25e7bef53b20bcc40008d`，外层 ZIP CRC 通过；内层候选 ZIP SHA-256 `dbfb81a5266de47f90771fc258e4d27eb189668575485160a0c3d35030c5677c` 与 sidecar 一致，内层 ZIP CRC 通过，含 554 个条目和 62 个 symlink。使用 `ditto` 解包后 strict codesign 验证通过；bundle `com.campusnettools.campusnetmanager`，版本 5.6.0，arm64，adhoc 签名、无 Team ID。
 - 两份都是 PR draft 候选包；runner launch smoke、包结构和签名检查不代表用户设备安装/升级、macOS Developer ID/公证或正式 Release。
+
+## 6e542a2 当前 head 的 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39014042412` 对 head `6e542a2c4299fd7d1062dfb52e2dc2ffbad7748a` Windows/macOS 检查均 completed/success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39014042411` 的 Windows/macOS build、runner launch smoke、artifact upload 均 success。
+- Windows artifact `12093927810`（20,535,518 bytes）Actions digest 与下载 ZIP SHA-256 一致：`019879e5bf75de5180596ee45318424d773a1da819dc3e1da4ee2ab58f832f2e`，外层 CRC 通过；EXE SHA-256 `3a8de9c029348323c28383cb374e39c77da8d34c507afdf02869dd7962826de9` 与 sidecar 一致。PE 为 x86-64 PE32+，Authenticode Security Directory 为 `(0, 0)`，未签名。
+- macOS artifact `12094326845`（17,995,805 bytes）Actions digest 与下载 ZIP SHA-256 一致：`043ced6dd286ca087e6e7ac055450faabb444021c618d7997acfe195d7505608`，外层 CRC 通过；内层候选 ZIP SHA-256 `bf6197840149675483df331ddfb7ebf8acd1bf656c649294429839878fb5aa55` 与 sidecar 一致，CRC 通过。ditto 解包后 strict codesign 通过；app bundle 含 62 个 symlink，bundle `com.campusnettools.campusnetmanager` v5.6.0 arm64、adhoc、无 Team ID。
+- 当前 Android run `39013104353`（head `32c9a9e`）仍在 API36 APK build step，job log 暂不可读；iOS run `39013866613`（head `3da21dc`）仍在 enrollment XCTest step，日志资源暂不可读。两者状态仍为 in_progress，只轮询原 run，不重启。
+- 本次 Windows/macOS 包为 PR draft 候选与 runner smoke，不证明用户设备安装、Windows Authenticode、macOS Developer ID/公证、升级或正式 Release。
