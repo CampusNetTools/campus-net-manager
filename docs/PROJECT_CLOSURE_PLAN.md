@@ -620,6 +620,15 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Desktop candidate run `39036271681` 检测步骤 success；提交只涉及闭环 Markdown 记录，Windows/macOS 构建和 runner smoke jobs skipped。
 - 该终态仅验证文档提交的 CI 状态；不扩展前述本机 v5.6.0 主窗口目视检查的证据范围。
 
+## 3da4e8f Android 模拟器与桌面候选验证（2026-10-17）
+
+- PR CI run `39036789695` 对 head `3da4e8f5e6175933c69a2cab819d62c01c04d0e6` 的 Windows/macOS 测试与静态检查均 success；Release job 因 PR #1 仍为 OPEN draft skipped。Desktop candidate run `39036789701` 的 Windows/macOS build、runner launch smoke 和 artifact upload 均 success。
+- Windows artifact `12102407484` 外层 SHA-256 与 Actions digest 一致：`1167f24beab9c2610805ab084271a323b133ba31da16e7b2553dd69477c56877`，ZIP CRC 通过；内层 EXE SHA-256 `167018fc3df5300dec0ecf0aaf00ffccc03998ede6be6783f25b73b384e586d0` 与 sidecar 一致，PE32+ GUI x86-64，Authenticode Security Directory `(0, 0)`，未签名。
+- macOS artifact `12102945195` 外层 SHA-256 与 Actions digest 一致：`d5f98db02595e1567a9352c03a4bd60bb4abc55aa353be22f2d483d08639dbc0`，ZIP CRC 通过；内层候选 ZIP SHA-256 `19a23ca174b0d18c6836c6b5050cd33615ea0e00e767dc0c9c292e3b6894c108` 与 sidecar 一致，CRC 通过且保留 62 个 symlink。`ditto` 解包后的 strict codesign 通过，bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、adhoc、无 Team ID。
+- Android API 36 run `39036786196` 的 APK 编译、合并 Manifest 前台服务声明 gate、KVM 权限、模拟器安装/启动及两个 artifact 上传均 success。APK artifact `12103416570`（67,968,009 bytes）外层 digest/下载 SHA-256 一致：`95765de9e4d9e9cb80700ede3abf3de438f4a3d2089733aad01b4fe19f4a32aa`，CRC 通过；内含 APK `campusnetmanager-1.0.0-arm64-v8a_armeabi-v7a_x86_64-debug.apk`（68,210,411 bytes），SHA-256 `ae0816a44abefb613f7ec71e6e263b92f9a4cf2698faf80a0691f1fa969f72b7`，APK CRC 通过并含 arm64-v8a、armeabi-v7a、x86_64 三个 ABI。
+- 模拟器证据 artifact `12102928334`（108,165 bytes）外层 digest/下载 SHA-256 一致：`528e5b0daaa12f951325a490663d852a6da6b01f2ef49606bc5ff1ea21db85d2`，CRC 通过。logcat 输出 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未检出 `FATAL EXCEPTION`、`ANR in` 或应用进程死亡标记；截图显示已退出加载态的登录页、HTTP 凭据风险提示和空账号/密码字段。logcat 还记录 Kivy logo 目录复制因权限被拒绝、HIDAPI receiver 未指定导出标志以及 `Unknown <android> provider`；随后主循环和网络状态更新均继续。它们在本次首屏 smoke 中未阻断启动，但相关图标目录和 HID/外设能力尚未单独验收，不能记作已修复。
+- 以上均是 PR 候选、runner smoke 和 API 36 模拟器证据；不证明实体 Android 设备锁屏/切网/Keystore、校园网认证流量、signed Play、用户 Windows 安装、macOS Developer ID/公证/升级或正式 Release。
+
 ## Android 档案持久化失败时阻止启动后台保活（2026-10-17）
 
 - 源码检查发现 `mobile/main.py` 的 `_save_profile()` 只记录异常、不返回成功状态；Android 开启前台保活时即使 Keystore 加密/档案持久化失败，仍继续请求通知权限并启动服务。若应用目录已有旧档案，服务可能继续读取旧凭据。
