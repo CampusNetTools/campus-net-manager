@@ -499,3 +499,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - APK artifact `12092969670`（67,967,582 bytes）Actions digest 和下载 ZIP SHA-256 相同：`047ce25d7e919d5f0cb8e6385562ee3285acbc921a8413d6213b07f5166fac09`；外层 ZIP CRC 通过。内含 APK SHA-256 `bc1d57d56779f610cadba8b03e51bd305dd7c3052712dbf8540a5cdf97ef11fb`，APK ZIP CRC 通过，共 56 项，包含 `arm64-v8a`、`armeabi-v7a` 与 `x86_64` ABI。Manifest 由该 run 的 gate 验证；本机未独立解码合并 Manifest。
 - Emulator evidence artifact `12092934772`（70,125 bytes）Actions digest 与下载 ZIP SHA-256 相同：`88db6102172bbc4599bde86cf16bf81c172177085e83edfbf2a39adb01d6fb46`；外层 ZIP CRC 通过。logcat 有 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未发现 `FATAL EXCEPTION`、`ANR in` 或 app process death 记录；截图显示登录页、该环境状态和空账号/密码框。run 的模拟器步骤成功，但不证明校园网认证、真实手机锁屏/切网、Keystore 或网络流量。
 - 同分支另一个 Android run `39010889130`（head `fd22a47ec2ad8de2b61f9b72d593766f5cf5119b`）查询时仍在 API36 APK 编译步骤 11；仅轮询原 run，不重启。`39010565663` 验证的是较早 head，不包含 `fd22a47` 的登录风险提示改动。
+
+## 32c9a9e iOS enrollment XCTest 与 Simulator 包回读（2026-10-17）
+
+- iOS Actions run `39013104364` 对 head `32c9a9ebb7d3041d3e15f2f086b0a4123731b3e0` completed/success。XcodeGen、工程生成、IKEv2 enrollment XCTest（6 tests、0 failures）、unsigned Simulator build、模拟器安装/启动、打包和上传均 success。
+- artifact `12093464420`（5,156,249 bytes）SHA-256 与 Actions digest 一致：`efb55215d65a18c5cfb83b78ebaa67a33ef208cb98302e6dd262be7df862b54d`；外层 ZIP CRC 通过。内层 `CampusNetCompanion-Simulator.app.zip` SHA-256 为 `fcf580d68acd1dab2e881c3179b611e3f6c1b82bd5bc430adbdbb1e9ac4a04aa`，ZIP CRC 通过且保留完整 `CampusNetCompanion.app/` 目录。bundle id `com.campusnettools.companion`，版本 `0.2.0 (3)`，平台为 `iPhoneSimulator`，可执行文件含 x86_64/arm64。主二进制为 adhoc linker 签名；应用 bundle 无 Team ID、未做分发签名，工作流明确 `CODE_SIGNING_ALLOWED=NO`。
+- XCTest 只验证 enrollment JSON 解码边界；模拟器包和运行不证明真实 iPhone 的 Keychain 生命周期、系统 VPN 授权、IKEv2 建连、双向流量、升级或 App Store 验收。
+- 同 head Android APK run `39013104353` 仍在 API 36 debug APK 编译步骤；job `117339606809` 最近可读日志显示 NDK 正在编译 OpenSSL x86_64。Manifest、KVM、模拟器和 APK artifact 尚未产生终态证据；只轮询该 run，不重启。
