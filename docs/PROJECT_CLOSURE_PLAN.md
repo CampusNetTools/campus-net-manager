@@ -569,3 +569,19 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - PR CI run `39025924271` 对文档 head `58d0e3d7af9e26b76500d8ba6184df6f3c702aba` 的 Windows/macOS 测试、静态、版本、页面和敏感值检查均 completed/success；发布 job 因 PR 为 draft skipped。
 - Desktop candidate run `39025924223` 的变更检测 success；提交只修改闭环 Markdown 文档，因此两个平台打包和 runner smoke jobs skipped。
 - 本次结果不改变 `927c142` 的 iOS 功能与模拟器证据；PR #1 仍 open draft，真机、签名商店和正式桌面发布仍待验。
+
+
+## f9c6d73 登录 HTTPS 保留与构建状态（2026-10-17）
+
+**已核实**
+- 提交 `f9c6d73147a62530b1edffa28c294610a26e19e2` 保留校园登录档案显式配置的 HTTPS，拒绝未知 scheme 和 URL userinfo，并阻止认证请求跟随 HTTPS→HTTP 降级跳转；裸主机和 HTTP 默认 Dr.COM 行为保持兼容。校园门户真实 HTTPS 兼容性仍待实网验证。
+- 本地全套 unittest 538 passed/3 skipped；repo CI Ruff F/E9、compileall、版本检查、`git diff --check` 均通过。
+- PR CI run `39033219351` Windows/macOS 测试、静态、版本、页面及敏感值检查 success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39033219343` detector、Windows/macOS build、runner launch smoke 和 artifact upload success。
+- Windows artifact `12100139992` 的 Actions digest 为 `33642a5a62cbec37e4e3b9686979f9f80ce8cab831cbd069952c50bb2f5fcd07`；macOS artifact `12101361339` digest 为 `2fe072316b2285e3d056535484f3ac77105a250871a9116eade8138d209933b2`。本机读取下载 blob 时 `curl` 返回 `SSL_ERROR_SYSCALL`；没有取得 ZIP 包体，因此没有包内哈希、签名或内容回读证据。
+- Android API36 APK run `39033215828` 环境准备步骤 1–10 success；最近轮询仍在 APK 构建步骤 11。Manifest/KVM/模拟器/产物上传步骤尚未开始，继续只轮询此 run，不重启。
+
+**结论 / 边界**
+- HTTPS 配置在代码路径中得到保留并禁止认证重定向降级；不推断学校认证网关支持 HTTPS。CI 和 runner smoke 不能替代终端用户设备、真实校园网络、签名商店或正式发布验收。
+
+**待验证**
+- Android 真机锁屏/切网/Keystore 与 signed Play；iPhone 真机签名、VPN/Keychain、IKEv2 双向流量与 App Store；Windows 用户设备安装逐功能；macOS Developer ID、公证、升级、逐功能和正式 Release 回读。
