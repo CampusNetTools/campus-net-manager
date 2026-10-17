@@ -1,6 +1,6 @@
 # Android / Google Play 审核材料草案
 
-更新日期：2026-10-16  
+更新日期：2026-10-17
 适用功能：用户启动的校园网认证与前台保活（`campusguard`）
 
 > 这是供 Play Console 填报前校对的事实草案，不构成 Google Play 政策批准或上架通过。服务用途和视频仍须在真实 APK/设备上确认。
@@ -38,7 +38,8 @@
 
 - 源码中的服务由用户主动启动，可见通知并可从应用停止；API 36 Manifest 构建门禁已通过。
 - unsigned AAB 不是可上传 Play 的正式 bundle。GitHub Actions 当前没有 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 这些签名 secrets。
-- API 36 模拟器启动 workflow 已加入，但须等 run `38892862907` 完成；模拟器证据仍不替代实体 Android 设备验收。
+- API 36 模拟器 workflow 的 runs `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）已完成 success，均通过 APK build、合并 Manifest、KVM、模拟器安装/启动和运行证据上传。`39010889130` 截图显示 HTTP 明文凭据警告及空字段；logcat 显示非校园网环境、无 FATAL/ANR。模拟器证据仍不替代实体 Android 设备锁屏/切网、Keystore 和校园网登录验收。
+- unsigned AAB run `38856949123` 已完成 API 36 构建与未签名 bundle 检查；该文件不能上传 Play。Actions 尚无 Android 上传 keystore secrets，signed AAB 与 Play Console 接收/审核尚未验证。
 - Google Play 对 Android 14+ 要求在 Manifest 声明前台服务类型，并在 Play Console 为类型填写说明、用户影响和视频；最终是否接受由 Play 审核决定。
 - 截至本文件日期，新应用和应用更新需 target Android 16 / API 36，政策生效日为 2026-08-31；当前 `mobile/buildozer.spec` 已设 API 36。
 - 若 Play 开发者账号是 2023-11-13 后创建的个人账号，生产访问申请前需至少 12 位测试者连续参加封闭测试 14 天；账号类型和创建时间尚未核实。

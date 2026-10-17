@@ -33,6 +33,13 @@ PR CI run `38879156449` 的 Windows job 因新回归测试按 Windows 默认 cp1
 
 Android run `38919046038`（head `f84145e`）构建、Manifest gate、KVM、API 36 模拟器安装/启动步骤和 artifact 上传均成功；PR CI `38919056780` 与桌面候选 `38919056811` 成功。回读 APK artifact `12055816564` 后发现 `assets/private.tar` 未包含 `assets/NotoSansSC.ttf`，所以此前字体改动没有进入 APK。模拟器证据 artifact `12055746790` 的截图停留在 Kivy `Loading...`，不能算界面显示验收。原因是 workflow 组装打包目录漏拷贝 `mobile/assets`。workflow 现复制该目录，并在 APK 校验中检查字体条目和 SHA-256；需要新 Android run 验证。该 run 的模拟器进程检查只证明进程存活，不证明主界面已绘制或真实手机行为。
 
+## 最新模拟器验证（2026-10-17）
+
+- run `39010565663`（head `20f58f5`）和 `39010889130`（head `fd22a47`）均 completed/success；API 36 APK build、合并 Manifest 校验、KVM、模拟器安装/启动及运行证据上传全部通过。两个 APK ZIP 均通过 CRC 且包含 `arm64-v8a`、`armeabi-v7a`、`x86_64`；较新的 APK artifact `12093492574` 内层 APK SHA-256 为 `0d54f4d66ff9c07465bacaf428cf8571523b4395929d2a6d1915449d74803933`。
+- run `39010889130` 的模拟器截图确认登录页显示 HTTP 明文凭据提示；logcat 显示“非校园网环境（认证服务器不可达）”，无 FATAL/ANR。它只证明 runner 模拟器首屏渲染和短时启动 smoke，不证明门户登录、实体设备后台运行、切网、Keystore 生命周期或网络流量。
+- unsigned API 36 AAB run `38856949123` 已成功构建并移除临时签名块，artifact `12028181480` 的 ZIP CRC 通过且无 JAR signature entries。它不能上传 Play。signed AAB 尚未验证，Actions 尚无正式上传密钥 secrets；不自动发布商店。
+- iOS XCTest / Simulator 的较新证据见 `../ios/CampusNetCompanion/README.md` 和项目闭环计划；真机、签名、VPN 与商店流程仍未完成。
+
 本地构建（需 Linux 或 macOS + buildozer 环境；macOS 本机因同样上游问题暂无法出包，
 建议用 Windows 的 WSL2/Linux 或 Docker 完成）：
 
@@ -50,11 +57,11 @@ buildozer android debug   # 产物在 bin/*.apk
 
 ### 签名 AAB
 
-手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用 runner 上的一次性临时密钥满足 Gradle release 构建，随后移除签名块并校验 bundle 未签名，因此不能上传 Play；signed 模式会验证真实上传密钥并产出可供 Play Console 上传的 bundle。此工作流不会自动发布到 Google Play。signed 模式需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。`38854446189` 是无 jobs 的 push 事件，不构成构建验证。unsigned run `38854980739` 证实 Buildozer release 仍要求 keystore；新临时签名再剥离实现待构建验证。
+手动运行 `.github/workflows/android-release-aab.yml` 可构建 API 36 AAB artifact；unsigned 模式用 runner 上的一次性临时密钥满足 Gradle release 构建，随后移除签名块并校验 bundle 未签名，因此不能上传 Play；signed 模式会验证真实上传密钥并产出可供 Play Console 上传的 bundle。此工作流不会自动发布到 Google Play。signed 模式需在 GitHub Actions secrets 配置 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`。签名材料只保存在 GitHub 官方 secrets 与 Google Play Console，不写入仓库或聊天。unsigned AAB run `38856949123` 已成功构建并验证未签名状态；signed 构建和 Play 接收仍待配置真实上传密钥并在 Console 验收。
 
 ## 已知限制
 
-- **运行时状态**：Android 前台服务由用户在 App 内启动/停止，要求通知权限；系统省电策略、厂商后台限制和网络状态仍需真机验收。
-- **凭据**：Android Keystore 实现已加入源码，但本机尚无 Android 构建工具链；最终 APK 中的加解密、升级迁移和密钥丢失恢复仍待验证。
-- **发布状态**：API 36 unsigned debug APK run `38915018182` 已通过模拟器安装/启动检查并上传 artifact `12053800638`；它是 debug APK，不是 Play 可发布签名包。unsigned API 36 AAB run `38856949123` 已构建并通过 ZIP/未签名检查。二者均不代表真机验收或 Play 接收。signed 模式需要上述 keystore secrets；商店内测/生产发布和审核尚未完成。
+- **运行时状态**：前台服务由用户在 App 内启动/停止并要求通知权限；API 36 模拟器 install/launch smoke 已通过，系统省电策略、厂商后台限制、锁屏/切网和校园网登录仍需实体 Android 设备验收。
+- **凭据**：Keystore AES-GCM helper 已纳入 Android 源码并随 API 36 APK 构建；实体设备上的加解密、明文档案迁移、密钥轮换和密钥丢失恢复仍待验证。本机无 adb 和 Android SDK。
+- **发布状态**：run `39010889130` 的是 unsigned debug APK；run `38856949123` 的 unsigned AAB 也不可上传 Play。两者都不代表真机验收或 Play 接收。signed 模式需要上述 keystore secrets；商店内测/生产发布和审核尚未完成。
 - iOS 系统 IKEv2 客户端与 Mac 端 enrollment 路线见 `../ios/CampusNetCompanion/README.md`；App Store build、签名、设备验收和上架尚未完成。
