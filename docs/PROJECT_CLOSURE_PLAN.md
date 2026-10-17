@@ -329,3 +329,10 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - macOS artifact `12090294691` 外层 SHA-256 与 Actions digest 一致：`7d891b3c321c28277bdd3ef811641a9922c581ae847d01db48446cc00751130b`，ZIP CRC 通过；内层候选 ZIP SHA-256 `aed15794413d29f483188e6ea27860846334924a2051347749307b4143149385` 与 sidecar 一致且 CRC 通过。`ditto` 解包后 strict codesign 通过，bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个符号链接；签名 adhoc、无 Team ID。
 - Windows artifact `12091196471` 外层 SHA-256 与 Actions digest 一致：`2a6af8f56ed5a35982693de8a9dd8406af4fc1181cc06a8fcc1f17bc470eb044`，ZIP CRC 通过；EXE SHA-256 `e016c33913a2441bbf2a8fa51795c377a27fa6afc394ffe1844ef14880c845a1` 与 sidecar 一致，PE32+ GUI x86-64，证书表大小为 0（未签名）。
 - 这些包仍是 PR 候选；runner smoke 不证明用户设备安装/逐功能验收，macOS adhoc 签名也不是 Developer ID/公证。Android API36 模拟器 run `39003633514` 的首屏门禁已通过，但不代替实体设备与商店验收。
+
+## 2da2013 双平台 CI 与桌面候选回读（2026-10-17）
+
+- PR CI run `39005761943` 对 head `2da2013989f0e913959a1f34db2bb0166475f4e4` 的 Windows/macOS 测试、静态、版本、页面与敏感值检查均 success；发布 job 因 PR 为 draft skipped。Desktop candidate run `39005761862` 两平台构建、runner launch smoke 和 artifact 上传均 success。
+- macOS artifact `12090623652` 外层 SHA-256 与 Actions digest 一致：`8c9017d6ab4174b5796e0f83d4fb29beebfc26fbbc1909370a444514753e1ba0`，ZIP CRC 通过；内层候选 ZIP SHA-256 `af33ac07d6cb318dca4de12224228846fb2e844653d0c0caf4384d6421587be8` 与 sidecar 一致、CRC 通过。`ditto` 解包后 strict codesign 通过；bundle `com.campusnettools.campusnetmanager` v5.6.0、arm64、62 个符号链接，签名 adhoc、无 Team ID。
+- Windows artifact `12091176787` 外层 SHA-256 与 Actions digest 一致：`53b6e64967f9239718ea70b912b632631481674452712039b90bad0aeda4f5b7`，ZIP CRC 通过；EXE SHA-256 `aee02a230b90863b449f74f97dc06585035083d4fd52bd66e63b4667edb3d534` 与 sidecar 一致，PE32+ GUI x86-64，证书表大小为 0（未签名）。
+- 验证限于 PR 候选 artifact 与 Actions runner smoke；未证明用户设备安装、签名发行、公证、升级或商店发布。
