@@ -19,6 +19,14 @@
 
 按平台完成现有功能开发、自动检测、构建、免费直接下载分发和真实设备验收。用户不要求应用商店上架或付费；接受平台安装所必需的免费签名。源码、测试、CI、候选包、安装运行、真机和校园网络分别记录，不能互相替代。
 
+## Windows 实机交接与 2026-10-18 本轮 UI/USB 核验
+
+- 用户明确将 Android 实体机验收暂缓（没有 Android 手机），并要求准备交给 Windows 设备 AI 的验收资料；详见 [`WINDOWS_DEVICE_ACCEPTANCE_HANDOFF.md`](WINDOWS_DEVICE_ACCEPTANCE_HANDOFF.md)。文档列出 v5.6.0 正式 EXE/sidecar、SHA-256、SmartScreen 边界、普通用户只读验收步骤和禁止未授权副作用。
+- GitHub Release `v5.6.0` 当前可读；Windows EXE `CampusNetManager-v5.6.0-win64.exe` 的 Release digest 为 `a0faeff9ea197e7e34be582059fdfc64d97679e6cfac265010c3bc9df337c689`，未 Authenticode 签名。当前不据此声称 Windows 用户设备安装或功能验收完成。
+- iPhone USB 现已被 `idevice_id -l` 枚举；只读取 `ProductType=iPhone18,1`、`ProductVersion=26.6.2` 和 `DeviceClass=iPhone`。未记录 UDID；设备激活。`ideviceprovision list` 显示 0 个 provisioning profiles（不等于 VPN 配置文件状态）。本轮未读取或操作 VPN 配置，也没有 IKEv2 SA/手机双向流量证据。
+- macOS `/Applications/校园网连接管家.app` v5.6.0 进程存在；bundle `com.campusnettools.campusnetmanager`，adhoc strict codesign 通过。尝试系统 Accessibility/AppleScript 激活和读取控件：只能枚举窗口标题，Kivy 窗口没有暴露可操作控件；Codex Computer Use runtime 报 app missing，`screencapture` 中 app 没有置于前台。因此本轮没有声称完成控件点击/功能通过，等待 GUI 自动化运行时恢复或可见窗口后再做。
+- 分支 `codex/full-project-closure` 本地提交 `358f693`，当前比远端分支多 3 个提交；本地工作树在新增本交接文档前干净。提交推送已获用户明确授权，推送执行结果以本轮后续远端回读为准。
+
 ## 平台交付矩阵
 
 | 平台 | 当前证据 | 尚需验收 |
