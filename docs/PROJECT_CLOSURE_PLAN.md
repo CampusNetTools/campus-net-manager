@@ -773,3 +773,11 @@
 - Mac 没有完整 Xcode、Apple Configurator 或 `cfgutil`；Computer Use runtime 返回 “app missing”，因此无法操作 Finder、App Store 或 iPhone Settings。Apple 官方说明 Configurator 可免费从 App Store 获取、可连接 USB 设备并提供 `cfgutil`；未监督设备添加 profile 时仍需按屏幕提示确认。已在 Mac 打开 Apple Configurator 的 App Store 页面，等待安装该免费工具后再尝试 USB 安装；不使用 Xcode 或 7 天个人签名方案。
 - 本机 macOS 下载包 `/Users/nanyu/Desktop/CampusNetManager-macOS-arm64-v5.6.0.zip` 的 SHA-256 为 `ad7f66820d8f42ccf4e52ec4b5f796e0b5d1306cd86a6d4c0029f93df15bb60f`，sidecar 核验一致。此包仍是 adhoc、未公证的本机直下载包；用户首次打开可能看到 macOS 安全提示，不能描述为 Developer ID/公证发布。
 - 参考：Apple Configurator 免费与 USB/`cfgutil` 说明见 [Apple Platform Deployment](https://support.apple.com/guide/deployment/dep6f70f6647/1/web/1.0)；非监督设备安装 profile 操作见 [Add or remove configuration profiles](https://support.apple.com/guide/apple-configurator-mac/add-or-remove-configuration-profiles-cadb67fcd4f/mac)。
+
+## 2026-10-18 Apple Configurator USB 安装请求状态
+
+- 用户安装了 Apple Configurator 2.21。直接使用应用 bundle 内的 `cfgutil` 可运行，无需安装 Xcode 或额外的 CLI 链接。
+- 重新确认 iPhone USB 配对成功，strongSwan `charon` 进程运行，Mac 当前地址仍与生成 profile 中的网关地址一致，UDP 500/4500 有监听。
+- `cfgutil install-profile` 已向这台连接的 iPhone 提交受限目录中的 IKEv2 配置，但命令返回 `ConfigurationUtilityKit.error` code 625，含义为需要用户在设备上交互确认。因此**不能将其记录成 profile 已安装**；等待 iPhone 屏幕确认或用户在“设置 → 通用 → VPN 与设备管理”完成安装。未观察到 IKE SA 或双向流量证据。
+- 安装请求输出含设备标识，已从共享记录中排除；输出文件权限为 root-only。profile 内容和 EAP 凭据从未写入仓库、共享记忆或公开位置。
+- 提交 `82d22c0` 的 PR CI `39095498098` success；Desktop candidate `39095498093` success，因仅文档变更而跳过平台打包。PR #1 仍为 OPEN draft。
