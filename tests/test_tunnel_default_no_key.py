@@ -12,7 +12,6 @@
   3) toggle_share 的 cfg 决策函数在不同残留场景下输出符合预期
 """
 import os
-import socket
 import sys
 import unittest
 import urllib.request
@@ -22,25 +21,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import shared_proxy
 
 
-def _free_port():
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("127.0.0.1", 0))
-    p = s.getsockname()[1]
-    s.close()
-    return p
-
-
 class DefaultNoKeyTests(unittest.TestCase):
     """v4.0.5 默认行为: 不开启口令, 所有请求直通。"""
 
     def setUp(self):
-        self.port = _free_port()
+        # Let the server bind port 0 atomically. Reserving a free port first
+        # and closing it leaves a race with parallel macOS CI tests.
         # shared_key=None 模拟 v4.0.5 默认行为 (SharedProxy 内部会 or "" 转成空字符串, 即"不校验")
         self.proxy = shared_proxy.SharedProxy(
-            port=self.port, allowed=[],
+            port=0, allowed=[],
             on_ask=None, pac_host="127.0.0.1",
             shared_key=None)
         self.proxy.start()
+        self.port = self.proxy.port
 
     def tearDown(self):
         try:
@@ -82,13 +75,13 @@ class WithKeyTests(unittest.TestCase):
     """v4.0.5 显式开启口令时仍正常工作: 第三方调用需要附 X-Shared-Key。"""
 
     def setUp(self):
-        self.port = _free_port()
         self.key = "test-key-1234567890"
         self.proxy = shared_proxy.SharedProxy(
-            port=self.port, allowed=[],
+            port=0, allowed=[],
             on_ask=None, pac_host="127.0.0.1",
             shared_key=self.key)
         self.proxy.start()
+        self.port = self.proxy.port
 
     def tearDown(self):
         try:

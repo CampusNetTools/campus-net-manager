@@ -729,3 +729,8 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - 下载后的 macOS 候选 ZIP SHA-256 与 sidecar 一致：`ae5c2bf57bf5e5794446d5a3b9d6c77cf594a2e8a0a10aee4a640242161dc565`；ZIP CRC 通过。`ditto` 解包保留 62 个 symlink，`CampusNetManager.app` strict codesign 验证通过，bundle `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、adhoc、无 Team ID。
 - Windows EXE SHA-256 与 sidecar 一致：`8f4d016a2c78ec4c7a9752a47e4a01909ef077d807900e1db89632fd01233cd0`；PE32+ GUI x86-64，Authenticode security directory offset/size 均为 0，未签名。
 - 这是 CI runner smoke 和 PR 候选 artifact 回读，不是 Windows 用户设备安装/运行证据、macOS 候选 artifact 本身安装运行证据、升级验收或公开 Release。macOS 本机运行证据来自已安装的 v5.6.0 应用，不能与此次下载的候选包混为一谈。
+
+## cd322b0 CI 端口冲突回归
+
+- 文档提交 `cd322b095f4928439d25305a885194c76d9fb606` 的 PR CI run `39087973787` 中 Windows 全套测试成功，macOS 全套测试有 2 项在 `SharedProxy.start()` 绑定端口时 `OSError: [Errno 48] Address already in use`。两项都先探测临时端口、关闭套接字，再启动服务器，留下并行测试可抢占的时间窗；不是新文档引入的内容错误。
+- 已将 `tests/test_tunnel_default_no_key.py` 两组代理测试改为直接 bind port 0，再读取服务实际分配端口。目标测试连续 5 轮（每轮 10 项）通过；本地全套 unittest 553 passed/3 skipped。后续提交的 PR CI 仍需验证 macOS runner 修复。
