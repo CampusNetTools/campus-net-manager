@@ -716,3 +716,9 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 - Android APK runs `39049513521`、`39049528799`、`39049629732`、`39049713532` 均完成 API 36 debug APK 编译，但在字体文件清单校验处失败。`39049713532` 的日志确认 tar 清单实际含 `assets/NotoSansSC.ttf`；`set -o pipefail` 下 `tar -tf archive | grep -q` 会因 grep 提前关闭管道而使 tar 报 stdout write error，导致误报字体缺失，不能据此判定 APK 内容有问题。
 - 修复将 tar 清单先写入临时文件，再从普通文件 grep；新增回归断言避免恢复会触发 SIGPIPE 的管道写法。Android 专项 11 项通过，全套 unittest 553 passed/3 skipped，两个 workflow YAML 可解析；合成归档的修复后清单检查和 `git diff --check` 通过。
 - 修复版 Actions run 尚待新提交触发；需确认字体/Manifest gate、稳定签名指纹、模拟器安装/运行/日志和 APK artifact 回读。公开 GitHub Release 仍为 `v5.5.0`；v5.6.0 还没有公开下载资产。
+
+## 2026-10-18 macOS v5.6.0 安装版界面验收
+
+- `/Applications/校园网连接管家.app` 窗口显示 v5.6.0；主界面检测结果显示守护仍运行、当前网络在线。通过新手向导进入“方式 B：路由器中继”并选择校园网后，向导只读识别为未知品牌，给出网关 `192.168.31.1` 与通用中继步骤。未打开管理地址、修改连接档案或网络配置，也未启停守护、代理或热点。
+- 在应用中手动检查更新，界面返回“当前版本 v5.6.0 高于最新公开版 v5.5.0（可能是预览版本）”。现场 `gh release view` 也确认 latest 为 `v5.5.0`；因此当前安装的是尚未公开发布的候选源码版本，GitHub 仍没有 v5.6.0 下载包。
+- 这些是本机 macOS 安装版的有限 GUI 和当前网络状态证据；不能推广到其他电脑、Windows、真实路由器型号、设备逐项功能或升级安装。Computer Use 运行时连续不可用时，改用本机截图和鼠标事件完成上述低风险操作；截图不提交、不上传，避免包含本地连接档案内容。
