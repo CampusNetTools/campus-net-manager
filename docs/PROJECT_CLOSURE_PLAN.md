@@ -791,3 +791,12 @@
 - `cfgutil install-profile` 已向这台连接的 iPhone 提交受限目录中的 IKEv2 配置，但命令返回 `ConfigurationUtilityKit.error` code 625，含义为需要用户在设备上交互确认。因此**不能将其记录成 profile 已安装**；等待 iPhone 屏幕确认或用户在“设置 → 通用 → VPN 与设备管理”完成安装。未观察到 IKE SA 或双向流量证据。
 - 安装请求输出含设备标识，已从共享记录中排除；输出文件权限为 root-only。profile 内容和 EAP 凭据从未写入仓库、共享记忆或公开位置。
 - 提交 `82d22c0` 的 PR CI `39095498098` success；Desktop candidate `39095498093` success，因仅文档变更而跳过平台打包。PR #1 仍为 OPEN draft。
+
+## 2026-10-18 macOS 公开直下载回读与 iPhone 配置状态复核
+
+- 当前分支工作树在复核前干净；本地与 `origin/codex/full-project-closure` 指向 `ef96d783`。GitHub REST 回读 PR #1 已合并，合并提交 `2cfa822`；tag `v5.6.0` 的 Release 资产清单含 macOS arm64 ZIP、Windows x64 EXE、Android APK 及各自 SHA-256 sidecar。最近 tag Actions run `39105849360` 和 iOS IKEv2 companion run `39105562659` 均 completed/success。
+- 用 `gh release download` 从公开 v5.6.0 直链获取 macOS 包（首次原生 curl 到 release-assets 域遇 TLS `SSL_ERROR_SYSCALL`，改用 gh 客户端成功）。下载 ZIP 为 18,201,497 bytes，SHA-256 `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b`，与 GitHub Release digest 一致；ZIP CRC 通过。`ditto` 解包保留 62 个 symlink；bundle `com.campusnettools.campusnetmanager`，版本/build `5.6.0`，arm64；`codesign --verify --deep --strict` 通过，签名为 adhoc、无 Team ID，未公证。
+- 从该下载包直接启动主二进制，在隔离临时 HOME 下运行超过 8 秒后由验收脚本主动终止，证明该下载包二进制能启动并保持运行；未取得可访问性/UI 画面证据，因此不记主窗口或逐功能通过。`open -n` 被 macOS Launch Services 复用成已安装的 `/Applications/校园网连接管家.app` 进程，不能把那条进程证据归给临时解包的公开包。
+- 本轮 USB 检测枚举到已配对的 iPhone（iPhone18,1，iOS 26.6.2）；Configurator `cfgutil get isPaired` 为 true。`cfgutil get configurationProfiles` 列出“校园网连接管家 IKEv2 · iphone”，所以更正上一节“等待 profile 安装”的状态：系统 IKEv2 profile 现在确实已安装。此信息不证明 VPN 已连接。
+- Mac 上 strongSwan `charon` 进程运行，netstat 显示其绑定 UDP4/UDP6 wildcard 端口 500、4500。反证：`brew services info strongswan` 为 Running=false、Loaded=false、Schedulable=false，未找到相应 LaunchDaemon/Agent；当前人工启动进程不能证明 Mac 重启后服务会自动恢复。普通账户读取 VICI SA 列表遭 `Permission denied`，非交互管理员读取也因缺少当前授权而未执行；因此没有 IKE SA、CHILD SA 或双向流量计数证据。没有更改路由器或防火墙。
+- 本轮外部 Release 元数据可读，初次直接下载遇 TLS 错误后由 gh 客户端完成文件校验；Computer Use UI runtime 返回 app missing，因此 GUI 可见性及控件逐项检查仍未完成。当前明确的 iPhone 下一步：在手机“设置 → VPN”中启用刚安装的“校园网连接管家 IKEv2 · iphone”配置并确认状态显示“已连接”，再告知助手；随后核查 SA/计数及可达性。Mac 服务重启持久化仍需后续解决，不能宣称已完成长期可用验收。
