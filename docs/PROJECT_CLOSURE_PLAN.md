@@ -9,14 +9,21 @@
 - 新增 `pwa/` 静态可安装页面：下载入口、iPhone/Mac 添加方法、可离线说明、浏览器 `navigator.onLine` 状态提示和仅保存在本地的非敏感清单。页面没有账号输入、后台 API、第三方脚本、字体或统计；明确说明浏览器状态不等于互联网/VPN测试。
 - 功能门槛：PWA 不实现 Dr.COM 自动登录、后台保活、SSID/ARP/路由器读取、Mac/Windows服务控制或 iOS VPN 控制。后者须由已有桌面程序或操作系统/VPN服务提供；不发布账号、私钥、enrollment JSON 或一次性 `.mobileconfig`。
 - 本地 HTTP 页面已打开，iPhone 与 Mac 的安装说明切换和页面内容可见；本地 Playwright CLI 因 npm 依赖启动错误未运行，改用 Codex 内置浏览器观察页面。此为本机页面 smoke，不是 GitHub Pages 部署或实体 iPhone 安装验收。
-- `.github/workflows/pwa-pages.yml` 只允许 `main` 上的 PWA 文件变更或手动触发部署，防止从临时分支发布。GitHub Pages 尚未配置：此前只读查询返回 404，本轮 GitHub API 请求遇到 EOF，当前不能确认站点已启用；因此网站未上线。下一步需合入 `main`、启用 GitHub Actions 发布源，再以部署 URL、手机/桌面安装与断网回读作为验收证据。
+- `.github/workflows/pwa-pages.yml` 只允许 `main` 上的 PWA 文件变更或手动触发部署，防止从临时分支发布。候选阶段首次检查时 Pages 尚未配置（只读查询返回 404；另一次请求遇 EOF），所以当时不能确认上线。随后已合入 `main`、启用 GitHub Actions 发布源并成功部署；实际部署证据见下文“首次公开部署”。手机/桌面安装与真实断网回读仍待验收。
 
 ## 本轮基线（2026-10-18）
 
 - PWA 开发起点为 `5c1183267fd39d9062342bab17de1e0bfaac546b`；该时点 PR #1 已合并、无其他开放 PR，工作树原本干净。为避免将续跑分支的旧提交混入，本功能现以当时 `origin/main` 为基线单独迁移。
-- PWA 已提交为 `2f05f43`，位于从 `origin/main` 创建的功能分支；GitHub Pages 尚未配置，公开站点未上线。不得将 `127.0.0.1` 本地预览称作公开网站。
+- 候选实现先以 `2f05f43` 位于从 `origin/main` 创建的功能分支，之后通过 PR #3 合入；当时 Pages 尚未配置。不得将 `127.0.0.1` 本地预览称作公开网站。
 - 用户当前确认的是免费 PWA 页面路线；其 VPN 仍由用户自己的电脑提供，本页面只放公开说明和公开 Release 链接，不提供或代理 VPN 服务。
 - 本机 `unittest` 553 项通过、3 项跳过；Ruff F/E9、版本同步、控制台页面检查、公开仓库敏感值扫描通过。PWA JavaScript/manifest、HTML 资源引用检查与本地 HTTP 200 通过，内置浏览器确认页面渲染和 Mac/iPhone 标签切换。GitHub PR 尚无 Actions check suite，因此这些是本机验证，不记为 CI 通过。
+
+### 首次公开部署（2026-10-18）
+
+- PWA PR #3 已合入 `main`，merge commit `8d0069fff8ed1d969ff176a5ae3be495d3e1ba2e`；PR CI run `39140775545` 的 Windows/macOS 检查通过，Desktop candidate detector run `39140775571` 成功，原生包构建按仅 PWA 变更规则跳过。
+- 仓库 Pages 发布源已设为 GitHub Actions。首次部署 run `39140936549` completed/success，公开 URL 为 <https://campusnettools.github.io/campus-net-manager/>。
+- 内置浏览器实际加载公开页面；直接打开 `manifest.webmanifest` 确认 `display: standalone` 和图标声明，直接打开 `sw.js` 确认缓存脚本发布。以上是公开站点部署/回读证据，不等同 iPhone/Mac 添加到主屏幕、断网行为或真实 VPN 验收。
+- 本地 unittest `553 passed, 3 skipped`；Ruff F/E9、版本一致性、控制台页检查、敏感值扫描、PWA JS/manifest/HTML 引用检查均通过。公开页面目前只引用最新 Release 页面，不包含账号、凭据、设备 VPN profile 或后端接口。
 
 ## 最近一次核验快照（2026-10-18，HEAD 8165cd2）
 
