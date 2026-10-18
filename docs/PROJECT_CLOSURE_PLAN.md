@@ -41,7 +41,8 @@
 
 - 用户提醒 iPhone 已通过 USB 连接。补查 IOUSB device tree 后确认 iPhone 已枚举；安装免费的 Homebrew `libimobiledevice` 1.4.0_2（不安装 Xcode），`idevicepair validate` 成功，读取到 ProductType `iPhone18,1`、iOS `26.6.2`。未在文档记录设备序列号或 UDID。
 - `adb devices` 为空只反映 Android 设备；不能据此判断 iPhone。Computer Use app runtime 仍不可用，所以未能读取 iPhone 屏幕或操作 Settings。
-- 目前仍无 `/var/run/charon.vici`，且 CA 私有文件因 root 权限不可读；未生成/安装 `.mobileconfig`、未触发网关 PF/NAT 配置、未验证 VPN 流量。等待用户授权所需的本机管理员系统提示，再继续。
+- iOS run `39094409561`（head `0093f9b`）已成功：8 项 enrollment XCTest、unsigned Simulator build、模拟器安装/启动、完整 `.app` ZIP 与 artifact 上传均通过；artifact `12123794529` 上传 digest `08e855525edfe721d8801b9147db6dd7522098ae10c12a258c9625695feb4002`。这是 GitHub macOS runner 的模拟器检查，不是 iPhone 安装或系统 VPN 实测。
+- 网关已安装 strongSwan，PF 配置中已有项目 anchor；但当前仍无 `/var/run/charon.vici`，且 CA 私有文件因 root 权限不可读。尝试通过 macOS 管理员授权服务启动脚本返回 `Operation not permitted (126)`；未生成/安装 `.mobileconfig`，未验证 VPN 流量。需要解决本机管理员授权/自动化权限后再继续。
 
 ## 初始核验基线（2026-10-16，历史记录）
 
