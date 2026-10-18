@@ -715,10 +715,17 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 
 - Android APK runs `39049513521`、`39049528799`、`39049629732`、`39049713532` 均完成 API 36 debug APK 编译，但在字体文件清单校验处失败。`39049713532` 的日志确认 tar 清单实际含 `assets/NotoSansSC.ttf`；`set -o pipefail` 下 `tar -tf archive | grep -q` 会因 grep 提前关闭管道而使 tar 报 stdout write error，导致误报字体缺失，不能据此判定 APK 内容有问题。
 - 修复将 tar 清单先写入临时文件，再从普通文件 grep；新增回归断言避免恢复会触发 SIGPIPE 的管道写法。Android 专项 11 项通过，全套 unittest 553 passed/3 skipped，两个 workflow YAML 可解析；合成归档的修复后清单检查和 `git diff --check` 通过。
-- 修复版 Actions run 尚待新提交触发；需确认字体/Manifest gate、稳定签名指纹、模拟器安装/运行/日志和 APK artifact 回读。公开 GitHub Release 仍为 `v5.5.0`；v5.6.0 还没有公开下载资产。
+- 修复提交 `c45b970c39b18f36a3aac6e4e64c9869e388b5f7` 已推送。Android run `39087643194` 截至本次记录仍在 API 36 APK 编译步骤，字体/Manifest gate、稳定签名指纹、模拟器安装/运行/日志和 APK artifact 回读待后续轮询；同 head PR CI `39087646271` 与 Desktop candidate `39087646286` 已 success。公开 GitHub Release 仍为 `v5.5.0`；v5.6.0 还没有公开下载资产。
 
 ## 2026-10-18 macOS v5.6.0 安装版界面验收
 
 - `/Applications/校园网连接管家.app` 窗口显示 v5.6.0；主界面检测结果显示守护仍运行、当前网络在线。通过新手向导进入“方式 B：路由器中继”并选择校园网后，向导只读识别为未知品牌，给出网关 `192.168.31.1` 与通用中继步骤。未打开管理地址、修改连接档案或网络配置，也未启停守护、代理或热点。
 - 在应用中手动检查更新，界面返回“当前版本 v5.6.0 高于最新公开版 v5.5.0（可能是预览版本）”。现场 `gh release view` 也确认 latest 为 `v5.5.0`；因此当前安装的是尚未公开发布的候选源码版本，GitHub 仍没有 v5.6.0 下载包。
 - 这些是本机 macOS 安装版的有限 GUI 和当前网络状态证据；不能推广到其他电脑、Windows、真实路由器型号、设备逐项功能或升级安装。Computer Use 运行时连续不可用时，改用本机截图和鼠标事件完成上述低风险操作；截图不提交、不上传，避免包含本地连接档案内容。
+
+## c45b970 桌面候选包下载回读
+
+- Desktop candidate run `39087646286` 对提交 `c45b970c39b18f36a3aac6e4e64c9869e388b5f7` 完成 Windows/macOS build、runner launch smoke 与 artifact 上传。Actions artifact digest：macOS `b9e5cb91a07a050ca580854c4fde360bc1e307174130b62aae364d137baa7582`，Windows `2e0f2bc18f807dd1e6a6754505c5bf877915816856e8801c15d64d34743f4430`。
+- 下载后的 macOS 候选 ZIP SHA-256 与 sidecar 一致：`ae5c2bf57bf5e5794446d5a3b9d6c77cf594a2e8a0a10aee4a640242161dc565`；ZIP CRC 通过。`ditto` 解包保留 62 个 symlink，`CampusNetManager.app` strict codesign 验证通过，bundle `com.campusnettools.campusnetmanager`、版本 `5.6.0`、arm64、adhoc、无 Team ID。
+- Windows EXE SHA-256 与 sidecar 一致：`8f4d016a2c78ec4c7a9752a47e4a01909ef077d807900e1db89632fd01233cd0`；PE32+ GUI x86-64，Authenticode security directory offset/size 均为 0，未签名。
+- 这是 CI runner smoke 和 PR 候选 artifact 回读，不是 Windows 用户设备安装/运行证据、macOS 候选 artifact 本身安装运行证据、升级验收或公开 Release。macOS 本机运行证据来自已安装的 v5.6.0 应用，不能与此次下载的候选包混为一谈。
