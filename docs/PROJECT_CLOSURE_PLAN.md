@@ -2,6 +2,22 @@
 
 更新时间：2026-10-18
 
+## 免费 PWA 路线实现进度（2026-10-18）
+
+- 用户已确认采用浏览器 PWA 路线，优先 macOS/iPhone，要求长期使用且不增加费用；本轮从干净的 `5c1183267fd39d9062342bab17de1e0bfaac546b` 开始。该提交时本地与 origin 对齐，PR #1 已合并。
+- 已核对当前 GitHub 最新 Release 为 `v5.6.0`，含 macOS arm64 ZIP、Windows x64 EXE、Android APK 和对应 SHA-256 文件；PWA 的下载按钮统一指向 `releases/latest`，避免硬编码版本资产过期。
+- 新增 `pwa/` 静态可安装页面：下载入口、iPhone/Mac 添加方法、可离线说明、浏览器 `navigator.onLine` 状态提示和仅保存在本地的非敏感清单。页面没有账号输入、后台 API、第三方脚本、字体或统计；明确说明浏览器状态不等于互联网/VPN测试。
+- 功能门槛：PWA 不实现 Dr.COM 自动登录、后台保活、SSID/ARP/路由器读取、Mac/Windows服务控制或 iOS VPN 控制。后者须由已有桌面程序或操作系统/VPN服务提供；不发布账号、私钥、enrollment JSON 或一次性 `.mobileconfig`。
+- 本地 HTTP 页面已打开，iPhone 与 Mac 的安装说明切换和页面内容可见；本地 Playwright CLI 因 npm 依赖启动错误未运行，改用 Codex 内置浏览器观察页面。此为本机页面 smoke，不是 GitHub Pages 部署或实体 iPhone 安装验收。
+- `.github/workflows/pwa-pages.yml` 只允许 `main` 上的 PWA 文件变更或手动触发部署，防止从临时分支发布。GitHub Pages 尚未配置：此前只读查询返回 404，本轮 GitHub API 请求遇到 EOF，当前不能确认站点已启用；因此网站未上线。下一步需合入 `main`、启用 GitHub Actions 发布源，再以部署 URL、手机/桌面安装与断网回读作为验收证据。
+
+## 本轮基线（2026-10-18）
+
+- PWA 开发起点为 `5c1183267fd39d9062342bab17de1e0bfaac546b`；该时点 PR #1 已合并、无其他开放 PR，工作树原本干净。为避免将续跑分支的旧提交混入，本功能现以当时 `origin/main` 为基线单独迁移。
+- PWA 已提交为 `2f05f43`，位于从 `origin/main` 创建的功能分支；GitHub Pages 尚未配置，公开站点未上线。不得将 `127.0.0.1` 本地预览称作公开网站。
+- 用户当前确认的是免费 PWA 页面路线；其 VPN 仍由用户自己的电脑提供，本页面只放公开说明和公开 Release 链接，不提供或代理 VPN 服务。
+- 本机 `unittest` 553 项通过、3 项跳过；Ruff F/E9、版本同步、控制台页面检查、公开仓库敏感值扫描通过。PWA JavaScript/manifest、HTML 资源引用检查与本地 HTTP 200 通过，内置浏览器确认页面渲染和 Mac/iPhone 标签切换。GitHub PR 尚无 Actions check suite，因此这些是本机验证，不记为 CI 通过。
+
 ## 最近一次核验快照（2026-10-18，HEAD 8165cd2）
 
 - 当前分支 `codex/full-project-closure`、本地 HEAD 与 `origin` 均为 `8165cd23573484b809a030bb7de684fedb1e3046`，工作树干净；PR #1 为 OPEN draft，head 对齐。该 head 的 PR CI run `39096133148` 和 Desktop candidate run `39096133096` 均 completed/success；未发现仍活跃的 run。公开 Release 最新为 `v5.5.0`，`v5.6.0` 尚未公开。
