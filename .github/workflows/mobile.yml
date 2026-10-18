@@ -151,8 +151,8 @@ jobs:
             exit 1
           fi
 
-      - name: 使用项目自有免费密钥签 APK（仅标签下载发布）
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.sign_for_direct_download
+      - name: 使用项目自有免费密钥签 APK 并校验直下载证书
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.sign_for_direct_download || github.event_name == 'push'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -179,8 +179,11 @@ jobs:
             "$apk"
           cert_info=$("$build_tools/apksigner" verify --verbose --print-certs "$apk")
           printf '%s\n' "$cert_info"
-          printf '%s\n' "$cert_info" \
-            | grep -F 'Signer #1 certificate SHA-256 digest: a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613'
+          expected_fingerprint='a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613'
+          if [[ "$cert_info" != *"$expected_fingerprint"* ]]; then
+            echo '::error::APK signer certificate fingerprint does not match the direct-download key.'
+            exit 1
+          fi
           rm -f "$key_store"
 
       - name: 准备可下载 APK 与 SHA-256
