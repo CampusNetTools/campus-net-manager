@@ -764,3 +764,12 @@
 - 手动签名 run `39088722413`（head `e38b71e4c4a8563e4be3b6cb62e8441449d7b051`）成功构建 API 36 APK、Manifest gate 通过；项目 PKCS#12 密钥签名成功，`apksigner verify` 报告 v2/v3 有效，证书 SHA-256 指纹也与项目免费直下载证书匹配（`a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613`）。失败点是 workflow grep 固定期待旧版 `Signer #1 certificate SHA-256 digest:` 标签；当前 Build Tools 输出 `V3.0 Signer: certificate SHA-256 digest:`，导致正确签名被误判。失败发生在签名 gate 后、APK/模拟器 artifact 上传前，因此该 run 没有产出包体 artifact，模拟器步骤 skipped。
 - `.github/workflows/mobile.yml` 改为仅比较 `apksigner` 已验证证书输出中的固定指纹，不依赖标签措辞；受信任的 `codex/full-project-closure` push 也执行同一免费稳定签名步骤。这样 push 生成的 APK 候选可直接用于覆盖更新，仍只上传 Actions artifact；GitHub Release 资产仍仅在 `v*` 标签创建，不做商店上架。
 - `tests/test_p4a_special_use_patch.py` 增加 push 触发签名和格式无关指纹校验的回归断言。修复后的专项测试及下一条 push Actions run 待验证；必须检查签名摘要、模拟器安装/启动和 APK artifact，不能把源代码修复视作验证完成。
+
+## 2026-10-18 iPhone USB 配对、IKEv2 网关与待安装配置
+
+- 更正此前记录：iPhone 已通过 USB 在本机枚举，`idevicepair validate` 返回成功；`ideviceinfo` 可读取 ProductType `iPhone18,1`、iOS `26.6.2`。不记录设备 UDID。Android ADB 的设备列表与 iPhone USB 连接无关。
+- 已通过本机管理员授权启动项目 strongSwan `charon`，服务进程仍在；同一授权会话中创建了该 iPhone 的 system IKEv2 `.mobileconfig`、CA profile 和 companion enrollment JSON。文件保存在权限受限的项目网关目录，未复制到仓库、公开网页或 GitHub。创建时 `swanctl` 已读到 `campusnet-ikev2` 配置；当时 IKE SA 数为 0，因此不能说手机已连 VPN。
+- 普通账户读取网关私有 profile 目录与 VICI socket 被权限拒绝；本轮用非交互 `sudo -n` 复核状态因需管理员认证而未执行。当前未观察到 iPhone 上已安装该 profile、VPN 授权、IKE SA 或双向流量的证据。
+- Mac 没有完整 Xcode、Apple Configurator 或 `cfgutil`；Computer Use runtime 返回 “app missing”，因此无法操作 Finder、App Store 或 iPhone Settings。Apple 官方说明 Configurator 可免费从 App Store 获取、可连接 USB 设备并提供 `cfgutil`；未监督设备添加 profile 时仍需按屏幕提示确认。已在 Mac 打开 Apple Configurator 的 App Store 页面，等待安装该免费工具后再尝试 USB 安装；不使用 Xcode 或 7 天个人签名方案。
+- 本机 macOS 下载包 `/Users/nanyu/Desktop/CampusNetManager-macOS-arm64-v5.6.0.zip` 的 SHA-256 为 `ad7f66820d8f42ccf4e52ec4b5f796e0b5d1306cd86a6d4c0029f93df15bb60f`，sidecar 核验一致。此包仍是 adhoc、未公证的本机直下载包；用户首次打开可能看到 macOS 安全提示，不能描述为 Developer ID/公证发布。
+- 参考：Apple Configurator 免费与 USB/`cfgutil` 说明见 [Apple Platform Deployment](https://support.apple.com/guide/deployment/dep6f70f6647/1/web/1.0)；非监督设备安装 profile 操作见 [Add or remove configuration profiles](https://support.apple.com/guide/apple-configurator-mac/add-or-remove-configuration-profiles-cadb67fcd4f/mac)。
