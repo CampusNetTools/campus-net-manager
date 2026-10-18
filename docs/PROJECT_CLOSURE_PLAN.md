@@ -2,31 +2,32 @@
 
 更新时间：2026-10-18
 
-本摘要核验时 PR head：`964b88bdf05de8710453daab4fd1c76078278654`（`codex/full-project-closure`）
-可恢复标签：`codex/full-project-closure-baseline-2026-10-16`
-
-Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc8678d6f2db38`，标签 `codex/android-fgs-before-2026-10-16`。
+本摘要核验时 PR head：`b4f67c3a52486ad1db97e742096c6dd1a1c3f28a`（`codex/full-project-closure`）；PR #1 为 OPEN draft，origin 与本地 HEAD 对齐，工作树干净。
+可恢复标签：`codex/full-project-closure-baseline-2026-10-16`。Android 前台保活改动前检查点：`c03bfd26817b14eb4aabefabf4fc8678d6f2db38`。
 
 ## 目标
 
-按平台完成现有功能的开发、自动检测、构建、直接下载分发和真实设备验收。用户不要求应用商店上架或付费；允许采用免费的平台本地/开发签名来保证可安装运行。源码、单元测试、CI 构建、安装包、已安装运行和真实设备验收分别记录，不能互相替代。
+按平台完成现有功能开发、自动检测、构建、免费直接下载分发和真实设备验收。用户不要求应用商店上架或付费；接受平台安装所必需的免费签名。源码、测试、CI、候选包、安装运行、真机和校园网络分别记录，不能互相替代。
 
 ## 平台交付矩阵
 
-| 平台 | 当前基线 | 完成条件 |
+| 平台 | 当前证据 | 尚需验收 |
 |---|---|---|
-| Windows 桌面 | Python/Tkinter 主程序；最新公开下载仍为 v5.5.0；v5.6.0 CI 候选在 runner 构建/启动通过 | 当前源码测试；用户设备安装、逐功能和升级；直接下载资产及 SHA256 回读。Authenticode 非免费前提，未签名警告需明确告知 |
-| macOS 桌面 | Apple Silicon 构建脚本；本机 v5.6.0 安装版进程运行，strict adhoc codesign 通过；最新公开下载仍为 v5.5.0 | 当前源码测试；用户设备安装、逐功能和升级；直接下载资产及 SHA256 回读。Developer ID/公证不作为付费目标，adhoc 包的 Gatekeeper 提示需明确告知 |
-| Android | Kivy 登录/环境检查/档案/前台保活；API 36 debug APK 在 Actions 模拟器安装启动成功 | debug APK 可免费包签名并直接下载；需真实手机验收登录、锁屏/切网、Keystore 与后台行为。模拟器不替代真机 |
-| iOS | SwiftUI 系统 IKEv2 客户端源码与 enrollment Simulator workflow；只有模拟器包 | 需要完整 Xcode、用户自己的 Apple 账号/设备做免费 Personal Team 签名与真机安装；该配置有 7 天到期限制，适用于有限设备测试，不等于面向所有用户的免续签直下载 |
+| Windows 桌面 | v5.6.0 候选在 run `39090548425` 构建和 runner launch smoke 成功；EXE sidecar/hash 与 Actions artifact digest、CRC 一致，PE32+ GUI x64；Authenticode 未签名 | Windows 用户设备下载安装、逐功能和升级；直下载 Release 及回读。告知 SmartScreen 可能提示 |
+| macOS 桌面 | 本机 `/Applications/校园网连接管家.app` v5.6.0 可运行；adhoc strict codesign 通过。run `39090548425` 的 ZIP 保留 62 symlinks，`ditto` 解包后 strict codesign 通过，arm64、无 Team ID | 控件逐项、用户设备升级和公开直下载资产回读；adhoc/未公证包可能有 Gatekeeper 提示 |
+| Android | run `39090546301` 在 API 36 runner 模拟器安装启动成功；APK 有项目自有免费稳定签名，v2/v3 验签与 SHA-256 指纹匹配，截图显示 ready 登录页 | Android 真机下载安装、登录、锁屏/切网、Keystore 与后台行为；校园网络真实流量 |
+| iOS | run `39034330011` 对 `d232b5d` 成功完成 XcodeGen、enrollment XCTest、unsigned Simulator build/install/launch/upload；当前 HEAD 对 iOS 源码和 workflow 无改动 | 需要完整 Xcode、个人免费签名和 iPhone 真机；验证安装、VPN 授权、Keychain、IKEv2 双向流量。当前本机只有 Command Line Tools，无 `simctl`/provisioning profile |
 
 ## 当前状态摘要（2026-10-18）
 
-- 本地、origin 与 PR #1 head 均为 `964b88bdf05de8710453daab4fd1c76078278654`，工作树干净，PR OPEN draft。该 head 的 PR CI run `39048160885` Windows/macOS 测试与静态检查 success；文档-only Desktop candidate run `39048161051` detector success、打包 job 按规则 skipped。最新公开 GitHub Release 仍是 v5.5.0，含 Windows/macOS 资产，不含公开 Android/iOS 包。
-- 本机 `python3 -m unittest discover -s tests -v`：545 passed、3 skipped。已安装 `/Applications/校园网连接管家.app` 的进程存在；bundle `com.campusnettools.campusnetmanager`、版本 5.6.0，`codesign --verify --deep --strict` 通过，签名为本地 adhoc、无 Team ID。当前 Computer Use runtime 缺失，不能借此称作控件逐项验收。
-- Android run `39042050230`（head `ffc69a0`）的 API 36 APK 构建、Manifest 前台服务 gate、runner KVM、模拟器安装/启动及 APK/运行证据上传均 success；截图为已退出加载态的登录/状态页，logcat 有 `CNM_NETWORK_STATUS_READY`，未见 FATAL/ANR/进程死亡。它是 runner 模拟器证据，不是实体手机。该 artifact 仍是 Actions 候选，不是公开 Release。
-- iOS 目前只有 Simulator XCTest/build/install/launch 包；本机仅 Command Line Tools，无完整 Xcode、`simctl` 或 provisioning profile。免费 Apple Personal Team 适用于有限真机测试，但 profile 7 天过期，需要周期重签；不能声称已有 iPhone 可安装直下载包。
-- 仍待：Android 真机锁屏/切网/Keystore；iPhone 免费签名安装、系统 VPN 授权及 IKEv2 双向流量；Windows/macOS 用户设备逐功能与升级；把当前可用的桌面/Android 资产发布为直接下载并回读。不得把模拟器、CI 或 runner smoke 作为真实设备验收。
+- PR CI run `39090548424` 的 Windows/macOS 测试和静态检查成功；发布步骤按 draft 规则跳过。Desktop candidate run `39090548425` 的 Windows/macOS build、runner launch smoke、artifact 上传成功。公开 GitHub Release 最新仍为 v5.5.0；v5.6.0 尚未公开发布。
+- macOS artifact `12122109587`：外层 SHA-256/Actions digest `2b43a51a4e06a0ad022bb533246250b254ace4c55b8adfb7940dc0ae10042e9d`，CRC 通过；内层 ZIP SHA-256 `9e8787fe7b1651aae9273d137357e6ae6df389b946f8b5b961755aaf0a0d296b` 与 sidecar 一致，CRC 通过，含 62 个 symlink。`ditto` 解包后 `codesign --verify --deep --strict` 通过，bundle `com.campusnettools.campusnetmanager`、v5.6.0、arm64、adhoc、无 Team ID。
+- Windows artifact `12122089755`：外层 SHA-256/Actions digest `db3b55089fae7c0c3396a6ba749081cdf29cd09c5612d25a15dc14a57d17fa4d`，CRC 通过；EXE SHA-256 `b04a0c41837377dff6e73ee5af01d3f1726d67537af28fb457a47fcd647720aa` 与 sidecar 一致，PE32+ GUI x64，Authenticode certificate table size 为 0。均为候选包，不是用户设备安装验收。
+- Android run `39090546301`（head `b4f67c3`）completed/success。API 36 APK build、前台服务 Manifest gate、免费签名指纹检查、APK 准备、KVM 与模拟器安装/启动步骤均 success。APK artifact `12122867765` 外层 digest/CRC 通过，SHA-256 `aa18ac9202dcf5eaf639c5a9e6b7d48adb0696b4e12c1c1d37121bbf46db044b`；内层 `CampusNetManager-Android-5.6.0.apk` SHA-256 `b38cc6742afc6a5aff285bb92bfa349b0d83789ca2582a5096a7550c403082cc` 与 sidecar 一致，APK ZIP CRC 通过，含 arm64-v8a、armeabi-v7a、x86_64。Actions `apksigner` 日志显示 v2/v3 均验证有效，项目证书 SHA-256 指纹 `a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613` 匹配。
+- Android emulator evidence artifact `12122269908` 外层 digest/CRC 通过。logcat SHA-256 `3a5b27a44ecf950e304421869d09f9d8b91a993fe347b3be2832220d91c0be59`；出现 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未检出 FATAL EXCEPTION、ANR、进程死亡或 Force finishing。截图 SHA-256 `c0552197ccf315adb01f4b8aa19f6ca3983384db250904787c74a315e0e8b798`，显示非加载态登录页、账号密码为空及 HTTP 明文凭据风险提示。模拟器不代表实体 Android 手机或真实校园网登录。
+- 本机 `adb devices -l` 无连接 Android 设备；`xcode-select -p` 为 Command Line Tools，`xcrun simctl` 不可用。iPhone Mirroring 状态读取出现 CUA server error，未形成 iPhone 屏幕/实机证据。Windows 用户设备也尚未接入。
+- 本机 macOS app accessibility 窗口标题为 v5.6.0，进程可以置前运行；Computer Use 控件读取/点击接口仍报运行时错误，故不把应用窗口标题等同于逐功能验收。
+- 仍待：Android 真机锁屏/切网/Keystore；iPhone 免费签名安装、系统 VPN 授权与 IKEv2 双向流量；Windows 用户设备安装/逐功能；macOS 控件逐项与升级；将经确认的资产发布为免费直下载并回读。不得把模拟器、runner smoke 或候选包称为真机或正式 Release。
 
 ## 初始核验基线（2026-10-16，历史记录）
 
