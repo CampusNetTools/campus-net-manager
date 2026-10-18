@@ -2,7 +2,7 @@
 
 更新时间：2026-10-18
 
-本摘要本次核验时 HEAD、origin 与 PR #1 head 均为 `3f8db22742c5755b012737ada760cb88e60f91cc`（`codex/full-project-closure`）；PR 为 OPEN draft，工作树干净。Windows/macOS 与 Android 候选包对应的源码 head 为其祖先 `b4f67c3a52486ad1db97e742096c6dd1a1c3f28a`；从该提交到当前 head 没有非文档文件变化，当前 head 的 PR CI 通过。
+本轮开始核验时 HEAD、origin 与 PR #1 head 均为 `16d2fa99f5c3d61313d0f11c630917bccc9c9b61`（`codex/full-project-closure`）；PR 为 OPEN draft，工作树干净。Windows/macOS 与 Android 候选包对应的源码 head 为其祖先 `b4f67c3a52486ad1db97e742096c6dd1a1c3f28a`；从该提交到本轮开始时没有非文档文件变化。
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`。Android 前台保活改动前检查点：`c03bfd26817b14eb4aabefabf4fc8678d6f2db38`。
 
 ## 目标
@@ -16,7 +16,7 @@
 | Windows 桌面 | v5.6.0 候选在 run `39090548425` 构建和 runner launch smoke 成功；EXE sidecar/hash 与 Actions artifact digest、CRC 一致，PE32+ GUI x64；Authenticode 未签名 | Windows 用户设备下载安装、逐功能和升级；直下载 Release 及回读。告知 SmartScreen 可能提示 |
 | macOS 桌面 | 本机 `/Applications/校园网连接管家.app` v5.6.0 可运行；adhoc strict codesign 通过。run `39090548425` 的 ZIP 保留 62 symlinks，`ditto` 解包后 strict codesign 通过，arm64、无 Team ID | 控件逐项、用户设备升级和公开直下载资产回读；adhoc/未公证包可能有 Gatekeeper 提示 |
 | Android | run `39090546301` 在 API 36 runner 模拟器安装启动成功；APK 有项目自有免费稳定签名，v2/v3 验签与 SHA-256 指纹匹配，截图显示 ready 登录页 | Android 真机下载安装、登录、锁屏/切网、Keystore 与后台行为；校园网络真实流量 |
-| iOS | run `39034330011` 对 `d232b5d` 成功完成 XcodeGen、enrollment XCTest、unsigned Simulator build/install/launch/upload；当前 HEAD 对 iOS 源码和 workflow 无改动 | 需要完整 Xcode、个人免费签名和 iPhone 真机；验证安装、VPN 授权、Keychain、IKEv2 双向流量。当前本机只有 Command Line Tools，无 `simctl`/provisioning profile |
+| iOS | 有 iOS Simulator build/install/launch 和 8 项 enrollment XCTest 通过记录；源码已有完整系统 IKEv2 `.mobileconfig` 备用路线，无需安装 iOS App/Xcode；本轮 profile 单测 5/5 通过 | 用户选择长期方案为系统 profile；需网关在线并安全生成含单设备凭据的文件，在 iPhone Settings 安装，随后验 VPN 与双向流量。当前 `charon` VICI socket 不存在，网关私有状态需管理员授权读取；Mac 未检测到连接的手机。原生 companion App 控件路线仍需 Xcode/签名，不作为当前长期方案 |
 
 ## 当前状态摘要（2026-10-18）
 
@@ -27,7 +27,15 @@
 - Android emulator evidence artifact `12122269908` 外层 digest/CRC 通过。logcat SHA-256 `3a5b27a44ecf950e304421869d09f9d8b91a993fe347b3be2832220d91c0be59`；出现 `CNM_NETWORK_STATUS_READY: 非校园网环境（认证服务器不可达）`，未检出 FATAL EXCEPTION、ANR、进程死亡或 Force finishing。截图 SHA-256 `c0552197ccf315adb01f4b8aa19f6ca3983384db250904787c74a315e0e8b798`，显示非加载态登录页、账号密码为空及 HTTP 明文凭据风险提示。模拟器不代表实体 Android 手机或真实校园网登录。
 - 本机 `adb devices -l` 无连接 Android 设备；`xcode-select -p` 为 Command Line Tools，`xcrun simctl` 不可用。iPhone Mirroring 状态读取出现 CUA server error，未形成 iPhone 屏幕/实机证据。Windows 用户设备也尚未接入。
 - 本机 macOS app accessibility 窗口标题为 v5.6.0，进程可以置前运行；Computer Use 控件读取/点击接口仍报运行时错误，故不把应用窗口标题等同于逐功能验收。
-- 仍待：Android 真机锁屏/切网/Keystore；iPhone 免费签名安装、系统 VPN 授权与 IKEv2 双向流量；Windows 用户设备安装/逐功能；macOS 控件逐项与升级；将经确认的资产发布为免费直下载并回读。不得把模拟器、runner smoke 或候选包称为真机或正式 Release。
+- 仍待：Android 真机锁屏/切网/Keystore；iPhone 的系统 `.mobileconfig` 安装、VPN 授权与 IKEv2 双向流量；Windows 用户设备安装/逐功能；macOS 控件逐项与升级；将经确认的桌面资产发布为免费直下载并回读。不得把模拟器、runner smoke 或候选包称为真机或正式 Release。
+
+## macOS 本地桌面包与 iOS 长期免 Xcode 路线（2026-10-18）
+
+- 用户本轮要求先处理 macOS 与 iOS，并明确不要 Xcode/短期个人签名，希望零成本且能长期使用；允许用浏览器或桌面包替代。
+- macOS 将本机 `/Applications/校园网连接管家.app` v5.6.0 用 `ditto` 打包到桌面：`/Users/nanyu/Desktop/CampusNetManager-macOS-arm64-v5.6.0.zip`，SHA-256 `ad7f66820d8f42ccf4e52ec4b5f796e0b5d1306cd86a6d4c0029f93df15bb60f`；对应校验文件为同名 `.zip.sha256`。外层 ZIP CRC 通过；解包后 55 个符号链接与源 app 一致，`codesign --verify --deep --strict` 通过。包是 adhoc 签名、无 Team ID、未公证的本地候选，不是公开 Release；从互联网下载时 Gatekeeper 可能要求用户手动允许。
+- iOS 的免费个人签名 profile 会在 7 天后到期并要求重装，不符合用户的长期要求。当前采用项目已有的完整 IKEv2 `.mobileconfig` 作为无 Xcode 替代：Safari/本地传输到 iPhone 后由 Settings 安装，VPN 由系统管理；这不提供 Companion App 的连接/状态 UI，也不是 PWA 对 `NEVPNManager` 的控制。
+- 配置文件含单设备 EAP 用户名和密码，必须在授权网关 Mac 本地生成、经 AirDrop/USB 私下传递，安装后删除，不能公开托管。本仓库网关安装脚本创建的 CA 有效期 3650 天、服务器证书有效期 825 天，需在到期前续期；因此方案长期但非永久。
+- 本轮 `python3 -m unittest tests.test_ikev2_profile -v` 5/5 通过，证明 profile 结构生成逻辑；没有在 iPhone 安装或连 VPN。`swanctl --stats` 未找到 `/var/run/charon.vici`，且私有状态目录不能在无管理员授权时读取；`adb devices -l` 为空、USB 名称列表未识别 iPhone；真机与网关网络验收未完成。
 
 ## 初始核验基线（2026-10-16，历史记录）
 

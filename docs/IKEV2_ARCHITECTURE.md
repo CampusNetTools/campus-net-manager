@@ -6,6 +6,12 @@ iPhone Companion App / iOS 系统 VPN -- IKEv2 --> Mac「校园网连接管家�
 
 系统 `.mobileconfig` 仍是无需 App 的备用安装方式。iOS Companion App 使用 `NEVPNManager` 管理内建 IKEv2，首次配置由 iOS 显示授权提示；VPN 服务上架仍需组织开发者账号、隐私披露和 App Review。
 
+## 无 Xcode 的长期 iPhone 使用方式
+
+如果用户不接受个人免费签名短周期重装，则使用安装在 iOS 设置中的完整 IKEv2 `.mobileconfig`，而不是把 unsigned Simulator app 或 Home Screen PWA 当成原生 VPN App。该系统配置可以由 iPhone Safari 下载后在“设置 > 通用 > VPN 与设备管理”安装；配置没有设置 profile expiration，但受服务端证书有效期约束。安装器会把单设备 EAP 凭据写进配置文件，因此只允许在网关 Mac 本地生成后经 AirDrop/USB 私下传递，安装后删除传输副本，不上传公开网站或聊天。该方式用 iOS Settings 管理连接，不包含 companion app 的 UI/Keychain 管理能力。
+
+本仓库 `scripts/install_ikev2_gateway.sh` 创建的 CA 有效期 3650 天，服务器证书有效期 825 天。到期前需由管理员续发服务器证书；CA 到期前需替换根证书并重新发放 profile。浏览器 PWA 可以提供流程说明，但不能调用 `NEVPNManager` 控制系统 VPN。参见 [Apple 的 profile 安装说明](https://support.apple.com/guide/iphone/iph6c493b19/ios) 与 [IKEv2 payload 参考](https://developer.apple.com/documentation/devicemanagement/vpn/ikev2-data.dictionary)。
+
 ## Mac 端职责
 
 - 用户可见授权后安装和启动 IKEv2 服务端（例如 strongSwan 的 `swanctl`/`charon`）。

@@ -15,6 +15,16 @@ Transfer the CA profile and app enrollment file only by local AirDrop or USB. In
 
 Do not install both the complete `.mobileconfig` and the app-managed VPN at the same time. The complete profile is an alternative to using this app.
 
+## Long-term option without Xcode or app signing
+
+For a device that must keep working without periodic free-profile re-signing, install the generated complete `<device>.mobileconfig` as an iOS system profile instead of installing this companion app. Apple says Personal Team provisioning profiles for free on-device testing expire after 7 days, so that app-signing path does not meet the long-term requirement: [Apple Developer account overview](https://developer.apple.com/help/account/basics/about-your-developer-account). The system profile configures iOS's built-in IKEv2 VPN; it does not provide this app's connect/status screen, and the VPN is managed in iOS Settings. Apple allows users to install a configuration profile downloaded from a webpage, then review and install it in Settings: [Apple Support: install or remove configuration profiles](https://support.apple.com/guide/iphone/iph6c493b19/ios).
+
+The complete profile contains that device's EAP username and password in the profile payload. Generate it only on the authorized gateway Mac and transfer it privately (AirDrop or USB); do not put a real profile on a public website or shared desktop. After installation, delete the transferred profile file. A downloaded-but-not-installed profile is automatically removed by iOS after 8 minutes, so install it promptly: [Apple Support: install a downloaded profile](https://support.apple.com/102400).
+
+The generated profile has no profile-expiration field, but the VPN still depends on the gateway and its certificates: this project creates a 10-year CA certificate and an 825-day server certificate. Plan to renew the server certificate before it expires and replace the CA/profile before the CA expires. This is long-lived, not permanent. Current source verification for the profile schema is covered by `tests.test_ikev2_profile`; it does not replace installation and VPN traffic checks on a real iPhone.
+
+A Safari Home Screen web app can provide instructions and setup forms, but it cannot call the native [`NEVPNManager`](https://developer.apple.com/documentation/networkextension/nevpnmanager) API or control the system VPN. The persistent no-Xcode VPN path is the installed system profile, not a web app impersonating the native VPN controls. See [Apple's IKEv2 VPN payload reference](https://developer.apple.com/documentation/devicemanagement/vpn/ikev2-data.dictionary).
+
 ## App behavior
 
 - Imports and validates a per-device enrollment file.
