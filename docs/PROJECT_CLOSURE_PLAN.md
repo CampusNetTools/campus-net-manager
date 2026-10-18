@@ -800,3 +800,11 @@
 - 本轮 USB 检测枚举到已配对的 iPhone（iPhone18,1，iOS 26.6.2）；Configurator `cfgutil get isPaired` 为 true。`cfgutil get configurationProfiles` 列出“校园网连接管家 IKEv2 · iphone”，所以更正上一节“等待 profile 安装”的状态：系统 IKEv2 profile 现在确实已安装。此信息不证明 VPN 已连接。
 - Mac 上 strongSwan `charon` 进程运行，netstat 显示其绑定 UDP4/UDP6 wildcard 端口 500、4500。反证：`brew services info strongswan` 为 Running=false、Loaded=false、Schedulable=false，未找到相应 LaunchDaemon/Agent；当前人工启动进程不能证明 Mac 重启后服务会自动恢复。普通账户读取 VICI SA 列表遭 `Permission denied`，非交互管理员读取也因缺少当前授权而未执行；因此没有 IKE SA、CHILD SA 或双向流量计数证据。没有更改路由器或防火墙。
 - 本轮外部 Release 元数据可读，初次直接下载遇 TLS 错误后由 gh 客户端完成文件校验；Computer Use UI runtime 返回 app missing，因此 GUI 可见性及控件逐项检查仍未完成。当前明确的 iPhone 下一步：在手机“设置 → VPN”中启用刚安装的“校园网连接管家 IKEv2 · iphone”配置并确认状态显示“已连接”，再告知助手；随后核查 SA/计数及可达性。Mac 服务重启持久化仍需后续解决，不能宣称已完成长期可用验收。
+
+## 2026-10-18 iPhone IKEv2 真机连接尝试回读
+
+- 用户回复已连接后，对已配对 iPhone 做了 8 秒只读 `idevicesyslog` 采样。`NEIKEv2Provider` 记录连接请求重试到第 3/4 次后 closing；未见成功建立记录。该日志支持“手机已发起连接尝试”，不证明当前设置界面状态，也不证明 VPN 已连接或有双向流量。
+- 手机此次 IKE 请求的 RemoteAddress 属 RFC1918 `10/8` 私网段；本机 Mac 当前接口不持有该地址，Mac 到该地址的系统路由经 `utun` VPN 接口，且 `scutil --nc list` 显示另一个 VPN 服务连接中。因此当前日志不能证明同一 Wi-Fi 下直连本机网关或独立外网可达；profile 地址可能已随网络变化过期（推断，待验证）。未保存请求中的设备标识或完整网络日志。
+- 公开 v5.6.0 直下载包验证保持上一节结论；本轮 PR REST 状态仍为 merged，但 Actions 列表查询遇 GitHub API EOF，未得到新的 Actions 状态。工作区本地验收记录提交 `3c0bc56` 仍未推送，GitHub 443 TLS 错误未重试。
+- 当前准确状态：iPhone profile 已安装；连接尝试失败/重试，IKE SA、CHILD SA、双向计数未核实。Mac strongSwan 当前进程和 UDP 监听不代表该手机请求抵达此进程，且服务仍无重启持久性证据。没有修改路由器或防火墙。
+- 外网长期使用需一个稳定公网 IP 或域名，以及路由器将 UDP 500/4500 转发到 Mac、服务在重启后自动启动，并在不经过其他 VPN 的网络上完成实测。若仅限同一局域网，也需用当前 Mac 地址重新配置服务并重新安装 profile；这些后续操作需先取得管理员授权和稳定网络路径，不在本轮擅自修改。
