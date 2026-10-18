@@ -375,9 +375,23 @@ class PreferencesMixin:
             pass
 
     def _render_update_result(self, info):
-        if not info:
+        status = info.get("status")
+        if status == "error":
+            self._set_update_text("检查更新失败，请检查网络后重试")
+            btn = getattr(self, "_btn_update_now", None)
+            if btn is not None:
+                btn.pack_forget()
+            return
+        if status == "current":
             self._set_update_text("✓ 已是最新版本 v%s" % core.APP_VERSION)
             # 已有立即更新按钮时收起, 避免状态与按钮语义不符
+            btn = getattr(self, "_btn_update_now", None)
+            if btn is not None:
+                btn.pack_forget()
+            return
+        if status == "ahead":
+            self._set_update_text("当前 v%s 高于最新公开版 %s（可能是预览版本）" % (
+                core.APP_VERSION, info["latest_tag"]))
             btn = getattr(self, "_btn_update_now", None)
             if btn is not None:
                 btn.pack_forget()
@@ -468,16 +482,40 @@ class PreferencesMixin:
     def _render_pref_update_result(self, info):
         try:
             if self._btn_pref_check is not None:
-                self._btn_pref_check.configure(state="normal", text="立即检查")
+                self._btn_pref_check.configure(state="normal", text="立即检查",
+                                               command=self._pref_check_update,
+                                               style="Accent.TButton")
         except Exception:
             pass
-        if not info:
+        status = info.get("status")
+        if status == "error":
+            self._set_pref_upd_text("检查更新失败，请检查网络后重试")
+            if getattr(self, "_btn_pref_update_now", None) is not None:
+                try:
+                    self._btn_pref_update_now.destroy()
+                except Exception:
+                    pass
+                self._btn_pref_update_now = None
+            self._pref_update_info = None
+            return
+        if status == "current":
             self._set_pref_upd_text("✓ 已是最新版本 v%s" % core.APP_VERSION)
             # 清理残留的立即更新按钮
             btn = getattr(self, "_btn_pref_update_now", None)
             if btn is not None:
                 try:
                     btn.destroy()
+                except Exception:
+                    pass
+                self._btn_pref_update_now = None
+            self._pref_update_info = None
+            return
+        if status == "ahead":
+            self._set_pref_upd_text("当前 v%s 高于最新公开版 %s（可能是预览版本）" % (
+                core.APP_VERSION, info["latest_tag"]))
+            if getattr(self, "_btn_pref_update_now", None) is not None:
+                try:
+                    self._btn_pref_update_now.destroy()
                 except Exception:
                     pass
                 self._btn_pref_update_now = None
@@ -505,5 +543,4 @@ class PreferencesMixin:
                 self._btn_pref_update_now.pack(anchor="w", pady=(10, 0))
             except Exception:
                 pass
-
 

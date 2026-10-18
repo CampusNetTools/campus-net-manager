@@ -11,6 +11,24 @@ __all__ = ['auth_reachable', 'http_get', 'decode_gbk', 'check_auth', '_probe_mat
 # 登录请求甚至可能因代理无法访问校园网内网认证服务器而失败。
 _DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
+
+class _NoHttpsDowngradeRedirect(urllib.request.HTTPRedirectHandler):
+    """Do not let credential-bearing HTTPS login requests follow HTTP redirects."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        source_scheme = urllib.parse.urlsplit(req.full_url).scheme.lower()
+        target_scheme = urllib.parse.urlsplit(newurl).scheme.lower()
+        if source_scheme == "https" and target_scheme == "http":
+            raise urllib.error.HTTPError(
+                req.full_url, code, "HTTPS login redirect cannot downgrade to HTTP",
+                headers, fp,
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_LOGIN_OPENER = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}), _NoHttpsDowngradeRedirect())
+
 # 认证服务器可达性防抖: 单次探测失败(链路抖动 / 认证服务器瞬时繁忙 / DNS 抖动)
 # 不代表已经离开校园网。连续 _UNREACHABLE_STRIKES 次不可达才翻转为"不在校园网",
 # 中间沿用上一次的判定 —— 否则守护会在"校园网/非校园网"之间来回横跳: 每跳一次
@@ -53,15 +71,27 @@ def auth_reachable(auth_url, debounce=True):
 
 
 # ---------- 网络检测 ----------
-def http_get(url, timeout=6, physical=False):
+def http_get(url, timeout=6, physical=False, referer=None, login_request=False):
     """获取 URL；macOS 的校园认证请求可强制走物理网卡，避免被 VPN 路由接管。"""
     if physical and (common.IS_MACOS or common.IS_WINDOWS):
         interface = netinfo.get_physical_interface()
         if interface:
             curl = "/usr/bin/curl" if common.IS_MACOS else "curl"
             try:
+                # Legacy Dr.COM login URLs carry credentials in the query string.
+                # Keep them out of curl's process arguments while preserving GET.
+                curl_url = urllib.parse.quote(
+                    url, safe=":/?&=%#[]@!$'()*+,;~-._")
+                curl_url = curl_url.replace("\\", "\\\\").replace('"', '\\"')
+                curl_config = 'url = "%s"\n' % curl_url
+                if referer:
+                    curl_referer = urllib.parse.quote(
+                        referer, safe=":/?&=%#[]@!$'()*+,;~-._")
+                    curl_referer = curl_referer.replace("\\", "\\\\").replace('"', '\\"')
+                    curl_config += 'referer = "%s"\n' % curl_referer
                 # Windows 下 curl.exe 是控制台程序, 必须隐藏窗口, 否则每次探测都会闪黑框
                 run_kwargs = {"capture_output": True, "timeout": timeout + 2}
+                run_kwargs["input"] = curl_config.encode("ascii")
                 if common.IS_WINDOWS:
                     run_kwargs["creationflags"] = _NO_WINDOW
                 result = subprocess.run(
@@ -69,7 +99,7 @@ def http_get(url, timeout=6, physical=False):
                      "--noproxy", "*",
                      "--interface", interface, "--output", "-", "--write-out", "\n%{http_code}",
                      "--user-agent", "Mozilla/5.0 AppleWebKit/537.36 Chrome/137.0.0.0 Safari/537.36",
-                     url],
+                     "--config", "-"],
                     **run_kwargs)
                 if result.returncode == 0 and b"\n" in result.stdout:
                     body, raw_status = result.stdout.rsplit(b"\n", 1)
@@ -79,9 +109,10 @@ def http_get(url, timeout=6, physical=False):
                 raise urllib.error.URLError(exc)
     req = urllib.request.Request(url, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-        "Referer": url,
+        "Referer": referer or url,
     })
-    with _DIRECT_OPENER.open(req, timeout=timeout) as resp:
+    opener = _LOGIN_OPENER if login_request else _DIRECT_OPENER
+    with opener.open(req, timeout=timeout) as resp:
         return resp.status, resp.read()
 
 
@@ -90,6 +121,31 @@ def decode_gbk(body):
         return body.decode("gbk", errors="replace")
     except Exception:
         return body.decode("utf-8", errors="replace")
+
+
+def _auth_origin(auth_url):
+    """Return the configured HTTP(S) origin without path or credentials.
+
+    Legacy Dr.COM profiles usually use HTTP. Preserve HTTPS when the configured
+    portal supports it; never silently downgrade that profile to HTTP.
+    """
+    raw = str(auth_url or "").strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = "http://" + raw.lstrip("/")
+    try:
+        parsed = urllib.parse.urlsplit(raw)
+        scheme = parsed.scheme.lower()
+        # Accessing port validates malformed ports. Keep netloc to preserve an
+        # explicit port and bracketed IPv6 literal in the resulting origin.
+        parsed.port
+    except ValueError:
+        return None
+    if (scheme not in ("http", "https") or not parsed.hostname
+            or parsed.username is not None or parsed.password is not None):
+        return None
+    return "%s://%s" % (scheme, parsed.netloc)
 
 
 _LOGOUT_TITLES = ("注销页", "注销", "logout", "log out", "log off", "signed out", "已注销")
@@ -160,7 +216,9 @@ def check_network_paths():
 def try_login(profile):
     suffix = common.SUFFIX.get(profile.get("login_type", "cmcc"), "@cmcc")
     auth_url = profile.get("auth_url", common.DEFAULT_AUTH_URL)
-    host = auth_url.split("/")[2] if "//" in auth_url else auth_url
+    origin = _auth_origin(auth_url)
+    if not origin:
+        return False
     params = [
         ("callback", "dr1003"),
         ("DDDDD", profile["username"] + suffix),
@@ -171,9 +229,11 @@ def try_login(profile):
         ("terminal_type", "1"), ("lang", "zh-cn"),
         ("jsVersion", "4.1.3"), ("v", "2509"),
     ]
-    url = "http://%s/drcom/login?%s" % (host, urllib.parse.urlencode(params))
+    url = "%s/drcom/login?%s" % (origin, urllib.parse.urlencode(params))
     try:
-        status, body = http_get(url, timeout=15, physical=True)
+        # Avoid duplicating the credential-bearing query in the Referer header.
+        status, body = http_get(url, timeout=15, physical=True,
+                                referer=origin + "/", login_request=True)
         return status == 200 and b"dr1003" in body
     except Exception:
         return False
