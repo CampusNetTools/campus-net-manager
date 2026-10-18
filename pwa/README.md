@@ -18,6 +18,6 @@ Do not place account credentials, enrollment JSON, private keys, or per-device `
 
 ## Hosting
 
-GitHub Pages deployment is defined in `.github/workflows/pwa-pages.yml` and only deploys from `main`. Repository Pages must use the GitHub Actions publishing source. The intended project URL is `https://campusnettools.github.io/campus-net-manager/` after the first successful deployment. A missing Pages site or failed deployment must not be reported as live.
+GitHub Pages deployment is defined in `.github/workflows/pwa-pages.yml` and only deploys from `main`. The repository uses GitHub Actions as its Pages publishing source. The public site is available at <https://campusnettools.github.io/campus-net-manager/>. Initial deployment run `39140936549` completed successfully on 2026-10-18; the page, manifest, and service worker were opened from the public HTTPS site.
 
-The page is public static project documentation/download navigation, not a hosted software service. GitHub Pages has limits and is not a permanence or uptime guarantee.
+The page is public static project documentation/download navigation, not a hosted software service. GitHub Pages has limits and is not a permanence or uptime guarantee. Offline behavior and add-to-home-screen installation still need a real iPhone/Mac device check.
