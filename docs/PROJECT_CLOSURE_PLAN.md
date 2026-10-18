@@ -706,7 +706,13 @@ Android 前台保活改动前检查点：提交 `c03bfd26817b14eb4aabefabf4fc867
 ## 2026-10-18 Android 免费直下载发布链与版本同步
 
 - 用户确认的分发边界：不做 Play/App Store 上架、不购买付费签名或开发者身份；免费平台签名可以使用，优先保证普通用户能下载并安装运行。
-- 修复 Android 版本漂移：`mobile/buildozer.spec` 从旧 `1.0.0` 同步到 `APP_VERSION=5.6.0`；`scripts/sync_version.py --check` 现在同时校验 Android spec 与 README 的候选 badge，并新增 7 个版本同步回归。提交 `56457937f32dc8001a5449a1581cf22914913fec` 已推送，PR CI `39048995767` 和桌面候选 detector/build `39048995811` success；对应 Android API 36 APK run `39048992242` 仍处于编译步骤，尚不能宣称 APK/模拟器验证通过。
+- 修复 Android 版本漂移：`mobile/buildozer.spec` 从旧 `1.0.0` 同步到 `APP_VERSION=5.6.0`；`scripts/sync_version.py --check` 现在同时校验 Android spec 与 README 的候选 badge，并新增 7 个版本同步回归。提交 `56457937f32dc8001a5449a1581cf22914913fec` 已推送，PR CI `39048995767` 和桌面候选 detector/build `39048995811` success；Android API 36 APK run `39048992242` 后续已完成 APK 编译、Manifest、KVM、模拟器安装/启动及 artifact 上传，成功只适用于该旧提交，不证明其后加入的 stable signing gate。
 - 为未来 `v*` GitHub Release 增加 Android reusable workflow：依赖双平台 CI 与桌面 Release job；执行当前 API 36 APK 构建、Manifest/版本检查、模拟器网络状态就绪/截图 smoke，之后发布 APK 与 SHA-256 校验文件。PR/普通手动候选仍只上传 Actions artifact，不会创建公开 Release；手动 workflow_dispatch 可显式开启同一稳定签名以验候选安装/更新；该链不接入应用商店。
 - 已在本机生成免费项目 APK 签名证书和 PKCS#12 keystore，往返解码校验通过；Actions repository secrets `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD` 已配置，私钥/口令仅交给 GitHub Secrets，没有写入工作树。标签发布步骤会用同一证书重签 APK 并用 `apksigner verify` 检查，从而支持同签名覆盖更新；PR 候选 APK 继续使用临时 runner debug 签名。当前证书 SHA-256 公钥指纹：`a6a3451d09b6ec3b34f12ee07193233b812a04acd2ba711ab56dd466bb6aa613`。
 - 新发布链目前只有源码与本地静态回归证据（18 项 Android 专项测试通过、ci/mobile YAML 可解析、diff check 通过）；还需 CI 实际运行 tag/reusable workflow 与 `apksigner` gate，并在 Android 实体设备验证安装、覆盖升级、锁屏/切网和 Keystore。此处不代表任何 Release 已发布或设备验收完成。
+
+## 2026-10-18 Android APK 校验误报修复
+
+- Android APK runs `39049513521`、`39049528799`、`39049629732`、`39049713532` 均完成 API 36 debug APK 编译，但在字体文件清单校验处失败。`39049713532` 的日志确认 tar 清单实际含 `assets/NotoSansSC.ttf`；`set -o pipefail` 下 `tar -tf archive | grep -q` 会因 grep 提前关闭管道而使 tar 报 stdout write error，导致误报字体缺失，不能据此判定 APK 内容有问题。
+- 修复将 tar 清单先写入临时文件，再从普通文件 grep；新增回归断言避免恢复会触发 SIGPIPE 的管道写法。Android 专项 11 项通过，全套 unittest 553 passed/3 skipped，两个 workflow YAML 可解析；合成归档的修复后清单检查和 `git diff --check` 通过。
+- 修复版 Actions run 尚待新提交触发；需确认字体/Manifest gate、稳定签名指纹、模拟器安装/运行/日志和 APK artifact 回读。公开 GitHub Release 仍为 `v5.5.0`；v5.6.0 还没有公开下载资产。

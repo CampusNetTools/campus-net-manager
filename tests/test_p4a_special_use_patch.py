@@ -93,6 +93,18 @@ class P4aSpecialUsePatchTests(unittest.TestCase):
         self.assertIn("aapt\" dump badging \"$apk\" | grep -F \"versionName='$app_version'\"", mobile_workflow)
         self.assertIn("CampusNetManager-Android-${app_version}.apk", mobile_workflow)
         self.assertIn('"$GITHUB_REF_NAME" != "v$app_version"', mobile_workflow)
+        self.assertIn(
+            "tar -tf /tmp/campusnet-private.tar > /tmp/campusnet-private-members.txt",
+            mobile_workflow,
+        )
+        self.assertIn(
+            "grep -Fxq 'assets/NotoSansSC.ttf' /tmp/campusnet-private-members.txt",
+            mobile_workflow,
+        )
+        self.assertNotIn(
+            "tar -tf /tmp/campusnet-private.tar | grep -Fxq",
+            mobile_workflow,
+        )
         self.assertIn("sha256sum \"$release_apk\"", mobile_workflow)
         self.assertIn("api-level: 36", mobile_workflow)
         self.assertIn("CNM_NETWORK_STATUS_READY:", (root / "scripts" / "android_emulator_smoke.sh").read_text(encoding="utf-8"))

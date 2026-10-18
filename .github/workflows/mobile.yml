@@ -120,9 +120,12 @@ jobs:
           build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
           "$build_tools/aapt" dump badging "$apk" | grep -F "versionName='$app_version'"
           unzip -p "$apk" assets/private.tar > /tmp/campusnet-private.tar
-          if ! tar -tf /tmp/campusnet-private.tar | grep -Fxq 'assets/NotoSansSC.ttf'; then
+          # Avoid grep -q closing the pipe early: with pipefail, tar may report
+          # SIGPIPE even when the requested member is present in the archive.
+          tar -tf /tmp/campusnet-private.tar > /tmp/campusnet-private-members.txt
+          if ! grep -Fxq 'assets/NotoSansSC.ttf' /tmp/campusnet-private-members.txt; then
             echo '::error::APK private payload is missing assets/NotoSansSC.ttf.'
-            tar -tf /tmp/campusnet-private.tar | grep -E '(^|/)assets/|NotoSans' || true
+            grep -E '(^|/)assets/|NotoSans' /tmp/campusnet-private-members.txt || true
             exit 1
           fi
           tar -xOf /tmp/campusnet-private.tar assets/NotoSansSC.ttf \
