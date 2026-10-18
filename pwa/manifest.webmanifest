@@ -1,0 +1,28 @@
+{
+  "id": "./",
+  "name": "校园网连接管家",
+  "short_name": "校园网管家",
+  "description": "校园网工具下载入口与离线使用指南",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "categories": ["utilities", "education"],
+  "icons": [
+    {
+      "src": "./icons/campusnet-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/campusnet-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b1220">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="校园网管家">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="校园网连接管家的免费安装入口、离线指南和浏览器自检。">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icons/campusnet-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="./icons/campusnet-192.png">
+    <link rel="stylesheet" href="./styles.css">
+    <title>校园网连接管家 · 随身入口</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="校园网连接管家首页">
+        <img src="./icons/campusnet-192.png" width="38" height="38" alt="">
+        <span><strong>校园网连接管家</strong><small>随身入口</small></span>
+      </a>
+      <span class="online-badge" id="browser-status" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span><span id="browser-status-text">读取浏览器状态…</span>
+      </span>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">免费 · 轻量 · 可离线查看</p>
+          <h1>需要时，<span>快速找到</span>校园网工具</h1>
+          <p class="hero-lede">把这个页面添加到 iPhone 主屏幕或 Mac 程序坞。它提供下载入口、使用说明和本地浏览器状态；不会接管设备网络，也不收集账号密码。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#downloads">获取桌面版</a>
+            <a class="button button-secondary" href="#install">添加到主屏幕</a>
+          </div>
+        </div>
+        <div class="hero-mark" aria-hidden="true"><span>CN</span><i></i><b></b></div>
+      </section>
+
+      <section class="section" id="downloads" aria-labelledby="downloads-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">直接下载</p><h2 id="downloads-title">选择你的设备</h2></div>
+          <a class="text-link" href="https://github.com/CampusNetTools/campus-net-manager/releases/latest" target="_blank" rel="noopener noreferrer">查看最新版本 ↗</a>
+        </div>
+        <div class="download-grid">
+          <article class="download-card">
+            <div class="platform-icon" aria-hidden="true">⌘</div>
+            <p class="card-kicker">Mac · Apple 芯片</p>
+            <h3>macOS 桌面版</h3>
+            <p>下载 ZIP，解压后将 App 放到“应用程序”或桌面。首次打开若出现系统提示，请按项目说明确认来源。</p>
+            <a class="button button-card" href="https://github.com/CampusNetTools/campus-net-manager/releases/latest" target="_blank" rel="noopener noreferrer">打开最新下载页</a>
+            <span class="checksum-link">下载 ZIP 后，可在同页获取 SHA-256 文件</span>
+          </article>
+          <article class="download-card">
+            <div class="platform-icon windows" aria-hidden="true">▦</div>
+            <p class="card-kicker">Windows · x64</p>
+            <h3>Windows 桌面版</h3>
+            <p>下载 EXE 后双击运行。当前版本未使用商业 Authenticode 证书，Windows 可能显示来源提示。</p>
+            <a class="button button-card" href="https://github.com/CampusNetTools/campus-net-manager/releases/latest" target="_blank" rel="noopener noreferrer">打开最新下载页</a>
+            <span class="checksum-link">下载 EXE 后，可在同页获取 SHA-256 文件</span>
+          </article>
+          <article class="download-card">
+            <div class="platform-icon android" aria-hidden="true">◉</div>
+            <p class="card-kicker">Android · 手机和平板</p>
+            <h3>Android 直装版</h3>
+            <p>这是项目直接下载 APK。Android 安装时会要求你确认来源；仅从项目 Release 下载并核对校验值。</p>
+            <a class="button button-card" href="https://github.com/CampusNetTools/campus-net-manager/releases/latest" target="_blank" rel="noopener noreferrer">打开最新下载页</a>
+            <span class="checksum-link">下载 APK 后，可在同页获取 SHA-256 文件</span>
+          </article>
+        </div>
+        <p class="release-note">下载页列出各平台资产和校验文件，版本以 <a href="https://github.com/CampusNetTools/campus-net-manager/releases/latest" target="_blank" rel="noopener noreferrer">GitHub 最新 Release</a> 为准。iPhone 不安装此 APK；iPhone 可将本网页添加到主屏幕。</p>
+      </section>
+
+      <section class="section two-column" id="install" aria-labelledby="install-title">
+        <div class="panel install-panel">
+          <p class="eyebrow">像 App 一样打开</p>
+          <h2 id="install-title">添加到设备</h2>
+          <div class="device-tabs" role="tablist" aria-label="选择设备">
+            <button class="device-tab is-active" id="tab-iphone" type="button" role="tab" aria-selected="true" aria-controls="steps-iphone" data-device="iphone">iPhone</button>
+            <button class="device-tab" id="tab-mac" type="button" role="tab" aria-selected="false" aria-controls="steps-mac" data-device="mac">Mac</button>
+          </div>
+          <div id="steps-iphone" class="steps" role="tabpanel" aria-labelledby="tab-iphone" data-panel="iphone">
+            <ol>
+              <li>用 Safari 打开本页面。</li>
+              <li>点“分享”，选择“添加到主屏幕”。</li>
+              <li>打开“作为网页 App 打开”，再点“添加”。</li>
+            </ol>
+            <p class="step-note">添加后可从主屏幕启动；离线时能查看已缓存的页面和指南。</p>
+          </div>
+          <div id="steps-mac" class="steps" role="tabpanel" aria-labelledby="tab-mac" data-panel="mac" hidden>
+            <ol>
+              <li>用 Safari 打开本页面。</li>
+              <li>菜单栏选择“文件 → 添加到程序坞”。</li>
+              <li>从程序坞或 Spotlight 启动。</li>
+            </ol>
+            <p class="step-note">Safari 添加到程序坞的网页 App 需要 macOS Sonoma 14 或更新版本。</p>
+          </div>
+        </div>
+        <div class="panel status-panel">
+          <p class="eyebrow">本机浏览器</p>
+          <h2>当前状态</h2>
+          <div class="status-line"><span class="status-large-dot" id="status-dot" aria-hidden="true"></span><div><strong id="status-heading">正在读取…</strong><p id="status-detail">此信息由浏览器提供。</p></div></div>
+          <button class="button button-secondary refresh-button" id="refresh-status" type="button">刷新状态</button>
+          <p class="fine-print">这只是浏览器的 online/offline 标记，不是互联网测速、校园网认证、VPN 或系统 Wi-Fi 检测。</p>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="scope-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">能力边界</p><h2 id="scope-title">网页能做什么</h2></div>
+          <span class="small-pill">不需要商店或订阅</span>
+        </div>
+        <div class="scope-grid">
+          <article class="scope-card scope-yes">
+            <h3><span aria-hidden="true">✓</span> PWA 支持</h3>
+            <ul><li>打开软件与版本下载页</li><li>离线查看缓存的说明</li><li>在本机保存非敏感的阅读进度</li><li>查看浏览器 online/offline 标记</li></ul>
+          </article>
+          <article class="scope-card scope-no">
+            <h3><span aria-hidden="true">—</span> 仍需桌面 App 或系统设置</h3>
+            <ul><li>校园网自动登录、守护与后台保活</li><li>读取 SSID、ARP、网关或控制路由器</li><li>启停系统 VPN、代理或网络隧道</li><li>管理 Mac/Windows 上运行中的服务</li></ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="section two-column" aria-labelledby="privacy-title">
+        <div class="panel privacy-panel">
+          <p class="eyebrow">隐私设计</p>
+          <h2 id="privacy-title">不收集账号和密码</h2>
+          <p>此网页不提供账号登录框，不连接项目控制台，不加载第三方脚本、字体或统计服务。阅读清单只保存在当前设备浏览器。</p>
+          <p class="warning-note"><strong>不要把 VPN 配置文件、私钥、账号或密码上传到公开网站。</strong>如果你使用已有 VPN，请继续通过其原有 App 或 iOS“设置”管理；此 PWA 不会连接或控制它。</p>
+        </div>
+        <div class="panel checklist-panel">
+          <p class="eyebrow">仅保存在本机</p>
+          <h2>使用清单</h2>
+          <label class="check-row"><input type="checkbox" data-check="downloaded"><span>我已找到适合设备的下载项</span></label>
+          <label class="check-row"><input type="checkbox" data-check="installed"><span>我已阅读安装时的系统提示</span></label>
+          <label class="check-row"><input type="checkbox" data-check="understood"><span>我知道网页不会控制 VPN 或校园网守护</span></label>
+          <p class="step-note" id="checklist-status" aria-live="polite">清单状态只保存在此设备。</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>校园网连接管家 · PWA 随身入口</span>
+      <nav aria-label="项目链接">
+        <a href="https://github.com/CampusNetTools/campus-net-manager/releases/latest" target="_blank" rel="noopener noreferrer">下载版本</a>
+        <a href="https://github.com/CampusNetTools/campus-net-manager" target="_blank" rel="noopener noreferrer">项目源码</a>
+        <a href="https://github.com/CampusNetTools/campus-net-manager/blob/main/ios/CampusNetCompanion/README.md" target="_blank" rel="noopener noreferrer">iPhone 说明</a>
+      </nav>
+      <p>下载版本以 GitHub Release 页面为准 · 本网页不提供 VPN 服务，也不会替你连接校园网</p>
+    </footer>
+    <script src="./app.js" defer></script>
+  </body>
+</html>
