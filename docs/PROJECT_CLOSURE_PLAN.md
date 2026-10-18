@@ -2,7 +2,7 @@
 
 更新时间：2026-10-18
 
-本摘要核验时 PR head：`b4f67c3a52486ad1db97e742096c6dd1a1c3f28a`（`codex/full-project-closure`）；PR #1 为 OPEN draft，origin 与本地 HEAD 对齐，工作树干净。
+本摘要本次核验时 HEAD、origin 与 PR #1 head 均为 `3f8db22742c5755b012737ada760cb88e60f91cc`（`codex/full-project-closure`）；PR 为 OPEN draft，工作树干净。Windows/macOS 与 Android 候选包对应的源码 head 为其祖先 `b4f67c3a52486ad1db97e742096c6dd1a1c3f28a`；从该提交到当前 head 没有非文档文件变化，当前 head 的 PR CI 通过。
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`。Android 前台保活改动前检查点：`c03bfd26817b14eb4aabefabf4fc8678d6f2db38`。
 
 ## 目标
