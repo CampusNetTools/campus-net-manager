@@ -2,6 +2,16 @@
 
 更新时间：2026-10-18
 
+## 最近一次核验快照（2026-10-18，HEAD 8165cd2）
+
+- 当前分支 `codex/full-project-closure`、本地 HEAD 与 `origin` 均为 `8165cd23573484b809a030bb7de684fedb1e3046`，工作树干净；PR #1 为 OPEN draft，head 对齐。该 head 的 PR CI run `39096133148` 和 Desktop candidate run `39096133096` 均 completed/success；未发现仍活跃的 run。公开 Release 最新为 `v5.5.0`，`v5.6.0` 尚未公开。
+- 本机 `python3 -m unittest discover -s tests`：553 tests、3 skipped，全部通过；`scripts/sync_version.py --check` 通过。
+- 桌面候选 `/Users/nanyu/Desktop/CampusNetManager-macOS-arm64-v5.6.0.zip`：SHA-256 `ad7f66820d8f42ccf4e52ec4b5f796e0b5d1306cd86a6d4c0029f93df15bb60f`，ZIP CRC 通过；解包后 bundle `com.campusnettools.campusnetmanager`、版本 5.6.0、Mach-O arm64，55 个 symlink，`codesign --verify --deep --strict` 通过。签名为 adhoc、无 Team ID、未公证，仍是本机候选包。`/Applications/校园网连接管家.app` 当前运行，bundle strict codesign 与版本检查通过；控件逐项验收和升级尚未完成。
+- 直下载状态：GitHub 最新正式 Release 仍为 v5.5.0，仅有旧 macOS/Windows 资产；没有 v5.6.0 公开下载链接。PR 仍为 draft，当前未打 release tag。
+- iPhone：本轮 `idevicepair validate` 返回 `No device found`，`cfgutil list` 未列出设备。此前 `cfgutil install-profile` 返回 ConfigurationUtilityKit error 625（需要设备端交互），因此不能认定 IKEv2 profile 已安装。此轮仅确认 strongSwan `charon` 进程存在；未验证当前 IKE SA、服务器外网可达性或重启恢复，未观察手机双向流量。
+- Android：`adb devices` 没有已连接设备。既有 API 36 模拟器构建/安装/启动记录只适用于其对应源码 head，不等同本轮 Android 真机验收。Windows 实体设备未接入，用户端安装/升级与逐功能检查尚缺。
+- 本快照覆盖并更新本文更早的状态描述；此前按日期记录的证据仍保留为历史，不因本快照自动升级其证据范围。
+
 本轮开始核验时 HEAD、origin 与 PR #1 head 均为 `16d2fa99f5c3d61313d0f11c630917bccc9c9b61`（`codex/full-project-closure`）；PR 为 OPEN draft，工作树干净。Windows/macOS 与 Android 候选包对应的源码 head 为其祖先 `b4f67c3a52486ad1db97e742096c6dd1a1c3f28a`；从该提交到本轮开始时没有非文档文件变化。
 可恢复标签：`codex/full-project-closure-baseline-2026-10-16`。Android 前台保活改动前检查点：`c03bfd26817b14eb4aabefabf4fc8678d6f2db38`。
 
