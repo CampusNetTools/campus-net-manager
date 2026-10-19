@@ -873,3 +873,11 @@
 - 未选择“其他设备”或“耳机”，未开始录制，也未保存视频；QuickTime 录影预览随后关闭。该选择涉及手机系统对连接附件的分类，不能代替用户决定。
 - 当前在线 PWA 页面仍在系统弹窗后方。没有更改 Wi-Fi、蜂窝数据、VPN 或代理设置；真实离线冷启动尚未完成。
 - 后续需由设备所有者在手机弹窗选择附件类别后，才能确认 QuickTime USB 屏幕流是否恢复；若预览可见，再由用户确认是否进行离线冷启动验收。
+
+## 2026-10-19 macOS Release 资产复核与设备等待
+
+- 通过 GitHub Release API 读取 `v5.6.0` 公开资产；macOS arm64 ZIP 下载地址为 <https://github.com/CampusNetTools/campus-net-manager/releases/download/v5.6.0/CampusNetManager-macOS-arm64-v5.6.0.zip>。重新下载后 SHA-256 为 `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b`，与 GitHub release digest 和 sidecar 内容一致；`unzip -t` 无错误。
+- 对刚下载的官方 ZIP 用 `ditto` 解包；其中 `CampusNetManager.app` 的 `codesign --verify --deep --strict` 通过，bundle id 为 `com.campusnettools.campusnetmanager`，版本 5.6.0，签名为 adhoc、无 Team ID。当前 `/Applications/校园网连接管家.app` 的安装版进程存在，版本 5.6.0，严格签名验证通过；这不表示 Developer ID 签名或公证。
+- 原 Desktop 同名 ZIP 的 SHA-256 为 `ad7f66820d8f42ccf4e52ec4b5f796e0b5d1306cd86a6d4c0029f93df15bb60f`，与 GitHub Release digest 不同。已先将旧 ZIP 和 sidecar 保存在 `~/Desktop/archives/CampusNetManager-local-before-release-sync-2026-10-19/`，再将经核验的 Release ZIP 与 sidecar 复制到 Desktop；新的 Desktop ZIP SHA-256 与 Release 一致。旧副本未删除。
+- QuickTime 曾因新建录影默认输入而显示 Mac 摄像头预览；没有开始录制或保存视频。最近一次可读 QuickTime 状态是系统“打开”文件面板，不是录影预览。未再选择采集源、开启摄像头或切换网络。
+- 本轮复核时 `idevice_id -l` 返回 `No device found.`；iPhone Mirroring 窗口的屏幕控件可见，但 macOS UI 自动化提示 Mac 已锁定并拒绝交互。PR #5 仍为 open draft，head `0c65b5e` 的 CI run `39189797412` 为 success。iPhone PWA 离线冷启动仍未验收；未更改 Wi-Fi、蜂窝、VPN 或代理。
