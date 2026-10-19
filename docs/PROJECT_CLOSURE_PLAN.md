@@ -814,3 +814,12 @@
 - `cfgutil install-profile` 已向这台连接的 iPhone 提交受限目录中的 IKEv2 配置，但命令返回 `ConfigurationUtilityKit.error` code 625，含义为需要用户在设备上交互确认。因此**不能将其记录成 profile 已安装**；等待 iPhone 屏幕确认或用户在“设置 → 通用 → VPN 与设备管理”完成安装。未观察到 IKE SA 或双向流量证据。
 - 安装请求输出含设备标识，已从共享记录中排除；输出文件权限为 root-only。profile 内容和 EAP 凭据从未写入仓库、共享记忆或公开位置。
 - 提交 `82d22c0` 的 PR CI `39095498098` success；Desktop candidate `39095498093` success，因仅文档变更而跳过平台打包。PR #1 仍为 OPEN draft。
+
+## 2026-10-19 v5.6.0 公开下载与 iPhone 当前状态复核
+
+- 当前本地分支为 `main`，HEAD 与 `origin/main` 均为 `90d3ba5696d10afb55c0b5358751e63a73a9a9d6`，工作树干净；PR #1 已于 2026-10-18 合并。该 head 的 CI run `39141261630` 与 PWA Pages 部署 run `39141261623` 均 completed/success；公开页面为 <https://campusnettools.github.io/campus-net-manager/>。v5.6.0 是公开 GitHub Release，不是商店发布。
+- macOS arm64 Release ZIP 本轮下载回读 SHA-256 `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b` 与 GitHub Release digest 相符；ZIP CRC、`ditto` 解包和 app `codesign --verify --deep --strict` 均通过。Bundle `com.campusnettools.campusnetmanager`，版本 `5.6.0`，arm64，adhoc 签名且无 Team ID。`/Applications/校园网连接管家.app` 对应版本当前有进程运行。未公证、非 Developer ID；未完成本轮逐控件验收。
+- Windows x64 Release EXE 下载回读 SHA-256 `a0faeff9ea197e7e34be582059fdfc64d97679e6cfac265010c3bc9df337c689` 与 Release API digest 相符，文件识别为 PE32+ GUI x86-64。本轮未在 Windows 用户设备安装；文件无 Authenticode 签名。
+- Android Release APK 下载回读 SHA-256 `16fe62629ea30c3ab59d59fd12e0160d5b8dac6d0ba5a8c84342b9e1b1b7937e` 与 GitHub digest 和 `.sha256` sidecar 相符，APK ZIP CRC 检查通过。当前 Mac 的 `adb devices -l` 未列出 Android 设备；本轮未做实体 Android 安装或启动验收。此前 API 36 runner 模拟器结果仍只能算模拟器证据。
+- 先前 iPhone 镜像已回读 Safari PWA 页面、主屏幕图标和点击后无 Safari 工具栏的独立网页 App 启动；离线启动未测。本轮镜像读取时手机停在“设置 → VPN”，VPN 状态“未连接”，校园网连接管家 profile 出现在已安装配置列表且被选中；这更新并取代上节较早的 `cfgutil` code 625“等待安装”状态。未触碰 VPN 开关或任何网络设置；profile 安装不代表 IKEv2 建连或流量验收。
+- 本轮没有改源码或运行测试；上述下载与状态回读只更新证据。桌面 GUI 逐功能点击、升级、Windows 用户设备、Android 真机，以及 IKEv2 SA/双向流量仍未验收。手机 UI 的专用 Computer Use 服务返回 runtime app missing；通过 iPhone Mirroring 的 CUA 读取到 Settings 画面，但未继续操作 VPN。
