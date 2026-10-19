@@ -850,4 +850,5 @@
 - iPhone Mirroring 显示设备已连上 Wi-Fi 与 5GA 蜂窝网络；系统“设置 → VPN”显示 VPN 未连接，未改动或启用任何 VPN 配置。
 - 为进行真实离线启动检查，在 Wi-Fi 设置中临时关闭 Wi-Fi。iPhone Mirroring 随即显示“未找到 iPhone”，提示设备需要启用蓝牙和 Wi-Fi；通过 USB 的 `idevicepair validate` 仍返回成功。点击镜像重试后仍未恢复画面。
 - 因无法从 Mac 镜像观察离线时 PWA 页面，离线缓存结果未验证；本次不能记为通过或失败。蜂窝数据开关未改动。Wi-Fi 当前需要用户在 iPhone 上重新开启并恢复此前连接的网络，镜像恢复后再决定是否继续。
+- Apple Configurator `cfgutil help` 的命令列表没有无线开关控制命令；USB 配对可验证，但无法通过当前 USB 接口远程恢复 Wi-Fi。此前提交 `2d9d84c` 的 PR CI run `39186568193` 已终态成功（Windows/macOS 检查通过；Android APK 与桌面发布 job 因文档变更跳过）。
 - 本轮没有修改应用源码，也没有运行测试；没有删除主屏幕图标、安装配置文件或改变 VPN 设置。
