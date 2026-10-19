@@ -1,4 +1,4 @@
-const CACHE_NAME = "campusnet-pwa-shell-v1";
+const CACHE_NAME = "campusnet-pwa-shell-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
