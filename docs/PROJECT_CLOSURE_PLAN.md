@@ -828,3 +828,11 @@
 
 - 对公开 Pages URL 的 HTML、`app.js` 和 `sw.js` 本轮均通过 HTTPS 成功读取；HTML 含最新 Release 下载入口与 web manifest 引用，`app.js` 注册 `sw.js`，worker 使用 Cache API。HTML SHA-256 为 `7b3df188c6f7a7360ffdc23f2b7fafe95dd7f89080ee77acfbb71302c15e2912`。
 - 这是公开静态文件可访问和源码路径存在的证据，不等同于 iPhone 当前离线启动测试。本轮 iPhone 镜像回到主屏幕（蜂窝 5G），没有更改 VPN/Wi-Fi/蜂窝设置；PWA 添加主屏幕及独立启动沿用此前真机镜像验收。
+
+## 2026-10-19 iPhone 与 Mac 当前只读状态
+
+- 用户回复“好了”后按 Codex 已重启处理并重新检查。专用 `computer_use` 连续三次仍报 `runtime app is missing`；`cua_repl` 可以读取 iPhone Mirroring，但读取 `/Applications/校园网连接管家.app` 仍超时。Mac 上安装版进程存在、位于前台，System Events 报告可访问窗口数为 0；本轮没有完成控件点击，也没有证据判定这是产品 UI 故障还是自动化运行时问题。
+- iPhone Mirroring 显示手机在 5G、Settings → VPN 为“未连接”；“校园网连接管家 · iphone”配置仍列出并被选中，详情类型为 IKEv2，服务器地址属于私有 IPv4 网段。未记录账户值或完整地址，未触碰连接开关、Wi-Fi、蜂窝或其他网络设置。
+- Mac 上 strongSwan 进程正在运行，并由 `netstat` 观察到 IPv4/IPv6 UDP 500、4500 监听。读取 `ipsec statusall` 因权限被拒绝；本轮没有 SA/双向流量证据。可访问的 Homebrew 服务列表及 LaunchDaemons/LaunchAgents 搜索未找到可确认的 strongSwan 开机启动配置，因此重启恢复仍未验证；没有重启服务器或改路由器配置。
+- 用户此前明确表示手机离校后使用自己的 VPN，不需要回连这台 Mac。故本轮不尝试连接此配置；现有 profile 的安装/选中状态不作为 VPN 建连验收。私有地址不证明蜂窝网或公网可达，未做外部连通性测试。
+- 本轮没有修改源码或运行测试。iPhone PWA 已安装并以独立网页 App 启动的既有证据仍有效，离线启动未测；Windows 真机验收由用户交给 Windows AI，Android 真机验收暂缓。
