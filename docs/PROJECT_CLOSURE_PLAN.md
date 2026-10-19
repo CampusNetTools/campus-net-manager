@@ -859,3 +859,10 @@
 - 从主屏幕启动网页入口后，独立 PWA 首页完整显示，未出现 Safari 地址栏或工具栏；页面包含桌面版下载入口和设备下载区。系统设置回读 Wi-Fi 已开启、VPN 未连接；未更改 VPN、代理、蜂窝数据或 Wi-Fi 配置。
 - 为检查离线缓存，确认 Safari 网页检查器原先关闭；短暂开启后 Mac Safari 仍未列出可检查的 iPhone 页面，随后已恢复关闭状态。USB `idevicescreenshot` 因设备缺少 Developer disk image 无法启动截图服务。关闭 Wi-Fi 会使 iPhone Mirroring 断开，因此本轮没有取得离线页面画面，也没有把离线缓存标为通过或失败。
 - 本轮未改应用源码、未运行测试。PWA 真机安装/独立启动已复核；真实离线启动仍未验收。
+
+## 2026-10-19 iPhone PWA Service Worker 缓存回读
+
+- 用户确认 Wi-Fi 已重新开启。iPhone 当前 PWA 页面仍可见；Safari Web Inspector 在真实 iPhone 的 PWA 上回读 `navigator.onLine === true`，`navigator.serviceWorker.controller` 指向公开站点的 `sw.js`，`caches.keys()` 返回 `campusnet-pwa-shell-v1`。
+- Cache API 列出 7 个页面壳资源：站点根路径、`index.html`、`styles.css`、`app.js`、`manifest.webmanifest`、192 与 512 图标。它们已存入设备浏览器缓存；这证明安装页面完成了缓存填充，但没有证明断网后的冷启动或每个缓存响应均可成功呈现。
+- 为读取缓存而临时打开的 iPhone Safari「网页检查器」已关闭并在设备设置画面确认关闭；没有改 Wi-Fi、蜂窝、VPN 或代理设置。
+- 本轮未改应用源码或运行测试。真实断网启动依旧未验收；之前关闭 Wi-Fi 会令 iPhone Mirroring 失联，因此没有再次切断网络。
