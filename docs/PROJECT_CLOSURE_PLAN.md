@@ -823,3 +823,8 @@
 - Android Release APK 下载回读 SHA-256 `16fe62629ea30c3ab59d59fd12e0160d5b8dac6d0ba5a8c84342b9e1b1b7937e` 与 GitHub digest 和 `.sha256` sidecar 相符，APK ZIP CRC 检查通过。当前 Mac 的 `adb devices -l` 未列出 Android 设备；本轮未做实体 Android 安装或启动验收。此前 API 36 runner 模拟器结果仍只能算模拟器证据。
 - 先前 iPhone 镜像已回读 Safari PWA 页面、主屏幕图标和点击后无 Safari 工具栏的独立网页 App 启动；离线启动未测。本轮镜像读取时手机停在“设置 → VPN”，VPN 状态“未连接”，校园网连接管家 profile 出现在已安装配置列表且被选中；这更新并取代上节较早的 `cfgutil` code 625“等待安装”状态。未触碰 VPN 开关或任何网络设置；profile 安装不代表 IKEv2 建连或流量验收。
 - 本轮没有改源码或运行测试；上述下载与状态回读只更新证据。桌面 GUI 逐功能点击、升级、Windows 用户设备、Android 真机，以及 IKEv2 SA/双向流量仍未验收。手机 UI 的专用 Computer Use 服务返回 runtime app missing；通过 iPhone Mirroring 的 CUA 读取到 Settings 画面，但未继续操作 VPN。对 `/Applications/校园网连接管家.app` 的 CUA 读取返回 `Computer Use server error -10005: timeoutReached`；此前相同原因已有多次失败，停止重试，macOS 控件验收需等桌面控制服务恢复。
+
+## 2026-10-19 PWA 当前部署回读
+
+- 对公开 Pages URL 的 HTML、`app.js` 和 `sw.js` 本轮均通过 HTTPS 成功读取；HTML 含最新 Release 下载入口与 web manifest 引用，`app.js` 注册 `sw.js`，worker 使用 Cache API。HTML SHA-256 为 `7b3df188c6f7a7360ffdc23f2b7fafe95dd7f89080ee77acfbb71302c15e2912`。
+- 这是公开静态文件可访问和源码路径存在的证据，不等同于 iPhone 当前离线启动测试。本轮 iPhone 镜像回到主屏幕（蜂窝 5G），没有更改 VPN/Wi-Fi/蜂窝设置；PWA 添加主屏幕及独立启动沿用此前真机镜像验收。
