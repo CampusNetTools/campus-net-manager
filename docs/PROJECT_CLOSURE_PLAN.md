@@ -849,6 +849,13 @@
 
 - iPhone Mirroring 显示设备已连上 Wi-Fi 与 5GA 蜂窝网络；系统“设置 → VPN”显示 VPN 未连接，未改动或启用任何 VPN 配置。
 - 为进行真实离线启动检查，在 Wi-Fi 设置中临时关闭 Wi-Fi。iPhone Mirroring 随即显示“未找到 iPhone”，提示设备需要启用蓝牙和 Wi-Fi；通过 USB 的 `idevicepair validate` 仍返回成功。点击镜像重试后仍未恢复画面。
-- 因无法从 Mac 镜像观察离线时 PWA 页面，离线缓存结果未验证；本次不能记为通过或失败。蜂窝数据开关未改动。Wi-Fi 当前需要用户在 iPhone 上重新开启并恢复此前连接的网络，镜像恢复后再决定是否继续。
+- 因无法从 Mac 镜像观察离线时 PWA 页面，离线缓存结果未验证；本次不能记为通过或失败。蜂窝数据开关未改动。当时需要恢复 Wi-Fi 才能重新连接镜像，后续恢复情况见下一节。
 - Apple Configurator `cfgutil help` 的命令列表没有无线开关控制命令；USB 配对可验证，但无法通过当前 USB 接口远程恢复 Wi-Fi。此前提交 `2d9d84c` 的 PR CI run `39186568193` 已终态成功（Windows/macOS 检查通过；Android APK 与桌面发布 job 因文档变更跳过）。
 - 本轮没有修改应用源码，也没有运行测试；没有删除主屏幕图标、安装配置文件或改变 VPN 设置。
+
+## 2026-10-19 iPhone Wi-Fi 恢复与 PWA 复核
+
+- 用户恢复 Wi-Fi 后，Mac 的 iPhone Mirroring 首次显示“未找到 iPhone”；在镜像窗口点一次“重试”后成功连接。USB `idevicepair validate` 返回 `SUCCESS`，`cfgutil get-icon-layout` 读取到主屏幕的“校园网管家”网页入口。
+- 从主屏幕启动网页入口后，独立 PWA 首页完整显示，未出现 Safari 地址栏或工具栏；页面包含桌面版下载入口和设备下载区。系统设置回读 Wi-Fi 已开启、VPN 未连接；未更改 VPN、代理、蜂窝数据或 Wi-Fi 配置。
+- 为检查离线缓存，确认 Safari 网页检查器原先关闭；短暂开启后 Mac Safari 仍未列出可检查的 iPhone 页面，随后已恢复关闭状态。USB `idevicescreenshot` 因设备缺少 Developer disk image 无法启动截图服务。关闭 Wi-Fi 会使 iPhone Mirroring 断开，因此本轮没有取得离线页面画面，也没有把离线缓存标为通过或失败。
+- 本轮未改应用源码、未运行测试。PWA 真机安装/独立启动已复核；真实离线启动仍未验收。
