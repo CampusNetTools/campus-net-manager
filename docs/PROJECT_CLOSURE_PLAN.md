@@ -888,3 +888,10 @@
 - iPhone Mirroring 一度显示“连接暂停”；恢复后窗口提供主屏幕/App 切换器控制。通过已核实的主屏幕布局打开目标网页入口，iPhone 实际显示 GitHub Pages 上的公开 PWA 下载/说明首页，没有 Safari 地址栏或工具栏。这是本轮真机显示与启动证据，不代表离线冷启动。
 - 镜像画面状态栏显示蜂窝 `5G`；本轮没有通过设备设置确认 Wi-Fi 当前状态，也没有修改 Wi-Fi、蜂窝、VPN 或代理。Service Worker 缓存回读的既有证据不替代断网启动验收。
 - QuickTime 未打开；没有调用摄像头。当前剩余离线验收需要先确定一条断网时仍可观察屏幕的路径，再进行一次可恢复的离线启动检查。
+
+## 2026-10-19 当前状态复核
+
+- 工作区分支与 `origin` 对齐于 `90102a63b37e64587194144dcece89a9f69cd4fc`，工作树干净；PR #5 仍 OPEN draft。该 head 的 CI run `39199226762` 中 Windows/macOS 检查通过，发布与 Android APK 检查按 PR 条件跳过；没有活跃 Actions run 需要续轮询。
+- 当前 USB 配对校验成功，设备类型为 `iPhone18,1`、iOS `26.6.2`（未记录设备标识）。镜像实时画面再次显示已安装 PWA 的公开下载/说明首页，无 Safari 工具栏；状态栏显示蜂窝 `5G`。本轮未读取 Wi-Fi 设置，也未更改任何网络或 VPN 设置，离线冷启动仍未验收。
+- 重新从公开 GitHub Release 下载 `v5.6.0` macOS arm64 ZIP，SHA-256 `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b` 与 Release API digest 一致，ZIP CRC 通过。`ditto` 解包后的 `CampusNetManager.app` strict codesign 通过，bundle `com.campusnettools.campusnetmanager`、版本 `5.6.0`、adhoc 且无 Team ID；`/Applications/校园网连接管家.app` 存在、strict codesign 通过，安装版进程正在运行。此证据不等同于逐项控件验收、Developer ID 签名或公证。
+- QuickTime 在本次状态复核中未运行。本次未打开 QuickTime、未调用摄像头、未录制或保存视频；前次误触发 QuickTime 默认摄像头预览的经过与“未录制”的说明已向用户澄清。真实 iPhone 离线冷启动仍需先确定不使用摄像头、且断网后仍可观察页面的方式。
