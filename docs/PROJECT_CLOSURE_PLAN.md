@@ -881,3 +881,10 @@
 - 原 Desktop 同名 ZIP 的 SHA-256 为 `ad7f66820d8f42ccf4e52ec4b5f796e0b5d1306cd86a6d4c0029f93df15bb60f`，与 GitHub Release digest 不同。已先将旧 ZIP 和 sidecar 保存在 `~/Desktop/archives/CampusNetManager-local-before-release-sync-2026-10-19/`，再将经核验的 Release ZIP 与 sidecar 复制到 Desktop；新的 Desktop ZIP SHA-256 与 Release 一致。旧副本未删除。
 - QuickTime 曾因新建录影默认输入而显示 Mac 摄像头预览；没有开始录制或保存视频。最近一次可读 QuickTime 状态是系统“打开”文件面板，不是录影预览。未再选择采集源、开启摄像头或切换网络。
 - 本轮复核时 `idevice_id -l` 返回 `No device found.`；iPhone Mirroring 窗口的屏幕控件可见，但 macOS UI 自动化提示 Mac 已锁定并拒绝交互。PR #5 仍为 open draft，head `0c65b5e` 的 CI run `39189797412` 为 success。iPhone PWA 离线冷启动仍未验收；未更改 Wi-Fi、蜂窝、VPN 或代理。
+
+## 2026-10-19 iPhone USB 镜像恢复与 PWA 再次启动
+
+- USB `idevicepair validate` 返回成功；读取到设备类型 `iPhone18,1`、系统版本 `26.6.2`，未在记录中保存 UDID。Apple Configurator 的 `cfgutil get-icon-layout` 返回网页入口 `/campus-net-manager`，其页面位置与主屏幕图标一致。
+- iPhone Mirroring 一度显示“连接暂停”；恢复后窗口提供主屏幕/App 切换器控制。通过已核实的主屏幕布局打开目标网页入口，iPhone 实际显示 GitHub Pages 上的公开 PWA 下载/说明首页，没有 Safari 地址栏或工具栏。这是本轮真机显示与启动证据，不代表离线冷启动。
+- 镜像画面状态栏显示蜂窝 `5G`；本轮没有通过设备设置确认 Wi-Fi 当前状态，也没有修改 Wi-Fi、蜂窝、VPN 或代理。Service Worker 缓存回读的既有证据不替代断网启动验收。
+- QuickTime 未打开；没有调用摄像头。当前剩余离线验收需要先确定一条断网时仍可观察屏幕的路径，再进行一次可恢复的离线启动检查。
