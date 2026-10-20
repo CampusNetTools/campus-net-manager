@@ -6,6 +6,7 @@
 - The macOS first-run wizard opened from the main window using keyboard navigation. Selecting “A：电脑直连” displayed the plan A instructions. The Wi-Fi and hotspot actions were not invoked.
 - Windows hosted x64 VM run `39454672425` built the EXE and displayed the main window and first-run wizard. Its alternate keyboard path failed before sending keys: the report artifact says UIA `SetFocus()` raised “Target element cannot receive focus.”
 - The new Windows script revision removes that UIA focus call, relies on foregrounding the actual wizard window, and stops after verifying the local plan A view. It no longer sends keys on the plan A page, where the first Tab could focus the hotspot action.
+- Run `39456072346` built the EXE and displayed the main window and wizard, then failed because .NET `SendKeys` rejects the `{SPACE}` token. The corrected sequence sends `{TAB}` followed by a literal space; this is the final bounded retry of this keyboard path.
 - iPhone USB pairing validates, but iPhone Mirroring currently shows “连接暂停”; Safari Develop lists the iPhone target as “正在连接…” and the PWA target is not inspectable. No iPhone network settings were changed and no offline test was run.
 
 ## Limits

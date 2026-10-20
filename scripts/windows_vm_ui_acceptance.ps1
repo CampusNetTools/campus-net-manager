@@ -132,7 +132,7 @@ try {
 
     # Tk buttons are visible but may not be represented as UIA button controls
     # on hosted Windows runners. Use the normal keyboard focus order instead.
-    Send-KeyboardToWindow -Window $wizard -Keys "{TAB}{SPACE}" `
+    Send-KeyboardToWindow -Window $wizard -Keys "{TAB} " `
         -Description "select first wizard option with Tab and Space"
     $planA = Wait-ProcessWindow -RootProcessId $process.Id -Description "plan A wizard view" -Predicate {
         param($window)

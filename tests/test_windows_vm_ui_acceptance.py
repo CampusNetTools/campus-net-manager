@@ -18,7 +18,7 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn('Send-KeyboardToWindow -Window $wizard -Keys "{TAB}{SPACE}"', script)
+        self.assertIn('Send-KeyboardToWindow -Window $wizard -Keys "{TAB} "', script)
         self.assertIn('[System.Windows.Forms.SendKeys]::SendWait($Keys)', script)
         self.assertIn('[CampusNetUiWindow]::SetForegroundWindow($handle)', script)
         self.assertNotIn("$Window.SetFocus()", script)
