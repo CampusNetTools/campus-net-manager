@@ -1,0 +1,30 @@
+from pathlib import Path
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class WindowsVmUiAcceptanceTests(unittest.TestCase):
+    def test_desktop_candidate_runs_the_windows_ui_acceptance_script(self):
+        workflow = (ROOT / ".github/workflows/desktop-candidate.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("windows_vm_ui_acceptance.ps1", workflow)
+        self.assertIn("windows-ui-acceptance.txt", workflow)
+        self.assertIn("windows-latest", workflow)
+
+    def test_script_exercises_only_local_wizard_navigation(self):
+        script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('Invoke-ButtonByName -Window $wizard -Name "A：电脑直连"', script)
+        self.assertIn('Invoke-ButtonByName -Window $planA -Name "← 上一步"', script)
+        self.assertIn('plan_a_settings_actions=visible_not_invoked', script)
+        self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "C：隧道共享"', script)
+        self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "打开 WiFi 设置"', script)
+        self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "打开移动热点"', script)
+
+
+if __name__ == "__main__":
+    unittest.main()

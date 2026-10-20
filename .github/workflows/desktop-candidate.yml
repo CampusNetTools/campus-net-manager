@@ -80,19 +80,13 @@ jobs:
           mv dist/windows/校园网连接管家.exe dist/windows/CampusNetManager-windows.exe
           python scripts/make_checksum.py dist/windows/CampusNetManager-windows.exe
 
-      - name: Launch smoke test for Windows executable
+      - name: Windows x64 VM UI acceptance (first-run wizard navigation)
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
-          $exe = Join-Path $PWD "dist/windows/CampusNetManager-windows.exe"
-          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
-          Start-Sleep -Seconds 10
-          $process.Refresh()
-          if ($process.HasExited) {
-            throw "Windows app exited during startup (exit code $($process.ExitCode))."
-          }
-          Stop-Process -Id $process.Id -Force
-          Write-Output "Windows app remained running for 10 seconds after launch."
+          ./scripts/windows_vm_ui_acceptance.ps1 `
+            -ExecutablePath (Join-Path $PWD "dist/windows/CampusNetManager-windows.exe") `
+            -ReportPath (Join-Path $PWD "dist/windows/windows-ui-acceptance.txt")
 
       - name: Build, verify, and launch macOS app
         if: matrix.target == 'macos'
@@ -131,6 +125,14 @@ jobs:
           path: |
             dist/windows/CampusNetManager-windows.exe
             dist/windows/CampusNetManager-windows.exe.sha256
+
+      - name: Upload Windows VM UI acceptance report
+        if: always() && matrix.target == 'windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: campusnetmanager-windows-vm-ui-acceptance
+          path: dist/windows/windows-ui-acceptance.txt
+          if-no-files-found: warn
 
       - name: Upload macOS candidate
         if: matrix.target == 'macos'
