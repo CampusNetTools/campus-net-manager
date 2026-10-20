@@ -18,12 +18,12 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn('Invoke-ButtonByName -Window $wizard -Name "A：电脑直连"', script)
-        self.assertIn('Invoke-ButtonByName -Window $planA -Name "← 上一步"', script)
-        self.assertIn('plan_a_settings_actions=visible_not_invoked', script)
-        self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "C：隧道共享"', script)
-        self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "打开 WiFi 设置"', script)
-        self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "打开移动热点"', script)
+        self.assertIn('Send-KeyboardToWindow -Window $wizard -Keys "{TAB}{SPACE}"', script)
+        self.assertIn('Send-KeyboardToWindow -Window $planA -Keys "{TAB}{SPACE}"', script)
+        self.assertIn('[System.Windows.Forms.SendKeys]::SendWait($Keys)', script)
+        self.assertIn('network_settings_actions=not_invoked', script)
+        self.assertNotIn('Open WiFi Settings', script)
+        self.assertNotIn('Open mobile hotspot', script)
 
     def test_tracks_pyinstaller_onefile_child_process_windows(self):
         script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(

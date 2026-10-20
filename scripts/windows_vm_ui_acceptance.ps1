@@ -7,6 +7,18 @@ param(
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Windows.Forms
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class CampusNetUiWindow {
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr handle, int command);
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr handle);
+}
+"@
 
 $report = [System.Collections.Generic.List[string]]::new()
 $process = $null
@@ -72,33 +84,17 @@ function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [strin
     throw "Timed out waiting for visible UI window: $Description (process IDs: $($processIds -join ','))."
 }
 
-function Get-Buttons($Window) {
-    $all = $Window.FindAll(
-        [System.Windows.Automation.TreeScope]::Descendants,
-        [System.Windows.Automation.Condition]::TrueCondition
-    )
-    foreach ($element in $all) {
-        if ($element.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button -and
-            -not [string]::IsNullOrWhiteSpace($element.Current.Name)) {
-            $element
-        }
+function Send-KeyboardToWindow($Window, [string]$Keys, [string]$Description) {
+    $handle = [IntPtr]$Window.Current.NativeWindowHandle
+    if ($handle -eq [IntPtr]::Zero) {
+        throw "No native window handle for keyboard navigation: $Description."
     }
-}
-
-function Invoke-ButtonByName($Window, [string]$Name) {
-    foreach ($button in Get-Buttons -Window $Window) {
-        if ($button.Current.Name -eq $Name) {
-            $pattern = $null
-            if ($button.TryGetCurrentPattern(
-                    [System.Windows.Automation.InvokePattern]::Pattern,
-                    [ref]$pattern)) {
-                $pattern.Invoke()
-                return
-            }
-            throw "UI button '$Name' does not expose InvokePattern."
-        }
-    }
-    throw "Expected UI button '$Name' was not found."
+    [void][CampusNetUiWindow]::ShowWindow($handle, 9)
+    [void][CampusNetUiWindow]::SetForegroundWindow($handle)
+    $Window.SetFocus()
+    Start-Sleep -Milliseconds 150
+    [System.Windows.Forms.SendKeys]::SendWait($Keys)
+    Add-Report "keyboard_navigation=$Description"
 }
 
 try {
@@ -133,20 +129,19 @@ try {
     }
     Add-Report "first_run_wizard=visible"
 
-    Invoke-ButtonByName -Window $wizard -Name "A：电脑直连"
+    # Tk buttons are visible but may not be represented as UIA button controls
+    # on hosted Windows runners. Use the normal keyboard focus order instead.
+    Send-KeyboardToWindow -Window $wizard -Keys "{TAB}{SPACE}" `
+        -Description "select first wizard option with Tab and Space"
     $planA = Wait-ProcessWindow -RootProcessId $process.Id -Description "plan A wizard view" -Predicate {
         param($window)
         $window.Current.Name -eq "方式 A：电脑直连校园网"
     }
-    $planAButtons = @(Get-Buttons -Window $planA | ForEach-Object { $_.Current.Name })
-    if ($planAButtons -notcontains "打开 WiFi 设置" -or
-        $planAButtons -notcontains "打开移动热点") {
-        throw "Plan A help view did not expose its expected settings actions."
-    }
     Add-Report "plan_a_view=visible"
-    Add-Report "plan_a_settings_actions=visible_not_invoked"
+    Add-Report "network_settings_actions=not_invoked"
 
-    Invoke-ButtonByName -Window $planA -Name "← 上一步"
+    Send-KeyboardToWindow -Window $planA -Keys "{TAB}{SPACE}" `
+        -Description "return to choices with first Tab focus and Space"
     [void](Wait-ProcessWindow -RootProcessId $process.Id -Description "wizard choice view" -Predicate {
         param($window)
         $window.Current.Name -eq "新手向导"
