@@ -18,11 +18,14 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn('Send-KeyboardToWindow -Window $wizard -Keys "{TAB} "', script)
-        self.assertIn('[System.Windows.Forms.SendKeys]::SendWait($Keys)', script)
+        self.assertIn("Click-WizardPlanA -Window $wizard", script)
+        self.assertIn("[CampusNetUiWindow]::GetWindowRect", script)
+        self.assertIn("[CampusNetUiWindow]::SetCursorPos($x, $y)", script)
+        self.assertIn("plan_a_button_click=absolute screen position derived from wizard bounds", script)
         self.assertIn('[CampusNetUiWindow]::SetForegroundWindow($handle)', script)
         self.assertNotIn("$Window.SetFocus()", script)
         self.assertNotIn('Send-KeyboardToWindow -Window $planA', script)
+        self.assertNotIn("SendKeys", script)
         self.assertIn('network_settings_actions=not_invoked', script)
         self.assertIn('hotspot_and_wifi_actions=not_invoked', script)
         self.assertNotIn('Open WiFi Settings', script)

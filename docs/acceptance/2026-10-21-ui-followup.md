@@ -7,6 +7,7 @@
 - Windows hosted x64 VM run `39454672425` built the EXE and displayed the main window and first-run wizard. Its alternate keyboard path failed before sending keys: the report artifact says UIA `SetFocus()` raised “Target element cannot receive focus.”
 - The new Windows script revision removes that UIA focus call, relies on foregrounding the actual wizard window, and stops after verifying the local plan A view. It no longer sends keys on the plan A page, where the first Tab could focus the hotspot action.
 - Run `39456072346` built the EXE and displayed the main window and wizard, then failed because .NET `SendKeys` rejects the `{SPACE}` token. The corrected sequence sends `{TAB}` followed by a literal space; this is the final bounded retry of this keyboard path.
+- Run `39456484992` accepted the literal-space sequence but timed out waiting for the A-page title. It did not record which choice, if any, received the key event. The script now uses a bounded Win32 click at a screen position derived from the wizard bounds, targeting its bottom-right plan A button, and verifies the resulting title; no keys are sent on the plan page.
 - iPhone USB pairing validates, but iPhone Mirroring currently shows “连接暂停”; Safari Develop lists the iPhone target as “正在连接…” and the PWA target is not inspectable. No iPhone network settings were changed and no offline test was run.
 
 ## Limits

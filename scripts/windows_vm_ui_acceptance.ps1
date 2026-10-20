@@ -13,10 +13,18 @@ Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 public static class CampusNetUiWindow {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
     [DllImport("user32.dll")]
     public static extern bool ShowWindow(IntPtr handle, int command);
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr handle);
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr handle, out Rect rect);
+    [DllImport("user32.dll")]
+    public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")]
+    public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
 }
 "@
 
@@ -84,18 +92,31 @@ function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [strin
     throw "Timed out waiting for visible UI window: $Description (process IDs: $($processIds -join ','))."
 }
 
-function Send-KeyboardToWindow($Window, [string]$Keys, [string]$Description) {
+function Click-WizardPlanA($Window) {
     $handle = [IntPtr]$Window.Current.NativeWindowHandle
     if ($handle -eq [IntPtr]::Zero) {
-        throw "No native window handle for keyboard navigation: $Description."
+        throw "No native window handle for the first-run wizard."
     }
     [void][CampusNetUiWindow]::ShowWindow($handle, 9)
     if (-not [CampusNetUiWindow]::SetForegroundWindow($handle)) {
-        throw "Could not activate the wizard window for keyboard navigation: $Description."
+        throw "Could not activate the first-run wizard window."
     }
-    Start-Sleep -Milliseconds 300
-    [System.Windows.Forms.SendKeys]::SendWait($Keys)
-    Add-Report "keyboard_navigation=$Description"
+    $rect = [CampusNetUiWindow+Rect]::new()
+    if (-not [CampusNetUiWindow]::GetWindowRect($handle, [ref]$rect)) {
+        throw "Could not get the first-run wizard window bounds."
+    }
+    # In the choice screen, plan A is the rightmost bottom button. Click its
+    # interior using window bounds; do not click any controls on the plan page.
+    $x = $rect.Right - 70
+    $y = $rect.Bottom - 58
+    if (-not [CampusNetUiWindow]::SetCursorPos($x, $y)) {
+        throw "Could not move the VM pointer to the plan A choice."
+    }
+    Start-Sleep -Milliseconds 150
+    [CampusNetUiWindow]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 80
+    [CampusNetUiWindow]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
+    Add-Report "plan_a_button_click=absolute screen position derived from wizard bounds ($x,$y)"
 }
 
 try {
@@ -130,10 +151,9 @@ try {
     }
     Add-Report "first_run_wizard=visible"
 
-    # Tk buttons are visible but may not be represented as UIA button controls
-    # on hosted Windows runners. Use the normal keyboard focus order instead.
-    Send-KeyboardToWindow -Window $wizard -Keys "{TAB} " `
-        -Description "select first wizard option with Tab and Space"
+    # Tk buttons are not represented as UIA controls on this hosted runner.
+    # Use a bounded click on plan A's visible button and verify the new title.
+    Click-WizardPlanA -Window $wizard
     $planA = Wait-ProcessWindow -RootProcessId $process.Id -Description "plan A wizard view" -Predicate {
         param($window)
         $window.Current.Name -eq "方式 A：电脑直连校园网"
