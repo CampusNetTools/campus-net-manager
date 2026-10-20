@@ -29,17 +29,45 @@ function Get-ProcessWindows([int]$ProcessId) {
     }
 }
 
-function Wait-ProcessWindow([int]$ProcessId, [scriptblock]$Predicate, [string]$Description) {
-    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+function Get-ApplicationProcessIds([int]$RootProcessId) {
+    # PyInstaller one-file executables can keep a bootloader parent alive while
+    # the actual Python/Tk UI runs in a child process. UI Automation reports the
+    # child PID, so searching only Start-Process.Id misses the real window.
+    $processes = @(Get-CimInstance -ClassName Win32_Process)
+    $ids = [System.Collections.Generic.HashSet[int]]::new()
+    [void]$ids.Add($RootProcessId)
+    $changed = $true
+    while ($changed) {
+        $changed = $false
+        foreach ($candidate in $processes) {
+            if ($ids.Contains([int]$candidate.ParentProcessId) -and
+                $ids.Add([int]$candidate.ProcessId)) {
+                $changed = $true
+            }
+        }
+    }
+    @($ids)
+}
+
+function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [string]$Description) {
+    $deadline = [DateTime]::UtcNow.AddSeconds(45)
+    $refreshAt = [DateTime]::MinValue
+    $processIds = @($RootProcessId)
     do {
-        foreach ($window in Get-ProcessWindows -ProcessId $ProcessId) {
-            if (& $Predicate $window) {
-                return $window
+        if ([DateTime]::UtcNow -ge $refreshAt) {
+            $processIds = @(Get-ApplicationProcessIds -RootProcessId $RootProcessId)
+            $refreshAt = [DateTime]::UtcNow.AddSeconds(1)
+        }
+        foreach ($processId in $processIds) {
+            foreach ($window in Get-ProcessWindows -ProcessId $processId) {
+                if (& $Predicate $window) {
+                    return $window
+                }
             }
         }
         Start-Sleep -Milliseconds 250
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw "Timed out waiting for visible UI window: $Description"
+    throw "Timed out waiting for visible UI window: $Description (process IDs: $($processIds -join ','))."
 }
 
 function Get-Buttons($Window) {
@@ -84,24 +112,27 @@ try {
 
     $process = Start-Process -FilePath $resolvedExe `
         -WorkingDirectory (Split-Path -Parent $resolvedExe) -PassThru
+    Add-Report "root_process_id=$($process.Id)"
+    Add-Report "root_process_session_id=$($process.SessionId)"
 
-    $mainWindow = Wait-ProcessWindow -ProcessId $process.Id -Description "main window" -Predicate {
+    $mainWindow = Wait-ProcessWindow -RootProcessId $process.Id -Description "main window" -Predicate {
         param($window)
         $window.Current.Name.Contains("校园网连接管家")
     }
     Add-Report "main_window=visible"
+    Add-Report "main_window_process_id=$($mainWindow.Current.ProcessId)"
 
     # With an isolated runner profile and no enrolled campus credentials, the
     # first-run wizard is shown automatically. We only exercise its local text
     # navigation and deliberately never invoke network/settings buttons.
-    $wizard = Wait-ProcessWindow -ProcessId $process.Id -Description "first-run wizard" -Predicate {
+    $wizard = Wait-ProcessWindow -RootProcessId $process.Id -Description "first-run wizard" -Predicate {
         param($window)
         $window.Current.Name -eq "新手向导"
     }
     Add-Report "first_run_wizard=visible"
 
     Invoke-ButtonByName -Window $wizard -Name "A：电脑直连"
-    $planA = Wait-ProcessWindow -ProcessId $process.Id -Description "plan A wizard view" -Predicate {
+    $planA = Wait-ProcessWindow -RootProcessId $process.Id -Description "plan A wizard view" -Predicate {
         param($window)
         $window.Current.Name -eq "方式 A：电脑直连校园网"
     }
@@ -114,7 +145,7 @@ try {
     Add-Report "plan_a_settings_actions=visible_not_invoked"
 
     Invoke-ButtonByName -Window $planA -Name "← 上一步"
-    [void](Wait-ProcessWindow -ProcessId $process.Id -Description "wizard choice view" -Predicate {
+    [void](Wait-ProcessWindow -RootProcessId $process.Id -Description "wizard choice view" -Predicate {
         param($window)
         $window.Current.Name -eq "新手向导"
     })
@@ -127,8 +158,16 @@ catch {
     throw
 }
 finally {
-    if ($process -and -not $process.HasExited) {
-        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    if ($process) {
+        # Also stop a surviving PyInstaller child if its bootloader parent has
+        # already exited after spawning the GUI process.
+        $remainingIds = @(Get-ApplicationProcessIds -RootProcessId $process.Id)
+        foreach ($remainingId in $remainingIds | Where-Object { $_ -ne $process.Id }) {
+            Stop-Process -Id $remainingId -Force -ErrorAction SilentlyContinue
+        }
+        if (-not $process.HasExited) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        }
         Add-Report "process_cleanup=stopped"
     }
     $report | Set-Content -LiteralPath $ReportPath -Encoding utf8

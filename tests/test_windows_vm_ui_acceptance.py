@@ -25,6 +25,15 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "打开 WiFi 设置"', script)
         self.assertNotIn('Invoke-ButtonByName -Window $wizard -Name "打开移动热点"', script)
 
+    def test_tracks_pyinstaller_onefile_child_process_windows(self):
+        script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Get-ApplicationProcessIds", script)
+        self.assertIn("Win32_Process", script)
+        self.assertIn("ParentProcessId", script)
+        self.assertIn("-RootProcessId", script)
+
 
 if __name__ == "__main__":
     unittest.main()
