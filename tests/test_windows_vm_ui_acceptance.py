@@ -46,6 +46,13 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("-RootProcessId", script)
         self.assertIn("TreeScope]::Descendants", script)
 
+    def test_wizard_window_title_tracks_the_visible_plan_for_accessibility(self):
+        wizard = (ROOT / "gui/wizard.py").read_text(encoding="utf-8")
+        self.assertIn('win.title("新手向导")', wizard)
+        self.assertIn('win.title("方式 A：电脑直连校园网")', wizard)
+        self.assertIn('win.title("方式 B：副路由器中继扩展信号")', wizard)
+        self.assertIn('win.title("方式 C：隧道共享上网")', wizard)
+
 
 if __name__ == "__main__":
     unittest.main()

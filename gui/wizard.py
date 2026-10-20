@@ -65,6 +65,7 @@ class WizardMixin:
             body.configure(state="disabled")
 
         def show_plan_choice():
+            win.title("新手向导")
             title.configure(text="选择你的上网方式")
             set_body("没有电脑基础也没关系，跟着步骤点就行。\n\n"
                      "【方式 A】电脑直连校园网（最简单）\n"
@@ -86,6 +87,7 @@ class WizardMixin:
 
         def enter_plan_a():
             state["plan"] = "A"
+            win.title("方式 A：电脑直连校园网")
             btn_act3.pack_forget()
             title.configure(text="方式 A：电脑直连校园网")
             set_body("第 1 步：让电脑连接校园网 WiFi\n"
@@ -105,6 +107,7 @@ class WizardMixin:
 
         def enter_plan_b():
             state["plan"] = "B"
+            win.title("方式 B：副路由器中继扩展信号")
             btn_act3.pack_forget()
             title.configure(text="方式 B：副路由器中继扩展信号")
             set_body("副路由器的中继目标是什么？\n\n"
@@ -124,6 +127,7 @@ class WizardMixin:
             def enter_plan_b_detect(target_ssid, need_auth):
                 state["target_ssid"] = target_ssid
                 state["need_auth"] = need_auth
+                win.title("方式 B：正在检测副路由器")
                 title.configure(text="方式 B：副路由器中继「%s」" % target_ssid)
                 set_body("正在检测副路由器...\n\n（请确认电脑当前连接的是【副路由器】的 WiFi）")
                 btn_act.configure(text="重新检测", state="normal",
@@ -149,6 +153,7 @@ class WizardMixin:
                         # tkinter 调用, 必须回到主线程。以前这两句直接在 detect 这个
                         # 工作线程里跑, 撞上事件循环的空档就是 RuntimeError。
                         state["brand"], state["gw"], state["guide"] = brand, gw, guide
+                        win.title("方式 B：副路由器中继设置")
                         set_body(head + tail)
                         btn_act2.configure(state="normal" if gw else "disabled",
                                            command=lambda: webbrowser.open("http://%s" % gw))
@@ -158,6 +163,7 @@ class WizardMixin:
 
         def enter_plan_c():
             state["plan"] = "C"
+            win.title("方式 C：隧道共享上网")
             btn_act3.pack_forget()
             title.configure(text="方式 C：隧道共享上网")
             ips = shared_proxy.get_lan_ips()
