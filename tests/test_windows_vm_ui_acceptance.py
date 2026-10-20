@@ -53,6 +53,12 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn('win.title("方式 B：副路由器中继扩展信号")', wizard)
         self.assertIn('win.title("方式 C：隧道共享上网")', wizard)
 
+    def test_wizard_flushes_pending_page_redraws_after_state_changes(self):
+        wizard = (ROOT / "gui/wizard.py").read_text(encoding="utf-8")
+        self.assertIn("def refresh_wizard_view():", wizard)
+        self.assertIn("win.update_idletasks()", wizard)
+        self.assertGreaterEqual(wizard.count("refresh_wizard_view()"), 6)
+
 
 if __name__ == "__main__":
     unittest.main()

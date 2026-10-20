@@ -150,7 +150,8 @@ function Click-WizardPlanA($Window) {
     Start-Sleep -Milliseconds 80
     [CampusNetUiWindow]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
     Add-Report "plan_a_button_click=absolute screen position derived from wizard bounds ($x,$y)"
-    Start-Sleep -Milliseconds 500
+    # Let Tk process the explicit idle/layout flush before capturing the page.
+    Start-Sleep -Milliseconds 1500
     $afterPath = "${ScreenshotPrefix}-after.png"
     Add-Report "wizard_screenshot_after=$(Capture-WindowScreenshot -Handle $handle -Path $afterPath)"
 }

@@ -64,6 +64,12 @@ class WizardMixin:
             body.insert("1.0", text)
             body.configure(state="disabled")
 
+        def refresh_wizard_view():
+            # Tk can update a window's title and button labels before its Text
+            # widget and geometry have been repainted. Flush pending layout and
+            # redraw work so VM screenshot checks observe one consistent page.
+            win.update_idletasks()
+
         def show_plan_choice():
             win.title("新手向导")
             title.configure(text="选择你的上网方式")
@@ -84,6 +90,7 @@ class WizardMixin:
             btn_act2.pack(side="right", padx=(0, 8))
             btn_act3.configure(text="C：隧道共享", command=enter_plan_c, state="normal")
             btn_act3.pack(side="right", padx=(0, 8))
+            refresh_wizard_view()
 
         def enter_plan_a():
             state["plan"] = "A"
@@ -104,6 +111,7 @@ class WizardMixin:
             btn_act2.configure(text="打开移动热点", command=core.open_hotspot_settings)
             btn_prev.pack(side="left")
             btn_prev.configure(command=lambda: show_plan_choice())
+            refresh_wizard_view()
 
         def enter_plan_b():
             state["plan"] = "B"
@@ -123,6 +131,7 @@ class WizardMixin:
                                command=lambda: enter_plan_b_detect("主路由器的WiFi", False))
             btn_prev.pack(side="left")
             btn_prev.configure(command=lambda: show_plan_choice())
+            refresh_wizard_view()
 
             def enter_plan_b_detect(target_ssid, need_auth):
                 state["target_ssid"] = target_ssid
@@ -157,6 +166,7 @@ class WizardMixin:
                         set_body(head + tail)
                         btn_act2.configure(state="normal" if gw else "disabled",
                                            command=lambda: webbrowser.open("http://%s" % gw))
+                        refresh_wizard_view()
 
                     post(self, apply)
                 threading.Thread(target=detect, daemon=True).start()
@@ -196,6 +206,7 @@ class WizardMixin:
             btn_act2.pack(side="right", padx=(0, 8))
             btn_prev.pack(side="left")
             btn_prev.configure(command=show_plan_choice)
+            refresh_wizard_view()
 
         show_plan_choice()
         win.protocol("WM_DELETE_WINDOW", win.destroy)
