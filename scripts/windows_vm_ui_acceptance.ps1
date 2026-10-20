@@ -90,9 +90,10 @@ function Send-KeyboardToWindow($Window, [string]$Keys, [string]$Description) {
         throw "No native window handle for keyboard navigation: $Description."
     }
     [void][CampusNetUiWindow]::ShowWindow($handle, 9)
-    [void][CampusNetUiWindow]::SetForegroundWindow($handle)
-    $Window.SetFocus()
-    Start-Sleep -Milliseconds 150
+    if (-not [CampusNetUiWindow]::SetForegroundWindow($handle)) {
+        throw "Could not activate the wizard window for keyboard navigation: $Description."
+    }
+    Start-Sleep -Milliseconds 300
     [System.Windows.Forms.SendKeys]::SendWait($Keys)
     Add-Report "keyboard_navigation=$Description"
 }
@@ -139,14 +140,9 @@ try {
     }
     Add-Report "plan_a_view=visible"
     Add-Report "network_settings_actions=not_invoked"
-
-    Send-KeyboardToWindow -Window $planA -Keys "{TAB}{SPACE}" `
-        -Description "return to choices with first Tab focus and Space"
-    [void](Wait-ProcessWindow -RootProcessId $process.Id -Description "wizard choice view" -Predicate {
-        param($window)
-        $window.Current.Name -eq "新手向导"
-    })
-    Add-Report "wizard_back_navigation=passed"
+    Add-Report "hotspot_and_wifi_actions=not_invoked"
+    # On the A page, Tab focuses the hotspot action first. Do not send another
+    # Space or Tab sequence: that could open Windows network settings.
     Add-Report "result=passed"
 }
 catch {

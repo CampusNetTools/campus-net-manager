@@ -19,9 +19,12 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('Send-KeyboardToWindow -Window $wizard -Keys "{TAB}{SPACE}"', script)
-        self.assertIn('Send-KeyboardToWindow -Window $planA -Keys "{TAB}{SPACE}"', script)
         self.assertIn('[System.Windows.Forms.SendKeys]::SendWait($Keys)', script)
+        self.assertIn('[CampusNetUiWindow]::SetForegroundWindow($handle)', script)
+        self.assertNotIn("$Window.SetFocus()", script)
+        self.assertNotIn('Send-KeyboardToWindow -Window $planA', script)
         self.assertIn('network_settings_actions=not_invoked', script)
+        self.assertIn('hotspot_and_wifi_actions=not_invoked', script)
         self.assertNotIn('Open WiFi Settings', script)
         self.assertNotIn('Open mobile hotspot', script)
 
