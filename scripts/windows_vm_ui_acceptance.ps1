@@ -1,13 +1,15 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ExecutablePath,
-    [string]$ReportPath = "dist/windows/windows-ui-acceptance.txt"
+    [string]$ReportPath = "dist/windows/windows-ui-acceptance.txt",
+    [string]$ScreenshotPrefix = "dist/windows/windows-ui-wizard"
 )
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing.Common
 
 Add-Type -TypeDefinition @"
 using System;
@@ -71,6 +73,33 @@ function Get-ApplicationProcessIds([int]$RootProcessId) {
     @($ids)
 }
 
+function Capture-WindowScreenshot([IntPtr]$Handle, [string]$Path) {
+    $rect = [CampusNetUiWindow+Rect]::new()
+    if (-not [CampusNetUiWindow]::GetWindowRect($Handle, [ref]$rect)) {
+        throw "Could not read window bounds before screenshot capture."
+    }
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -le 0 -or $height -le 0) {
+        throw "Invalid screenshot bounds: $($rect.Left),$($rect.Top),$($rect.Right),$($rect.Bottom)."
+    }
+    $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+    try {
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
+            $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+        }
+        finally {
+            $graphics.Dispose()
+        }
+    }
+    finally {
+        $bitmap.Dispose()
+    }
+    "${Path}|$($rect.Left),$($rect.Top),$($rect.Right),$($rect.Bottom)|${width}x${height}"
+}
+
 function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [string]$Description) {
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
     $refreshAt = [DateTime]::MinValue
@@ -105,6 +134,10 @@ function Click-WizardPlanA($Window) {
     if (-not [CampusNetUiWindow]::GetWindowRect($handle, [ref]$rect)) {
         throw "Could not get the first-run wizard window bounds."
     }
+    Add-Report "wizard_window_bounds=$($rect.Left),$($rect.Top),$($rect.Right),$($rect.Bottom)"
+    Add-Report "wizard_window_size=$($rect.Right - $rect.Left)x$($rect.Bottom - $rect.Top)"
+    $beforePath = "${ScreenshotPrefix}-before.png"
+    Add-Report "wizard_screenshot_before=$(Capture-WindowScreenshot -Handle $handle -Path $beforePath)"
     # In the choice screen, plan A is the rightmost bottom button. Click its
     # interior using window bounds; do not click any controls on the plan page.
     $x = $rect.Right - 70
@@ -117,6 +150,9 @@ function Click-WizardPlanA($Window) {
     Start-Sleep -Milliseconds 80
     [CampusNetUiWindow]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
     Add-Report "plan_a_button_click=absolute screen position derived from wizard bounds ($x,$y)"
+    Start-Sleep -Milliseconds 500
+    $afterPath = "${ScreenshotPrefix}-after.png"
+    Add-Report "wizard_screenshot_after=$(Capture-WindowScreenshot -Handle $handle -Path $afterPath)"
 }
 
 try {

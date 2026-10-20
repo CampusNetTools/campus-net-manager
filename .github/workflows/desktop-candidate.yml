@@ -86,7 +86,8 @@ jobs:
         run: |
           ./scripts/windows_vm_ui_acceptance.ps1 `
             -ExecutablePath (Join-Path $PWD "dist/windows/CampusNetManager-windows.exe") `
-            -ReportPath (Join-Path $PWD "dist/windows/windows-ui-acceptance.txt")
+            -ReportPath (Join-Path $PWD "dist/windows/windows-ui-acceptance.txt") `
+            -ScreenshotPrefix (Join-Path $PWD "dist/windows/windows-ui-wizard")
 
       - name: Build, verify, and launch macOS app
         if: matrix.target == 'macos'
@@ -131,7 +132,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: campusnetmanager-windows-vm-ui-acceptance
-          path: dist/windows/windows-ui-acceptance.txt
+          path: |
+            dist/windows/windows-ui-acceptance.txt
+            dist/windows/windows-ui-wizard-before.png
+            dist/windows/windows-ui-wizard-after.png
           if-no-files-found: warn
 
       - name: Upload macOS candidate

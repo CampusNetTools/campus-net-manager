@@ -12,6 +12,8 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         )
         self.assertIn("windows_vm_ui_acceptance.ps1", workflow)
         self.assertIn("windows-ui-acceptance.txt", workflow)
+        self.assertIn("windows-ui-wizard-before.png", workflow)
+        self.assertIn("windows-ui-wizard-after.png", workflow)
         self.assertIn("windows-latest", workflow)
 
     def test_script_exercises_only_local_wizard_navigation(self):
@@ -22,6 +24,9 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("[CampusNetUiWindow]::GetWindowRect", script)
         self.assertIn("[CampusNetUiWindow]::SetCursorPos($x, $y)", script)
         self.assertIn("plan_a_button_click=absolute screen position derived from wizard bounds", script)
+        self.assertIn("Capture-WindowScreenshot", script)
+        self.assertIn('wizard_screenshot_before=', script)
+        self.assertIn('wizard_screenshot_after=', script)
         self.assertIn('[CampusNetUiWindow]::SetForegroundWindow($handle)', script)
         self.assertNotIn("$Window.SetFocus()", script)
         self.assertNotIn('Send-KeyboardToWindow -Window $planA', script)
