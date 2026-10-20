@@ -22,7 +22,9 @@ function Get-ProcessWindows([int]$ProcessId) {
         $ProcessId
     )
     $root = [System.Windows.Automation.AutomationElement]::RootElement
-    foreach ($window in $root.FindAll([System.Windows.Automation.TreeScope]::Children, $condition)) {
+    # Tk Toplevel dialogs created with transient(root) may appear as owned
+    # descendants instead of direct desktop children in the UIA tree.
+    foreach ($window in $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)) {
         if (-not $window.Current.IsOffscreen) {
             $window
         }

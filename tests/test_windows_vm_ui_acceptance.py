@@ -33,6 +33,7 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("Win32_Process", script)
         self.assertIn("ParentProcessId", script)
         self.assertIn("-RootProcessId", script)
+        self.assertIn("TreeScope]::Descendants", script)
 
 
 if __name__ == "__main__":
