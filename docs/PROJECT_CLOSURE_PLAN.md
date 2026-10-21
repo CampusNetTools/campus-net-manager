@@ -895,3 +895,95 @@
 - 当前 USB 配对校验成功，设备类型为 `iPhone18,1`、iOS `26.6.2`（未记录设备标识）。镜像实时画面再次显示已安装 PWA 的公开下载/说明首页，无 Safari 工具栏；状态栏显示蜂窝 `5G`。本轮未读取 Wi-Fi 设置，也未更改任何网络或 VPN 设置，离线冷启动仍未验收。
 - 重新从公开 GitHub Release 下载 `v5.6.0` macOS arm64 ZIP，SHA-256 `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b` 与 Release API digest 一致，ZIP CRC 通过。`ditto` 解包后的 `CampusNetManager.app` strict codesign 通过，bundle `com.campusnettools.campusnetmanager`、版本 `5.6.0`、adhoc 且无 Team ID；`/Applications/校园网连接管家.app` 存在、strict codesign 通过，安装版进程正在运行。此证据不等同于逐项控件验收、Developer ID 签名或公证。
 - QuickTime 在本次状态复核中未运行。本次未打开 QuickTime、未调用摄像头、未录制或保存视频；前次误触发 QuickTime 默认摄像头预览的经过与“未录制”的说明已向用户澄清。真实 iPhone 离线冷启动仍需先确定不使用摄像头、且断网后仍可观察页面的方式。
+
+## 2026-10-19 iPhone Safari 检查器重新枚举
+
+- 用户关闭飞行模式后，`idevicepair validate` 返回 `SUCCESS`，`ideviceinfo -k AirplaneMode` 返回 `false`；镜像画面状态栏显示蜂窝 5G。手机已留在主屏，未改 Wi-Fi、蜂窝、VPN 或代理设置。
+- Mac Safari「开发」菜单重新枚举到已配对 iPhone 的两个网页目标：主屏网页 App `campus-net-manager` 和 Safari 页面 `/campus-net-manager`。通过 `ios_webkit_debug_proxy` 确认 USB 调试代理能连接该设备；代理随后已停止。
+- 当前镜像最初显示普通 Safari 工具栏，故未将其当作独立 PWA 证据。Safari 远程目标菜单的辅助功能点击返回 `AXError.invalidUIElement`，键盘选择超时；本轮没有从检查器读取新的 DOM、`navigator.onLine` 或 Service Worker 状态。之前已读取的 standalone/Service Worker 状态不替代本轮实时复核。
+- 未执行离线启动测试；不具备稳定的检查器控制与断网后的屏幕观测通道。没有打开 QuickTime 或摄像头。下一步是在不更改 iPhone 网络设置的前提下恢复可操作的 Safari Web Inspector target 控制，再按既定条件决定是否进行一次离线冷启动。
+
+## 2026-10-19 iPhone PWA 主屏入口启动与检查器阻塞
+
+- Apple Configurator 随附的只读 `cfgutil get-icon-layout` 将主屏网页入口 `/campus-net-manager` 定位在第 3 个主屏布局的第 20 项。主屏另有一个同名旧入口；从布局映射确认的目标图标启动后，iPhone 显示 PWA 首页且没有 Safari 地址栏或工具栏。这补充了本轮真机独立启动证据。
+- Safari「开发」菜单将该目标分组在「主屏幕网页 App」下，并列出 `campusnettools.github.io — campus-net-manager`。尝试打开检查器目标时 CUA 返回 `AXError.invalidUIElement`；随后 Safari 操作报告 Mac 已锁定，拒绝继续 UI 操作。
+- 最后一次设备枚举返回 `No device found`；因此锁屏后未能重新读取飞行模式或在线状态。锁屏前现场读取 `AirplaneMode=false`，PWA 启动画面状态栏显示蜂窝 5G。没有更改 Wi-Fi、蜂窝、VPN、代理或其他网络配置；未启动离线测试，USB 调试代理已停止，没有使用 QuickTime 或摄像头。
+- 当前唯一后续步骤：设备所有者解锁 Mac；之后重新确认 USB 配对与网络恢复、再次打开该主屏 PWA 检查目标，在线读取 DOM/`navigator.onLine`/Service Worker/缓存，再依据既定可恢复条件评估一次离线冷启动。
+
+### 飞行模式关闭后的复核（2026-10-19）
+
+- 用户确认已关闭飞行模式；随后本机 `idevicepair validate` 和 `idevice_id -l` 仍分别返回 `No device found`，Apple Configurator `cfgutil list` 也未枚举设备。iPhone 镜像点击“继续”后停在重连/空白状态。
+- Safari「开发」菜单当前只枚举本机 macOS，无可检查的应用程序，也没有 iPhone 或主屏 PWA 目标；因此本轮没有读取 `navigator.onLine`、Service Worker、缓存，也没有执行离线测试。
+- 没有触碰 Wi-Fi、蜂窝、VPN、代理或账号设置。需先恢复可用的 USB 数据设备枚举，再继续原计划；主屏 PWA 独立启动的既有证据仍有效，但不替代离线验收。
+
+### USB 枚举阻塞第三次复核（2026-10-19）
+
+- 在用户确认飞行模式已关闭后，本轮再次执行 `idevicepair validate`、`idevice_id -l` 与 `system_profiler SPUSBDataType` 查询：仍无 iPhone 设备记录；此前 Safari 开发菜单也只列出 Mac 本机且无可检查应用。
+- 这是恢复设备通道后的第三次连续复核；PWA 已有主屏独立启动和在线 Service Worker/cache 读取证据，但离线冷启动及网络恢复后的复查没有完成。未更改 iPhone 网络、VPN、代理或账户设置。
+- 按目标停止条件暂停续跑。唯一解除步骤：设备所有者解锁 iPhone，并重新插拔 USB 数据线以恢复数据设备枚举；出现“信任此电脑”提示时由设备所有者确认。设备重新出现后再继续 Safari 检查器与离线验收。
+
+### 用户纠正后的 USB 与 Safari 检查器复核（2026-10-19）
+
+- 用户明确更正：iPhone 已通过 USB 连接 Mac，且飞行模式已关闭。当前本机复核确认 `idevicepair validate` 成功、`idevice_id -l` 仅返回一台设备，`ideviceinfo -k AirplaneMode` 返回 `false`；因此前述“设备未枚举”仅代表当时状态，不能描述当前状态。
+- Safari「开发 → 检查 App 和设备」列出已连接 iPhone，但设备内容区显示“无可检查内容”。Safari 开发菜单的设备条目曾显示“正在连接…”。本轮 `ios_webkit_debug_proxy` 在本机端口列出已连接设备，但其设备调试端点 `/json`、`/json/list`、`/json/version` 均返回 HTTP 404，没有可读取的页面目标；代理已停止。
+- 本轮没有读取当前 PWA DOM、`navigator.onLine`、Service Worker 或 Cache Storage，也没有执行离线启动或网络切换。USB 设备连接和飞行模式关闭均已确认，但不等于 Safari 页面检查通道可用。此前记录的主屏 PWA 独立启动与历史 Service Worker/cache 结果不替代本轮实时页面检查。
+- 未改 VPN、校园网、路由器、账户或手机网络设置。`idevicescreenshot` 无法使用，因为系统要求挂载 Developer Disk Image；没有安装/调用 Xcode、QuickTime 或摄像头。
+- 下一步只需让 iPhone 上的校园网管家 PWA 页面处于前台，并保持 Safari「设置 → Safari → 高级 → 网页检查器」开启；随后在 Safari 检查器确认该页面出现，再继续在线状态读取。只有检查器稳定且能恢复网络时才做一次离线启动。当前验收目标仍未完成。
+
+### iPhone PWA 检查器恢复后第三轮阻塞审计（2026-10-19）
+
+- 本轮重新验证 USB 配对成功、设备数为 1、`AirplaneMode=false`。Safari「开发」菜单没有 iPhone 远程目标；「App 和设备检查」仅列出本机及本机 Safari 标签页，没有 iPhone 页面。与前两轮一致，实时 PWA target 不可用。
+- 恢复目标后的连续三轮均因 Safari 检查器无可检查 PWA 页面无法继续；这不是 USB 未连接或飞行模式开启。没有读取实时 DOM、`navigator.onLine`、Service Worker 或缓存，也没有做离线启动/网络切换。
+- 依目标停止条件，本轮目标状态转为 `blocked` 并停止续跑。唯一解除步骤：在 iPhone 解锁后打开主屏幕的校园网管家 PWA 并保持前台，然后通知助手复查 Safari「检查 App 和设备」。无需重新插拔 USB、切换飞行模式或修改 VPN/校园网配置。
+
+### 用户打开 PWA 后的 Safari 实时检查（2026-10-19）
+
+- 用户回复“打开了”后，Safari「App 和设备检查」实时列出已连接的 iPhone（iOS 26.6.2）及两个目标：主屏幕网页 App `campus-net-manager` 和 Safari `/campus-net-manager`。打开主屏幕网页 App 的 Web Inspector 成功；这次检查器连接可用。
+- Web Inspector 控制台只读结果：`navigator.onLine=true`、`display-mode: standalone=true`、当前页由 Service Worker 控制；注册状态为 `activated`，scope 是 `https://campusnettools.github.io/campus-net-manager/`。
+- Cache Storage 只读回读到 `campusnet-pwa-shell-v1`，其中有 7 项：首页根路径、`index.html`、`styles.css`、`app.js`、`manifest.webmanifest`、192px 与 512px 图标；`caches.match()` 对当前根路径和 `index.html` 均返回缓存响应 `200`。USB 配对校验成功，`AirplaneMode=false`。
+- 本轮没有关闭 Wi-Fi/蜂窝或执行离线启动。Safari Web Inspector「网络」面板没有离线模拟选项；切断 iPhone 网络可能同时断开 iPhone Mirroring，而仅靠 USB 配对/检查器不能可靠恢复设备网络设置。因此离线冷启动和断网后的网络恢复仍未验收，不能由缓存清单推断为通过。
+
+### 获准离线测试后的设备操作阻塞（2026-10-19）
+
+- 用户同意进行一次短暂断网测试。执行前查看 iPhone Mirroring，系统显示“iPhone 使用中；锁定 iPhone 以连接”，因此镜像当前无法控制设备设置；Safari Web Inspector 的 USB 页面检查仍可用。
+- 未切换网络。虽然 `idevicediagnostics sleep` 可锁屏，但其工具说明明确会断开 USB 主机连接，会破坏当前稳定检查通道；本轮没有调用该命令，也没有尝试其他设备锁屏/网络控制命令。
+- 继续离线验收前需要设备所有者按侧边键锁定 iPhone，使镜像重新连接。连接后再进行一次短暂断网检查；若关闭 Wi-Fi 导致镜像断开，需由设备所有者在 iPhone 上恢复网络。
+
+### 镜像恢复后尝试离线验收（2026-10-19）
+
+- 用户锁定 iPhone 后，iPhone Mirroring 成功重连并显示 PWA 首页。设置页确认飞行模式关闭、Wi-Fi 连接 Xiaomi、蜂窝状态为 5G。用户此前已允许一次短暂断网测试。
+- 关闭 Wi-Fi 后 iPhone Mirroring 立刻报告连接中断，并提示需启用蓝牙和 Wi-Fi；点击“重试”仍显示未找到 iPhone。USB 配对仍有效（`idevicepair validate` 成功，`ideviceinfo -k AirplaneMode` 为 `false`）。
+- 蜂窝数据仍开启，因此这次操作没有让 PWA 离线，尚未运行离线启动检查。为避免失去恢复通道，没有关闭蜂窝数据。现需设备所有者在 iPhone 控制中心重新开启 Wi-Fi；镜像恢复后再执行唯一一次离线冷启动，并验证网络恢复。
+
+### Wi-Fi 恢复后的离线验收准备复核（2026-10-20）
+
+- 用户恢复 Wi-Fi 后，USB 配对校验成功、`AirplaneMode=false`；iPhone Mirroring 点击重试后恢复，并显示校园网管家 PWA 首页。页面显示“浏览器报告在线”，此前 Safari 实时检查器结果为 `navigator.onLine=true`、standalone、Service Worker 控制页面、`ready=complete`。
+- 为准备单次真正离线检查，临时关闭了蜂窝数据；Wi-Fi 保持连接。Safari「检查 App 和设备」再次只显示 iPhone 设备但内容为“无可检查内容”，没有可读取 PWA 页面/控制台的检查目标。
+- 已将蜂窝数据恢复为操作前选中的副号线路，设置界面显示该线路已选中。没有再次关闭 Wi-Fi，也没有宣称离线测试通过。当前阻塞是：Wi-Fi 关闭会断开 iPhone Mirroring，而 Safari 检查器没有可用页面；USB 配对只证明配对存在，不能在此状态下独立观察页面或可靠恢复手机网络。离线测试需先获得不会随 Wi-Fi 关闭而中断的观察与恢复通道。
+
+### PWA 前台后的检查器复核更正（2026-10-20）
+
+- 更正：上节第一次看到 Safari“无可检查内容”时，iPhone 正停在蜂窝数据设置页；这不足以认定检查器本身不可用。返回主屏并打开“校园网管家”后，Safari 开发菜单重新列出 `campusnettools.github.io — campus-net-manager`，Web Inspector 成功连接。
+- 检查器控制台只读结果：`navigator.onLine=true`、`display-mode: standalone=true`、Service Worker 控制页面、`document.readyState=complete`、正文可见。既有 Cache Storage 仍有 shell 资源；这仍是在线运行和缓存存在证据，不是离线冷启动证据。
+- 蜂窝数据已恢复到原先选择的线路，状态栏显示 5G 数据可用；Wi-Fi 保持未改。Safari Web Inspector 的网络面板没有离线模拟开关。没有执行断网/离线重载；若再关 Wi-Fi，Mirroring 会失联，无法保证不经用户操作恢复网络。
+
+### 单次离线缓存测试准备（2026-10-20）
+
+- 检查 iPhone 当前 Wi-Fi 网络的 HTTP 代理原本为“关闭”；Wi-Fi 处于开启并连接状态。未修改 DNS、APN、VPN、蜂窝数据或路由器。
+- 尝试在 iPhone Mirroring 的临时手动代理表单输入本机地址时，Simplified Pinyin 输入法将英文/数字转换为组合候选，表单显示错误值。未保存任何代理地址或端口；重新选择并保存“关闭”后回到 Wi-Fi 详情页，确认代理仍为“关闭”。随后已把 PWA 恢复到前台。
+- 这次只做了代理配置准备，没有断网、刷新或冷启动，不能算离线验收。下一步需要让 Mirroring 文本输入使用 ABC/英文字符，再以保存前屏幕回读确认临时地址后，运行一次离线缓存冷启动并立即恢复代理“关闭”。
+
+### USB 镜像复核与离线测试暂停（2026-10-20）
+
+- 本轮重新确认 `idevicepair validate` 成功、`AirplaneMode=false`。iPhone Mirroring 经“连接”后恢复；设置页可见 Wi-Fi 开关开启且当前网络已连接，状态栏有蜂窝信号。未关闭 Wi-Fi/蜂窝数据。
+- 为避免拼音法污染代理地址，Mac 输入源曾临时切到 ABC，之后已恢复原有简体拼音。没有打开或保存代理表单、没有改代理/DNS/VPN/APN，也没有发起断网或冷启动。
+- 当前 iPhone 在主屏/应用切换界面；本轮未将校园网管家 PWA 置于前台，未读取 Safari Web Inspector 实时目标。Computer Use 集成运行环境报告缺失；本机镜像虽可手动有限控制，但未能可靠定位并启动 PWA，故停止进一步网络操作。
+- 验收仍未通过。下次先重新打开主屏 PWA 并确认 Safari Web Inspector 实时目标可读，再执行已获准的一次短时离线冷启动；代理值必须保存前准确回读，测试后马上恢复代理关闭并验证联网。
+
+## 2026-10-20 独立收尾复核
+
+- GitHub Pages 首页、GitHub Latest Release 页面、macOS ZIP 和 Android APK 直链本轮均返回 HTTP 200。Release API 列出 v5.6.0 的 Android APK、macOS ZIP 和 Windows EXE 及各自 SHA-256 digest。Windows EXE 请求返回 GitHub 302 后，本轮连接 `release-assets.githubusercontent.com` 遇 TLS `SSL_ERROR_SYSCALL`，所以本轮未确认最终 CDN 状态；此前已有一次 Windows 下载端点 HTTP 200 记录。macOS ZIP SHA-256 `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b` 与 sidecar 一致，`zip -T` 通过；以 `ditto` 解包后，`CampusNetManager.app` 的 `codesign --verify --deep --strict` 通过，bundle id `com.campusnettools.campusnetmanager`、版本 5.6.0、adhoc、无 Team ID。
+- CUA 实际显示 macOS v5.6.0 主界面与 UI 报告的在线状态。点击“新手向导”后没有可见变化；辅助功能树只列窗口与菜单，因此控件级功能不能标为通过。验收后通过系统菜单退出；应用列表回读为未运行。
+- iPhone Mirroring 能显示已连接 iPhone；设备当时停在原有浏览器内容。本轮没有打开 QuickTime/摄像头，没有改 Wi-Fi、蜂窝、VPN、代理或账号设置，也没有执行 PWA 离线冷启动。
+- Pages 上线和直下载入口已完成；仍未独立完成的本机可访问验收为 macOS 自绘控件逐项响应与 PWA 离线冷启动。Windows 设备验收由用户的 Windows AI 执行，Android 真机暂不在用户设备范围。Actions run 列表接口本轮返回 EOF，未据此推断任何 run 的新状态。
+- 本轮没有改应用源码、Release 或 Pages 部署。既有工作区修改与未跟踪交付物保留，不提交、不清理。
