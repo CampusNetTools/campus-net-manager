@@ -40,4 +40,12 @@
 ### Method notes and remaining limits
 
 - The Playwright CLI wrapper failed to start with `Class extends value undefined`; the in-app browser/CDP path completed the site, responsive, and isolated offline checks instead.
-- Independent desktop-browser/PWA deployment checks are complete for this round. Remaining work that is not independently executable from the current state: iPhone Safari inspection/offline behavior (phone currently reports Airplane Mode on and no remote Safari target); Mac wizard plan A/B/C interaction (current UI path cannot activate the choices); and any user decision about the system tunnel-sharing authorization. No repeated coordinate clicks, network-setting changes, or authorization decisions were attempted.
+- At the time of this earlier checkpoint, the remaining non-independent work was iPhone Safari inspection/offline behavior, Mac wizard plan selection, and any user decision about system tunnel-sharing authorization. The later Mac check below resolves the wizard plan-selection item; the iPhone and authorization items remain open.
+
+## Mac keyboard navigation and current iPhone channel check — 2026-10-21
+
+- On the locally installed Mac v5.6.0 app, the wizard opened from the main window. A coordinate click did not activate the plan button; using Tab to focus the visible button and Space to activate it did. Plan A rendered its instructions, the Back button returned to the A/B/C chooser, and the B and C choices each opened their corresponding guide page. This verifies local guide-page navigation on this Mac.
+- The C guide displayed the app's pre-existing tunnel status as enabled. No tunnel enable/disable, completion, device-authorization, Wi-Fi, hotspot, or system-settings action was activated. No profile values or private network addresses were added to this record.
+- The wizard was closed normally. The app's main window remained available. No application source or network configuration was changed.
+- A fresh iPhone channel check returned `No device found` from `idevicepair validate` and zero USB device IDs. Safari “App and Device Inspection” showed only this Mac and local targets; its Develop menu showed no inspectable apps on an iPhone. iPhone Mirroring reported “连接暂停”. No iPhone settings were changed and no iPhone page/offline behavior was inspected.
+- Therefore Mac local wizard A/B/C navigation is now verified. iPhone live PWA inspection and offline/reconnect behavior remain blocked by the absent device/remote inspection channel; tunnel actions remain intentionally untested because they require an authorization decision.
