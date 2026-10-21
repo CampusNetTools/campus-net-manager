@@ -28,6 +28,8 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("[CampusNetUiWindow]::GetWindowRect", script)
         self.assertIn("[CampusNetUiWindow]::SetCursorPos($x, $y)", script)
         self.assertIn("plan_a_button_click=absolute screen position derived from wizard bounds", script)
+        self.assertIn('$window.Current.Name.StartsWith("方式 A")', script)
+        self.assertIn("visible window names:", script)
         self.assertIn("Capture-WindowScreenshot", script)
         self.assertIn('wizard_screenshot_before=', script)
         self.assertIn('wizard_screenshot_after=', script)

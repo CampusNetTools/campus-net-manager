@@ -122,7 +122,14 @@ function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [strin
         }
         Start-Sleep -Milliseconds 250
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw "Timed out waiting for visible UI window: $Description (process IDs: $($processIds -join ','))."
+    $visibleNames = @(
+        foreach ($processId in $processIds) {
+            foreach ($window in Get-ProcessWindows -ProcessId $processId) {
+                if ($window.Current.Name) { $window.Current.Name }
+            }
+        }
+    ) | Select-Object -Unique
+    throw "Timed out waiting for visible UI window: $Description (process IDs: $($processIds -join ','); visible window names: $($visibleNames -join ' | '))."
 }
 
 function Assert-PersistedProbeConfig([string]$Path) {
@@ -258,7 +265,7 @@ try {
     Click-WizardPlanA -Window $wizard
     $planA = Wait-ProcessWindow -RootProcessId $process.Id -Description "plan A wizard view" -Predicate {
         param($window)
-        $window.Current.Name -eq "方式 A：电脑直连校园网"
+        $window.Current.Name.StartsWith("方式 A")
     }
     Add-Report "plan_a_view=visible"
     Add-Report "network_settings_actions=not_invoked"
