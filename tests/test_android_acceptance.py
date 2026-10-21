@@ -95,6 +95,14 @@ class AndroidAcceptanceProbeTests(unittest.TestCase):
             'run-as "$package_name" sh -c \'mkdir -p files/app', script
         )
 
+    def test_foreground_service_assertion_waits_for_startup_and_reports_state(self):
+        script = (ROOT / "scripts/android_emulator_smoke.sh").read_text(encoding="utf-8")
+        assertion = script.split("assert_service_running() {", 1)[1].split("\n}", 1)[0]
+        self.assertIn('for attempt in $(seq 1 30)', assertion)
+        self.assertIn('isForeground=true|foregroundId=[1-9][0-9]*', assertion)
+        self.assertIn("did not reach foreground state", assertion)
+        self.assertIn('tee -a "$log_file" >&2', assertion)
+
 
 if __name__ == "__main__":
     unittest.main()

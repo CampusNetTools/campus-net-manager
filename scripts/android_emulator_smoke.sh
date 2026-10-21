@@ -154,17 +154,20 @@ wait_for_marker() {
 
 assert_service_running() {
   local description="$1"
-  local services
-  services="$(adb shell dumpsys activity services "$package_name" 2>/dev/null | tr -d '\r')"
-  if ! grep -Fq 'ServiceCampusguard' <<< "$services"; then
-    echo "::error::Android foreground service was not present $description."
-    return 1
-  fi
-  if ! grep -Eq 'isForeground=true|foregroundId=[1-9][0-9]*' <<< "$services"; then
-    echo "::error::Android service was present but was not foreground $description."
-    return 1
-  fi
-  echo "CNM_ANDROID_FOREGROUND_SERVICE_PRESENT $description" >> "$log_file"
+  local services=""
+  for attempt in $(seq 1 30); do
+    services="$(adb shell dumpsys activity services "$package_name" 2>/dev/null | tr -d '\r')"
+    if grep -Fq 'ServiceCampusguard' <<< "$services" && \
+       grep -Eq 'isForeground=true|foregroundId=[1-9][0-9]*' <<< "$services"; then
+      echo "CNM_ANDROID_FOREGROUND_SERVICE_PRESENT $description" >> "$log_file"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "::error::Android foreground service did not reach foreground state $description."
+  grep -E 'ServiceCampusguard|isForeground=|foregroundId=|foregroundServiceType=|startRequested=' \
+    <<< "$services" | tee -a "$log_file" >&2 || true
+  return 1
 }
 
 launch_app

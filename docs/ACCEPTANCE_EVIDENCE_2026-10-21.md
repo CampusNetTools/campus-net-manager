@@ -33,7 +33,7 @@
 |---|---|---|
 | v5.6.0 公共 APK | 已通过下载包校验 | 公共 Release APK SHA-256 `16fe62629ea30c3ab59d59fd12e0160d5b8dac6d0ba5a8c84342b9e1b1b7937e`。本轮 run `39542561956` 的 API36 debug APK sidecar 与下载文件 SHA-256 一致：`98b41da9aa4dd8efc11a4a3871290e316c9eff4191ef66dd91f45f2e367d974e`；ZIP CRC 通过。 |
 | API 36 安装/启动/UI | 已通过（run `39542561956`，源码 `d1265da`） | APK 构建、Manifest gate、KVM、模拟器安装启动和运行 smoke success；回读截图显示“非校园网环境（认证服务器不可达）”，不是卡在加载态；日志有 `CNM_NETWORK_STATUS_READY`，无 `FATAL EXCEPTION`。该旧 run 未运行新 Keystore/前台服务探针，不覆盖真机硬件。 |
-| Keystore、前台服务、进程重启、模拟 Wi-Fi 变化 | 修复后待 Actions | run `39545118250` 的 APK 编译、Manifest gate、项目密钥签名与 KVM 全部通过；模拟器启动并安装 APK 成功，但验收脚本在启动应用前退出，GitHub 日志显示 `mkdir: Needs 1 argument`。上传的模拟器证据包 digest `sha256:4a45dc200d1e1ef63d8969c8321edd78ab3c0a3a66fd1d61b7275c8971ae992c`，其中 logcat 文件为空。另一个旧代码 run `39545460665` 同样在模拟器验收步骤失败，证据 artifact digest `sha256:70139db272263c28a4509e1a08b15ec1de6f5027eaa7520e639b61a01f5f94ad`、logcat 为空；其 job 日志接口返回 EOF，故不推断具体故障。新发现的 runner-to-app 私有目录写入步骤原用嵌套 `run-as sh -c` 复合命令，现已在提交 `9360973` 改为分开的 `run-as mkdir` 与 `run-as tee` 参数调用并加回归断言；该提交已推送，run `39548383674` 正在验证修复。 |
+| Keystore、前台服务、进程重启、模拟 Wi-Fi 变化 | 部分通过；前台服务/恢复/网络切换待复验 | run `39545118250` 先在 runner-to-app 私有目录复合 shell 写入处报 `mkdir: Needs 1 argument`；提交 `9360973` 将其改为 direct `run-as mkdir/tee` 并加回归。run `39548383674` 对该修复构建成功，Manifest gate、项目密钥签名、KVM、API36模拟器启动和 APK 安装成功；探针写入 Keystore 加密档案并输出 `CNM_ANDROID_PROFILE_STORE_WRITE_PASS`，应用进程启动，UI 从加载态退出到“非校园网环境（认证服务器不可达）”，无 fatal 使脚本检查提前终止。随后“前台服务启动请求”和 app network-ready 标记均出现，页面截图也显示保活启动中；但脚本在一次立即 `dumpsys` 检查中判定 service 尚未到 foreground。证据 artifact digest `sha256:7ab55c88605b278f2018b98afb7102277d18ee9ada73ac77ff7be23406088486`；logcat SHA-256 `02f21844be8288e4af1aad6dca9874f5ce1ecb3a3a758e501cb35a1449902b1c`，截图 SHA-256 `bf52e24ee9881c6937a78aec507e91b20fcda11ac59dc6a977089e4eba2dca99`。进程重启解密、服务稳态保持、模拟 Wi-Fi 变化/恢复尚未执行。当前本地新增有界 30 秒前台态轮询及服务字段失败诊断，并增加回归断言；commit 与复验待提交。 |
 | 真机锁屏/硬件行为 | 未覆盖 | 按用户目标不用 Android 真机；模拟器结果不等同电池/厂商后台策略验收。 |
 
 ## Windows x64 hosted VM
@@ -50,9 +50,9 @@
 - 修复 `tests/test_shared_proxy_loopback.py` 的本地模拟控制台线程在一次空闲 socket timeout 后退出的问题；新增空闲超过 timeout 后仍可回环访问的回归用例。
 - Android 新增验收专用 Keystore/前台服务探针、空凭据合成 fixture 与流程检查。生产/商店 APK 不包含探针模块；目标分支相关 push/PR 与显式手动验收会加入探针，结束时清除模拟器数据。
 - Windows hosted VM 脚本增加独立目录合成档案的格式/重启持久化检查，并增加公开 EXE 的下载校验。
-- Android fixture 传入修复新增 `test_fixture_transfer_uses_direct_run_as_commands`；修复后完整本地 `python3 -m unittest discover -s tests` 为 566 passed、3 skipped，`bash -n` 与 `git diff --check` 通过。当前 Mac 没有安装 Ruff；CI 检查 `F,E9` 仍待确认。
+- Android fixture 传入修复新增 `test_fixture_transfer_uses_direct_run_as_commands`；新增前台服务有界等待及诊断测试 `test_foreground_service_assertion_waits_for_startup_and_reports_state`，定向 7 tests passed。较早完整本地套件为 567 passed、3 skipped；本轮新服务等待代码已通过 `bash -n` 与定向测试，完整套件待重跑。当前 Mac 没有安装 Ruff；CI 检查 `F,E9` 仍待确认。
 - 修复 desktop-candidate detector 只比较 `HEAD^`、遗漏同一 PR 先前代码提交的问题：PR 场景现在比较 base SHA 到 HEAD；新增 `test_desktop_candidate_detects_changes_across_the_entire_pull_request`，本地 commit `2d086b7`。定向 Windows/Android 测试共 13 passed，YAML parse、`bash -n` 和 `git diff --check` 通过；修复后完整套件为 567 passed、3 skipped。
 
 ## 待补终态
 
-补写后续 Android 模拟器、Windows hosted VM、PR CI 与 Desktop candidate Actions 的 run ID、逐 job 结果、artifact 回读和哈希；不得将未回读项表述为成功。当前 PR #6 远端头 `5c68774`；本地 commit `2d086b7` 尚待推送，且 Android run `39548383674` 正在运行。工作区既有 `docs/PROJECT_CLOSURE_PLAN.md` 改动和 `交付物/` 均保持原样。
+补写后续 Android 模拟器、Windows hosted VM、PR CI 与 Desktop candidate Actions 的 run ID、逐 job 结果、artifact 回读和哈希；不得将未回读项表述为成功。当前 PR #6 远端头 `5c68774`；本地有待推送的前台服务启动等待修复及 desktop-candidate 全 PR diff 检测修复。工作区既有 `docs/PROJECT_CLOSURE_PLAN.md` 改动和 `交付物/` 均保持原样。
