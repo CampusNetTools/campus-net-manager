@@ -103,6 +103,16 @@ class AndroidAcceptanceProbeTests(unittest.TestCase):
         self.assertIn("did not reach foreground state", assertion)
         self.assertIn('tee -a "$log_file" >&2', assertion)
 
+    def test_profile_lookup_checks_only_expected_private_paths_and_logs_diagnostics(self):
+        script = (ROOT / "scripts/android_emulator_smoke.sh").read_text(encoding="utf-8")
+        lookup = script.split("find_probe_profile() {", 1)[1].split("\n}", 1)[0]
+        self.assertIn("for candidate in files/profile.enc files/app/profile.enc", lookup)
+        self.assertIn('run-as "$package_name" test -f "$candidate"', lookup)
+        self.assertIn("CNM_ANDROID_PROFILE_LOOKUP_DIAGNOSTIC_BEGIN", lookup)
+        self.assertIn("CNM_ANDROID_PROFILE_LOOKUP_DIAGNOSTIC_END", lookup)
+        self.assertIn("CNM_ANDROID_PROFILE_PATH=$probe_relative_path", lookup)
+        self.assertNotIn("find files -name profile.enc", lookup)
+
 
 if __name__ == "__main__":
     unittest.main()

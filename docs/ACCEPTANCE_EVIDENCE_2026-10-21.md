@@ -15,7 +15,7 @@
 | GitHub Pages | 已通过 | 生产页面 `https://campusnettools.github.io/campus-net-manager/` 可打开；最近部署 run `39388792710` success。页面有软件下载、安装引导、隐私边界与 PWA 添加说明。本轮用系统 Python 经 TLS 回读首页、`app.js`、`sw.js`、`manifest.webmanifest`，均 HTTP 200；SHA-256 依次为 `86071a1f9e2a61b4ca529e75278743ac86d90aaff26819751a023f662a790653`、`e4ba18a4a9cf8cb93e29904d4c3bda04934c406cb5b0872016ec39762a2181e5`、`83d8dd9b5b6f995cf3fb66ab44fba1495e0740c0eb1358812ba1a514a5808772`、`62b3833072178b288ba61fc0de6b5a1c4b7f30a15d20455b3fa35bb3a98a3bac`。默认 Python 的 CA bundle 不信任链失败；切换到 `/usr/bin/python3` 后 TLS 验证成功，未关闭证书验证。 |
 | v5.6.0 下载资产 | 已通过校验 | APK `16fe62629ea30c3ab59d59fd12e0160d5b8dac6d0ba5a8c84342b9e1b1b7937e`；macOS ZIP `07a92be36aa279020b9efadc1bccd9f4ba9f66b4f2ce001ab35a748a4f9f685b`；Windows EXE `a0faeff9ea197e7e34be582059fdfc64d97679e6cfac265010c3bc9df337c689`。发布 API digest、下载文件和 `.sha256` sidecar 一致；APK 与 macOS ZIP CRC 通过，Windows 为 x64 PE32+ GUI。 |
 | 桌面浏览器/PWA 页面 | 已通过（页面可用性） | 本轮当前浏览器无障碍树可读到已渲染的首页与各平台下载/帮助入口。之前同一验收轮次记录过窄屏无横向溢出和离线 shell 缓存恢复；离线结果不代表 iPhone 已验收。 |
-| iPhone 主屏安装、Safari 远程页面、缓存离线恢复 | 未完成 | 本轮 `idevicepair validate` 成功；但桌面 Computer Use runtime 无法启动，不能读取 iPhone 镜像或 Safari DOM，因此没有本轮页面/主屏截图或缓存离线恢复证据。先前尝试输入页面地址时界面没有落到预期项目域名，因此已停止交互；没有打开陌生页面、提交信息或更改网络设置。USB 配对只证明配对链路，不替代手机页面验收。 |
+| iPhone 主屏安装、Safari 远程页面、缓存离线恢复 | 未完成 | 本轮 `idevicepair validate` 成功，USB 只读设备信息报告 `AirplaneMode=false`；`WiFiEnabled` 键没有返回值，不能据此判定当前 Wi-Fi 接入或网页可达。桌面 Computer Use runtime 无法启动，不能读取 iPhone 镜像或 Safari DOM，因此没有本轮页面/主屏截图或缓存离线恢复证据。先前尝试输入页面地址时界面没有落到预期项目域名，因此已停止交互；没有打开陌生页面、提交信息或更改网络设置。USB 配对只证明配对链路，不替代手机页面验收。 |
 
 ## macOS
 
@@ -33,7 +33,7 @@
 |---|---|---|
 | v5.6.0 公共 APK | 已通过下载包校验 | 公共 Release APK SHA-256 `16fe62629ea30c3ab59d59fd12e0160d5b8dac6d0ba5a8c84342b9e1b1b7937e`。本轮 run `39542561956` 的 API36 debug APK sidecar 与下载文件 SHA-256 一致：`98b41da9aa4dd8efc11a4a3871290e316c9eff4191ef66dd91f45f2e367d974e`；ZIP CRC 通过。 |
 | API 36 安装/启动/UI | 已通过（run `39542561956`，源码 `d1265da`） | APK 构建、Manifest gate、KVM、模拟器安装启动和运行 smoke success；回读截图显示“非校园网环境（认证服务器不可达）”，不是卡在加载态；日志有 `CNM_NETWORK_STATUS_READY`，无 `FATAL EXCEPTION`。该旧 run 未运行新 Keystore/前台服务探针，不覆盖真机硬件。 |
-| Keystore、前台服务、进程重启、模拟 Wi-Fi 变化 | 部分通过；前台服务/恢复/网络切换待复验 | run `39545118250` 先在 runner-to-app 私有目录复合 shell 写入处报 `mkdir: Needs 1 argument`；提交 `9360973` 将其改为 direct `run-as mkdir/tee` 并加回归。run `39548383674` 对该修复构建成功，Manifest gate、项目密钥签名、KVM、API36模拟器启动和 APK 安装成功；探针写入 Keystore 加密档案并输出 `CNM_ANDROID_PROFILE_STORE_WRITE_PASS`，应用进程启动，UI 从加载态退出到“非校园网环境（认证服务器不可达）”，无 fatal 使脚本检查提前终止。随后“前台服务启动请求”和 app network-ready 标记均出现，页面截图也显示保活启动中；但脚本在一次立即 `dumpsys` 检查中判定 service 尚未到 foreground。证据 artifact digest `sha256:7ab55c88605b278f2018b98afb7102277d18ee9ada73ac77ff7be23406088486`；logcat SHA-256 `02f21844be8288e4af1aad6dca9874f5ce1ecb3a3a758e501cb35a1449902b1c`，截图 SHA-256 `bf52e24ee9881c6937a78aec507e91b20fcda11ac59dc6a977089e4eba2dca99`。进程重启解密、服务稳态保持、模拟 Wi-Fi 变化/恢复尚未执行。当前本地新增有界 30 秒前台态轮询及服务字段失败诊断，并增加回归断言；commit 与复验待提交。 |
+| Keystore、前台服务、进程重启、模拟 Wi-Fi 变化 | 部分通过；存储文件定位/重启/网络变化待复验 | run `39545118250` 先在 runner-to-app 私有目录复合 shell 写入处报 `mkdir: Needs 1 argument`；提交 `9360973` 将其改为 direct `run-as mkdir/tee` 并加回归。run `39548383674` 对该修复构建成功，但前台服务立即检查失败；本地已加入 30 秒轮询并补诊断。run `39550469342` 对轮询版构建成功，Manifest gate、项目 APK 签名、KVM、API36 模拟器启动和安装成功。模拟器经历短暂 `adb: device offline` 后继续启动；应用输出 `CNM_ANDROID_PROFILE_STORE_WRITE_PASS`、`CNM_ANDROID_FOREGROUND_SERVICE_START_REQUESTED` 和 `CNM_NETWORK_STATUS_READY`，前台服务检查通过 `after first start`，截图显示已退出加载态并进入主界面。脚本随后无法通过 `find files ...` 识别刚写入的 `profile.enc`，因此在重启解密与网络变化前失败；当前证据不足以判断产品存储失败还是脚本路径发现问题。失败前读取到模拟器 Wi-Fi 原状态为 `1`，没有执行 Wi-Fi 开关命令；退出清理记录 `CNM_ANDROID_ACCEPTANCE_DATA_CLEARED`。证据 artifact `12323754232`，Actions digest `sha256:3b8fa33fb4ca0fe85e53242429a117debc5f6c09f9cfe96437959abdb94cdf4a`；logcat SHA-256 `7b945a554e9217d883c57cb7cc623ff8b1a2575f34b7fad30c64d2e34cf1f2ea`，截图 SHA-256 `f2b47df765deece80182b112113132aaa365b3f83b34e4b57c7ea865cc7962f8`。当前本地修正为检查两个预期应用私有路径，并在仍找不到时保留相对路径诊断；增加专项回归测试，8 项 `test_android_acceptance`、`bash -n`、`git diff --check` 通过。该修复尚未提交/远端复验。 |
 | 真机锁屏/硬件行为 | 未覆盖 | 按用户目标不用 Android 真机；模拟器结果不等同电池/厂商后台策略验收。 |
 
 ## Windows x64 hosted VM
@@ -62,4 +62,4 @@
 
 ## 待补终态
 
-补写 push `f73bdfd` 后 Android API36 模拟器 run `39550469342` 的终态、APK/artifact hash、Keystore/foreground service/restart/Wi-Fi markers；检查 PR head 与 CI 结束状态。当前 Android run 仍在构建 APK。工作区既有 `docs/PROJECT_CLOSURE_PLAN.md` 改动和 `交付物/` 均保持原样。
+待完成：先将 Android profile 文件路径定位改动与文档提交并推送；再只复验该路径修复后的 API36 模拟器流程，重点检查 APK artifact、文件加密内容、进程重启、前台服务、Wi-Fi 原状态恢复和退出清理。PR #6 目前仍 open，head 与 origin 为 `f73bdfd`；本地有一个未推送的 Windows 证据文档提交以及本轮路径修复，工作区原有 `docs/PROJECT_CLOSURE_PLAN.md` 改动和 `交付物/` 均保持原样。若 Mac UI 自动化或 iPhone Safari 目标访问仍不可用，则留下未覆盖结论并停止依赖步骤，不改系统网络开关。

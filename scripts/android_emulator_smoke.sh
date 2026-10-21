@@ -17,13 +17,28 @@ probe_file_local="$artifact_dir/emulator-profile.enc"
 probe_relative_path=""
 
 find_probe_profile() {
-  probe_relative_path="$(adb shell run-as "$package_name" sh -c \
-    'find files -name profile.enc -type f -print -quit' 2>/dev/null | tr -d '\r')"
-  if [[ "$probe_relative_path" != "files/profile.enc" && \
-        "$probe_relative_path" != "files/app/profile.enc" ]]; then
+  probe_relative_path=""
+  # The app stores profile.enc in one of the two user_data_dir layouts used by
+  # python-for-android. Check those exact package-private paths directly; the
+  # Android shell's find output differs across images and is not a stable API.
+  for candidate in files/profile.enc files/app/profile.enc; do
+    if adb shell run-as "$package_name" test -f "$candidate" >/dev/null 2>&1; then
+      probe_relative_path="$candidate"
+      break
+    fi
+  done
+  if [[ -z "$probe_relative_path" ]]; then
+    {
+      echo "CNM_ANDROID_PROFILE_LOOKUP_DIAGNOSTIC_BEGIN"
+      adb shell run-as "$package_name" sh -c \
+        'printf "cwd=%s\\n" "$PWD"; find . -type f -name profile.enc -print 2>&1 | head -20' \
+        || true
+      echo "CNM_ANDROID_PROFILE_LOOKUP_DIAGNOSTIC_END"
+    } | tee -a "$log_file" >&2
     echo "::error::Android encrypted profile was not found in the expected private app directory."
     return 1
   fi
+  echo "CNM_ANDROID_PROFILE_PATH=$probe_relative_path" >> "$log_file"
 }
 
 append_app_log() {
