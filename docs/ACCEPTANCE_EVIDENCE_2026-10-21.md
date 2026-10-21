@@ -33,7 +33,7 @@
 |---|---|---|
 | v5.6.0 公共 APK | 已通过下载包校验 | 公共 Release APK SHA-256 `16fe62629ea30c3ab59d59fd12e0160d5b8dac6d0ba5a8c84342b9e1b1b7937e`。本轮 run `39542561956` 的 API36 debug APK sidecar 与下载文件 SHA-256 一致：`98b41da9aa4dd8efc11a4a3871290e316c9eff4191ef66dd91f45f2e367d974e`；ZIP CRC 通过。 |
 | API 36 安装/启动/UI | 已通过（run `39542561956`，源码 `d1265da`） | APK 构建、Manifest gate、KVM、模拟器安装启动和运行 smoke success；回读截图显示“非校园网环境（认证服务器不可达）”，不是卡在加载态；日志有 `CNM_NETWORK_STATUS_READY`，无 `FATAL EXCEPTION`。该旧 run 未运行新 Keystore/前台服务探针，不覆盖真机硬件。 |
-| Keystore、前台服务、进程重启、模拟 Wi-Fi 变化 | 修复后待 Actions | run `39545118250` 的 APK 编译、Manifest gate、项目密钥签名与 KVM 全部通过；模拟器启动并安装 APK 成功，但验收脚本在启动应用前退出，GitHub 日志显示 `mkdir: Needs 1 argument`。上传的模拟器证据包 digest `sha256:4a45dc200d1e1ef63d8969c8321edd78ab3c0a3a66fd1d61b7275c8971ae992c`，其中 logcat 文件为空。另一个旧代码 run `39545460665` 同样在模拟器验收步骤失败，证据 artifact digest `sha256:70139db272263c28a4509e1a08b15ec1de6f5027eaa7520e639b61a01f5f94ad`、logcat 为空；其 job 日志接口返回 EOF，故不推断具体故障。新发现的 runner-to-app 私有目录写入步骤原用嵌套 `run-as sh -c` 复合命令，现已本地改为分开的 `run-as mkdir` 与 `run-as tee` 参数调用，并加回归断言；提交 `9360973`，等待推送后验证。 |
+| Keystore、前台服务、进程重启、模拟 Wi-Fi 变化 | 修复后待 Actions | run `39545118250` 的 APK 编译、Manifest gate、项目密钥签名与 KVM 全部通过；模拟器启动并安装 APK 成功，但验收脚本在启动应用前退出，GitHub 日志显示 `mkdir: Needs 1 argument`。上传的模拟器证据包 digest `sha256:4a45dc200d1e1ef63d8969c8321edd78ab3c0a3a66fd1d61b7275c8971ae992c`，其中 logcat 文件为空。另一个旧代码 run `39545460665` 同样在模拟器验收步骤失败，证据 artifact digest `sha256:70139db272263c28a4509e1a08b15ec1de6f5027eaa7520e639b61a01f5f94ad`、logcat 为空；其 job 日志接口返回 EOF，故不推断具体故障。新发现的 runner-to-app 私有目录写入步骤原用嵌套 `run-as sh -c` 复合命令，现已在提交 `9360973` 改为分开的 `run-as mkdir` 与 `run-as tee` 参数调用并加回归断言；该提交已推送，run `39548383674` 正在验证修复。 |
 | 真机锁屏/硬件行为 | 未覆盖 | 按用户目标不用 Android 真机；模拟器结果不等同电池/厂商后台策略验收。 |
 
 ## Windows x64 hosted VM
@@ -41,7 +41,7 @@
 | 项目 | 结果 | 证据与边界 |
 |---|---|---|
 | 当前源码候选包 | 已通过（主界面/向导导航） | run `39542762333` 构建、runner UI smoke、向导和 Plan A 导航通过；没有触发 Wi-Fi/热点操作。 |
-| 公开 v5.6.0 EXE 校验与 UI/持久化重启 | 部分通过，截图判定修复待 Actions | run `39545118239` 与 `39545460024` 的公开 EXE 下载、Release API digest/sidecar/SHA-256 比对及隔离配置重启持久化均通过；截图显示向导进入 Plan A，但 UIA 标题一直为“新手向导”，两次标题断言都失败。已在本地 commit `d3f5bbb` 改为比较主内容区域截图变化（标题栏与按钮悬停区排除；先前实测截图中心差异约 9.7%，门槛 5%）；此修复尚未推送/执行。 |
+| 公开 v5.6.0 EXE 校验与 UI/持久化重启 | UI 截图判定待 Actions | run `39545118239` 与 `39545460024` 的公开 EXE 下载、Release API digest/sidecar/SHA-256 比对及隔离配置重启持久化均通过；截图显示向导进入 Plan A，但 UIA 标题一直为“新手向导”，两次标题断言都失败。已在本地 commit `d3f5bbb` 改为比较主内容区域截图变化（标题栏与按钮悬停区排除；先前实测截图中心差异约 9.7%，门槛 5%）。PR docs-only 提交的 desktop run `39548383677` 被检测器判为无 app 改动，Windows/macOS 构建均 skip；根因是 detector 只检查最后一个提交。现已本地改为比较 pull request base 到 HEAD 的完整变更集，并新增回归断言；等 Android run 结束后推送复验。 |
 | 代理流程/真实网络 | 未覆盖 | hosted VM 不连接真实校园网、热点或手机网络；本轮探针不得请求外网认证。 |
 | Windows 实机 | 延后 | 本目标结束后交给用户指定的 Windows AI 按本机说明执行。 |
 
@@ -50,8 +50,9 @@
 - 修复 `tests/test_shared_proxy_loopback.py` 的本地模拟控制台线程在一次空闲 socket timeout 后退出的问题；新增空闲超过 timeout 后仍可回环访问的回归用例。
 - Android 新增验收专用 Keystore/前台服务探针、空凭据合成 fixture 与流程检查。生产/商店 APK 不包含探针模块；目标分支相关 push/PR 与显式手动验收会加入探针，结束时清除模拟器数据。
 - Windows hosted VM 脚本增加独立目录合成档案的格式/重启持久化检查，并增加公开 EXE 的下载校验。
-- Android fixture 传入修复新增 `test_fixture_transfer_uses_direct_run_as_commands`；最新本地完整 `python3 -m unittest discover -s tests` 为 566 passed、3 skipped，`bash -n` 与 `git diff --check` 通过。当前 Mac 没有安装 Ruff；推送后的 CI 会检查 `F,E9`。
+- Android fixture 传入修复新增 `test_fixture_transfer_uses_direct_run_as_commands`；修复后完整本地 `python3 -m unittest discover -s tests` 为 566 passed、3 skipped，`bash -n` 与 `git diff --check` 通过。当前 Mac 没有安装 Ruff；CI 检查 `F,E9` 仍待确认。
+- 修复 desktop-candidate detector 只比较 `HEAD^`、遗漏同一 PR 先前代码提交的问题：PR 场景现在比较 base SHA 到 HEAD；新增 `test_desktop_candidate_detects_changes_across_the_entire_pull_request`。定向 Windows/Android 测试共 13 passed，YAML parse、`bash -n` 和 diff-check 通过；完整套件待重新运行。
 
 ## 待补终态
 
-补写 push `9360973` 后 Android 模拟器、Windows hosted VM、PR CI 与 Desktop candidate Actions 的 run ID、逐 job 结果、artifact 回读和哈希；不得将未回读项表述为成功。当前 PR #6 远端头 `f7d607e`；本地在其上有两个待推送提交 `d3f5bbb` 与 `9360973`。工作区既有 `docs/PROJECT_CLOSURE_PLAN.md` 改动和 `交付物/` 均保持原样。
+补写后续 Android 模拟器、Windows hosted VM、PR CI 与 Desktop candidate Actions 的 run ID、逐 job 结果、artifact 回读和哈希；不得将未回读项表述为成功。当前 PR #6 远端头 `5c68774`；本地另有 desktop-candidate 全 PR diff 检测修复待推送。工作区既有 `docs/PROJECT_CLOSURE_PLAN.md` 改动和 `交付物/` 均保持原样。

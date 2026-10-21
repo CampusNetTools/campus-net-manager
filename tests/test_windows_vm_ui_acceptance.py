@@ -20,6 +20,15 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("windows-release-ui-acceptance.txt", workflow)
         self.assertGreaterEqual(workflow.count("-RunPersistenceProbe"), 2)
 
+    def test_desktop_candidate_detects_changes_across_the_entire_pull_request(self):
+        workflow = (ROOT / ".github/workflows/desktop-candidate.yml").read_text(
+            encoding="utf-8"
+        )
+        detector = workflow.split("id: check", 1)[1].split("build-candidate:", 1)[0]
+        self.assertIn("fetch-depth: 0", workflow)
+        self.assertIn("PR_BASE_SHA:", detector)
+        self.assertIn('git diff --name-only "$PR_BASE_SHA" HEAD', detector)
+
     def test_script_exercises_only_local_wizard_navigation(self):
         script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
             encoding="utf-8"
