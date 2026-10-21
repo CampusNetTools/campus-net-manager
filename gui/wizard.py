@@ -64,7 +64,14 @@ class WizardMixin:
             body.insert("1.0", text)
             body.configure(state="disabled")
 
+        def refresh_wizard_view():
+            # Tk can update a window's title and button labels before its Text
+            # widget and geometry have been repainted. Flush pending layout and
+            # redraw work so VM screenshot checks observe one consistent page.
+            win.update_idletasks()
+
         def show_plan_choice():
+            win.title("新手向导")
             title.configure(text="选择你的上网方式")
             set_body("没有电脑基础也没关系，跟着步骤点就行。\n\n"
                      "【方式 A】电脑直连校园网（最简单）\n"
@@ -83,9 +90,11 @@ class WizardMixin:
             btn_act2.pack(side="right", padx=(0, 8))
             btn_act3.configure(text="C：隧道共享", command=enter_plan_c, state="normal")
             btn_act3.pack(side="right", padx=(0, 8))
+            refresh_wizard_view()
 
         def enter_plan_a():
             state["plan"] = "A"
+            win.title("方式 A：电脑直连校园网")
             btn_act3.pack_forget()
             title.configure(text="方式 A：电脑直连校园网")
             set_body("第 1 步：让电脑连接校园网 WiFi\n"
@@ -102,9 +111,11 @@ class WizardMixin:
             btn_act2.configure(text="打开移动热点", command=core.open_hotspot_settings)
             btn_prev.pack(side="left")
             btn_prev.configure(command=lambda: show_plan_choice())
+            refresh_wizard_view()
 
         def enter_plan_b():
             state["plan"] = "B"
+            win.title("方式 B：副路由器中继扩展信号")
             btn_act3.pack_forget()
             title.configure(text="方式 B：副路由器中继扩展信号")
             set_body("副路由器的中继目标是什么？\n\n"
@@ -120,10 +131,12 @@ class WizardMixin:
                                command=lambda: enter_plan_b_detect("主路由器的WiFi", False))
             btn_prev.pack(side="left")
             btn_prev.configure(command=lambda: show_plan_choice())
+            refresh_wizard_view()
 
             def enter_plan_b_detect(target_ssid, need_auth):
                 state["target_ssid"] = target_ssid
                 state["need_auth"] = need_auth
+                win.title("方式 B：正在检测副路由器")
                 title.configure(text="方式 B：副路由器中继「%s」" % target_ssid)
                 set_body("正在检测副路由器...\n\n（请确认电脑当前连接的是【副路由器】的 WiFi）")
                 btn_act.configure(text="重新检测", state="normal",
@@ -149,15 +162,18 @@ class WizardMixin:
                         # tkinter 调用, 必须回到主线程。以前这两句直接在 detect 这个
                         # 工作线程里跑, 撞上事件循环的空档就是 RuntimeError。
                         state["brand"], state["gw"], state["guide"] = brand, gw, guide
+                        win.title("方式 B：副路由器中继设置")
                         set_body(head + tail)
                         btn_act2.configure(state="normal" if gw else "disabled",
                                            command=lambda: webbrowser.open("http://%s" % gw))
+                        refresh_wizard_view()
 
                     post(self, apply)
                 threading.Thread(target=detect, daemon=True).start()
 
         def enter_plan_c():
             state["plan"] = "C"
+            win.title("方式 C：隧道共享上网")
             btn_act3.pack_forget()
             title.configure(text="方式 C：隧道共享上网")
             ips = shared_proxy.get_lan_ips()
@@ -190,6 +206,7 @@ class WizardMixin:
             btn_act2.pack(side="right", padx=(0, 8))
             btn_prev.pack(side="left")
             btn_prev.configure(command=show_plan_choice)
+            refresh_wizard_view()
 
         show_plan_choice()
         win.protocol("WM_DELETE_WINDOW", win.destroy)

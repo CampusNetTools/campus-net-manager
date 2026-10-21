@@ -93,9 +93,18 @@ class ProfileFormMixin:
             if p.get("ssid") or p.get("gateway"):
                 d = "%s (%s)" % (p["name"], p.get("ssid") or p.get("gateway"))
             else:
-                d = "任意网络使用"
+                # 未绑定网络的档案要带上档案名: 多个未绑定档案若都显示同一句,
+                # 下拉里会出现无法分辨的重复项(用户无法知道自己在选哪一个)。
+                d = "%s（任意网络）" % p["name"]
             if p.get("preset") == core.LIDA_PROFILE_ID:
                 d = "立达专属 · " + d
+            # 兜底: 显示名仍重复时(如两个档案同名同绑定)追加序号,
+            # 否则 _profile_map 的 key 会互相覆盖, 选择项也分不清。
+            if d in self._profile_map:
+                base, n = d, 2
+                while "%s #%d" % (base, n) in self._profile_map:
+                    n += 1
+                d = "%s #%d" % (base, n)
             self._profile_map[d] = p["name"]
             displays.append(d)
         cmb = getattr(self, "cmb_profile", None)

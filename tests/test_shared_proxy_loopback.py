@@ -9,7 +9,6 @@ import socket
 import threading
 import time
 import unittest
-import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import shared_proxy  # noqa: E402
@@ -41,7 +40,12 @@ def _start(port=19092):
         while True:
             try:
                 c, _ = fake_console.accept()
-            except (socket.timeout, OSError):
+            except socket.timeout:
+                # Keep the fixture available for later tests. An idle period
+                # must not silently turn off the fake local console.
+                continue
+            except OSError:
+                # The listener is closed by tearDownClass.
                 return
             try:
                 d = b""
@@ -130,6 +134,13 @@ class TestLoopbackURL(unittest.TestCase):
     def test_loopback_other_port_proxied_locally(self):
         port = self.fake_port
         resp = self._request(f"GET http://10.52.188.32:{port}/?key=abc HTTP/1.1")
+        self.assertIn(b"200 OK", resp)
+        self.assertIn(b"FAKE CONSOLE OK", resp)
+
+    def test_fake_console_remains_available_after_idle_period(self):
+        time.sleep(0.7)
+        port = self.fake_port
+        resp = self._request(f"GET http://10.52.188.32:{port}/?key=idle HTTP/1.1")
         self.assertIn(b"200 OK", resp)
         self.assertIn(b"FAKE CONSOLE OK", resp)
 

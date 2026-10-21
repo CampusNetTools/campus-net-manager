@@ -160,7 +160,12 @@ class CampusNetMobile(App):
         self._guard_event = None
         self._guard_poll_event = None
         self._android_guard_requested = False
+        profile_probe_passed = self._run_android_profile_acceptance_probe()
         self._load_profile()
+        if profile_probe_passed:
+            # Acceptance APKs exercise the foreground-service startup with an
+            # empty, loopback-only profile. Release APKs omit the probe module.
+            Clock.schedule_once(self._start_android_acceptance_guard, 1.2)
         Clock.schedule_once(lambda _dt: self.refresh_status(), 0.5)
         if self._is_android():
             self._guard_poll_event = Clock.schedule_interval(
@@ -171,6 +176,27 @@ class CampusNetMobile(App):
     @staticmethod
     def _is_android():
         return bool(os.environ.get("ANDROID_ARGUMENT"))
+
+    def _run_android_profile_acceptance_probe(self):
+        if not self._is_android():
+            return False
+        try:
+            from android_acceptance import run_profile_store_probe
+            marker = run_profile_store_probe(self.user_data_dir)
+        except ImportError:
+            return False
+        except Exception as exc:
+            print("CNM_ANDROID_PROFILE_STORE_FAIL: " + type(exc).__name__, flush=True)
+            return False
+        if marker:
+            print(marker, flush=True)
+            return marker.endswith("_PASS")
+        return False
+
+    def _start_android_acceptance_guard(self, _dt):
+        self._start_android_guard(True)
+        if self._android_guard_requested:
+            print("CNM_ANDROID_FOREGROUND_SERVICE_START_REQUESTED", flush=True)
 
     # ---------- 档案 ----------
 

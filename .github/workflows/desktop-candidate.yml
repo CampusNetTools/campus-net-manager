@@ -22,19 +22,29 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 2
+          fetch-depth: 0
       - id: check
         shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             echo "build_candidate=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            echo "build_candidate=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            if [[ -z "$PR_BASE_SHA" ]] || ! git rev-parse --verify "$PR_BASE_SHA^{commit}" >/dev/null 2>&1; then
+              echo "::error::Could not resolve the pull request base commit."
+              exit 1
+            fi
+            changed=$(git diff --name-only "$PR_BASE_SHA" HEAD)
+          else
+            if ! git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+              echo "build_candidate=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            changed=$(git diff --name-only HEAD^ HEAD)
           fi
-          changed=$(git diff --name-only HEAD^ HEAD)
           if [[ -z "$changed" ]]; then
             echo "build_candidate=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -80,19 +90,54 @@ jobs:
           mv dist/windows/校园网连接管家.exe dist/windows/CampusNetManager-windows.exe
           python scripts/make_checksum.py dist/windows/CampusNetManager-windows.exe
 
-      - name: Launch smoke test for Windows executable
+      - name: Windows x64 VM UI acceptance (first-run wizard navigation)
         if: matrix.target == 'windows'
         shell: pwsh
         run: |
-          $exe = Join-Path $PWD "dist/windows/CampusNetManager-windows.exe"
-          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
-          Start-Sleep -Seconds 10
-          $process.Refresh()
-          if ($process.HasExited) {
-            throw "Windows app exited during startup (exit code $($process.ExitCode))."
+          ./scripts/windows_vm_ui_acceptance.ps1 `
+            -ExecutablePath (Join-Path $PWD "dist/windows/CampusNetManager-windows.exe") `
+            -ReportPath (Join-Path $PWD "dist/windows/windows-ui-acceptance.txt") `
+            -ScreenshotPrefix (Join-Path $PWD "dist/windows/windows-ui-wizard") `
+            -RunPersistenceProbe
+
+      - name: Download and verify the public Windows release EXE
+        if: matrix.target == 'windows'
+        id: public-release
+        shell: pwsh
+        run: |
+          $version = python -c 'from keepalive_core import APP_VERSION; print(APP_VERSION)'
+          $fileName = "CampusNetManager-v$version-win64.exe"
+          $assetDir = Join-Path $env:RUNNER_TEMP "campusnet-public-release"
+          New-Item -ItemType Directory -Path $assetDir | Out-Null
+          $exePath = Join-Path $assetDir $fileName
+          $sidecarPath = "$exePath.sha256"
+          $releaseUrl = "https://github.com/CampusNetTools/campus-net-manager/releases/download/v$version"
+          Invoke-WebRequest -Uri "$releaseUrl/$fileName" -OutFile $exePath
+          Invoke-WebRequest -Uri "$releaseUrl/$fileName.sha256" -OutFile $sidecarPath
+          $sidecarHash = ((Get-Content -LiteralPath $sidecarPath -Raw) -split '\s+')[0].ToLowerInvariant()
+          $assetHash = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/CampusNetTools/campus-net-manager/releases/tags/v$version"
+          $asset = $release.assets | Where-Object { $_.name -eq $fileName } | Select-Object -First 1
+          if (-not $asset -or -not $asset.digest.StartsWith('sha256:')) {
+            throw "The published Release API has no SHA-256 digest for $fileName."
           }
-          Stop-Process -Id $process.Id -Force
-          Write-Output "Windows app remained running for 10 seconds after launch."
+          $apiHash = $asset.digest.Substring(7).ToLowerInvariant()
+          if ($assetHash -ne $sidecarHash -or $assetHash -ne $apiHash) {
+            throw "The public Windows executable differs from its checksum or Release API digest."
+          }
+          "public_release_exe=$exePath" >> $env:GITHUB_OUTPUT
+          Write-Output "public_release_asset=$fileName"
+          Write-Output "public_release_sha256_verified=true"
+
+      - name: Windows x64 VM UI acceptance (public Release EXE)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          ./scripts/windows_vm_ui_acceptance.ps1 `
+            -ExecutablePath "${{ steps.public-release.outputs.public_release_exe }}" `
+            -ReportPath (Join-Path $PWD "dist/windows/windows-release-ui-acceptance.txt") `
+            -ScreenshotPrefix (Join-Path $PWD "dist/windows/windows-release-wizard") `
+            -RunPersistenceProbe
 
       - name: Build, verify, and launch macOS app
         if: matrix.target == 'macos'
@@ -131,6 +176,20 @@ jobs:
           path: |
             dist/windows/CampusNetManager-windows.exe
             dist/windows/CampusNetManager-windows.exe.sha256
+
+      - name: Upload Windows VM UI acceptance report
+        if: always() && matrix.target == 'windows'
+        uses: actions/upload-artifact@v7
+        with:
+          name: campusnetmanager-windows-vm-ui-acceptance
+          path: |
+            dist/windows/windows-ui-acceptance.txt
+            dist/windows/windows-ui-wizard-before.png
+            dist/windows/windows-ui-wizard-after.png
+            dist/windows/windows-release-ui-acceptance.txt
+            dist/windows/windows-release-wizard-before.png
+            dist/windows/windows-release-wizard-after.png
+          if-no-files-found: warn
 
       - name: Upload macOS candidate
         if: matrix.target == 'macos'

@@ -10,12 +10,21 @@ on:
         required: false
         type: boolean
         default: false
+      run_emulator_acceptance_probe:
+        description: "在模拟器中检查 Android Keystore 与前台服务（仅合成空账号）"
+        required: false
+        type: boolean
+        default: false
   # Reuse the same API 36 build + emulator smoke from the tag release workflow.
   # The APK uses Android's free debug signing key and is intended for direct
   # sideloading; it is not a Play Store bundle.
   workflow_call:
     inputs:
       sign_for_direct_download:
+        required: false
+        type: boolean
+        default: false
+      run_emulator_acceptance_probe:
         required: false
         type: boolean
         default: false
@@ -26,9 +35,22 @@ on:
       - mobile/**
       - core/**
       - scripts/android_emulator_smoke.sh
+      - scripts/android_emulator_profile_fixture.json
       - scripts/check_android_screenshot.py
       - scripts/patch_p4a_special_use.py
       - tests/test_p4a_special_use_patch.py
+      - tests/test_android_acceptance.py
+  pull_request:
+    paths:
+      - .github/workflows/mobile.yml
+      - mobile/**
+      - core/**
+      - scripts/android_emulator_smoke.sh
+      - scripts/android_emulator_profile_fixture.json
+      - scripts/check_android_screenshot.py
+      - scripts/patch_p4a_special_use.py
+      - tests/test_p4a_special_use_patch.py
+      - tests/test_android_acceptance.py
 
 jobs:
   build-apk:
@@ -52,6 +74,10 @@ jobs:
           cp -r mobile/java build_mobile/
           cp -r core build_mobile/
           ls build_mobile
+
+      - name: 仅在获选的模拟器验收构建中加入探针模块
+        if: inputs.run_emulator_acceptance_probe || github.event_name == 'push' || github.event_name == 'pull_request'
+        run: cp mobile/android_acceptance.py build_mobile/
 
       - name: 准备固定版本 python-for-android 并补充 special-use 说明
         run: |
@@ -217,6 +243,8 @@ jobs:
 
       - name: 在 Android API 36 模拟器安装并启动 APK
         uses: reactivecircus/android-emulator-runner@v2.38.0
+        env:
+          RUN_EMULATOR_ACCEPTANCE_PROBE: ${{ inputs.run_emulator_acceptance_probe || github.event_name == 'push' || github.event_name == 'pull_request' }}
         with:
           api-level: 36
           target: google_apis
