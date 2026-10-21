@@ -15,6 +15,10 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("windows-ui-wizard-before.png", workflow)
         self.assertIn("windows-ui-wizard-after.png", workflow)
         self.assertIn("windows-latest", workflow)
+        self.assertIn("public Windows release EXE", workflow)
+        self.assertIn("public_release_sha256_verified=true", workflow)
+        self.assertIn("windows-release-ui-acceptance.txt", workflow)
+        self.assertGreaterEqual(workflow.count("-RunPersistenceProbe"), 2)
 
     def test_script_exercises_only_local_wizard_navigation(self):
         script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
@@ -45,6 +49,18 @@ class WindowsVmUiAcceptanceTests(unittest.TestCase):
         self.assertIn("ParentProcessId", script)
         self.assertIn("-RootProcessId", script)
         self.assertIn("TreeScope]::Descendants", script)
+
+    def test_persistence_probe_uses_only_isolated_loopback_state(self):
+        script = (ROOT / "scripts/windows_vm_ui_acceptance.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Assert-PersistedProbeConfig", script)
+        self.assertIn("ConvertFrom-Json", script)
+        self.assertIn('auth_url = "http://127.0.0.1:9/"', script)
+        self.assertIn("auto_update_check = $false", script)
+        self.assertIn("config_survives_process_restart=", script)
+        self.assertIn("persistence_probe_cleanup=isolated test files removed", script)
+        self.assertIn("if ($RunPersistenceProbe)", script)
 
     def test_wizard_window_title_tracks_the_visible_plan_for_accessibility(self):
         wizard = (ROOT / "gui/wizard.py").read_text(encoding="utf-8")

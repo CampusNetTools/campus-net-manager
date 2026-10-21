@@ -1,0 +1,7 @@
+{
+  "username": "",
+  "password": "",
+  "method": "cmcc",
+  "auth_url": "http://127.0.0.1:9/",
+  "acceptance_marker": "synthetic-keystore-round-trip-not-a-secret"
+}

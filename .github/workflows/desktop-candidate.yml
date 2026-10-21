@@ -87,7 +87,47 @@ jobs:
           ./scripts/windows_vm_ui_acceptance.ps1 `
             -ExecutablePath (Join-Path $PWD "dist/windows/CampusNetManager-windows.exe") `
             -ReportPath (Join-Path $PWD "dist/windows/windows-ui-acceptance.txt") `
-            -ScreenshotPrefix (Join-Path $PWD "dist/windows/windows-ui-wizard")
+            -ScreenshotPrefix (Join-Path $PWD "dist/windows/windows-ui-wizard") `
+            -RunPersistenceProbe
+
+      - name: Download and verify the public Windows release EXE
+        if: matrix.target == 'windows'
+        id: public-release
+        shell: pwsh
+        run: |
+          $version = python -c 'from keepalive_core import APP_VERSION; print(APP_VERSION)'
+          $fileName = "CampusNetManager-v$version-win64.exe"
+          $assetDir = Join-Path $env:RUNNER_TEMP "campusnet-public-release"
+          New-Item -ItemType Directory -Path $assetDir | Out-Null
+          $exePath = Join-Path $assetDir $fileName
+          $sidecarPath = "$exePath.sha256"
+          $releaseUrl = "https://github.com/CampusNetTools/campus-net-manager/releases/download/v$version"
+          Invoke-WebRequest -Uri "$releaseUrl/$fileName" -OutFile $exePath
+          Invoke-WebRequest -Uri "$releaseUrl/$fileName.sha256" -OutFile $sidecarPath
+          $sidecarHash = ((Get-Content -LiteralPath $sidecarPath -Raw) -split '\s+')[0].ToLowerInvariant()
+          $assetHash = (Get-FileHash -LiteralPath $exePath -Algorithm SHA256).Hash.ToLowerInvariant()
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/CampusNetTools/campus-net-manager/releases/tags/v$version"
+          $asset = $release.assets | Where-Object { $_.name -eq $fileName } | Select-Object -First 1
+          if (-not $asset -or -not $asset.digest.StartsWith('sha256:')) {
+            throw "The published Release API has no SHA-256 digest for $fileName."
+          }
+          $apiHash = $asset.digest.Substring(7).ToLowerInvariant()
+          if ($assetHash -ne $sidecarHash -or $assetHash -ne $apiHash) {
+            throw "The public Windows executable differs from its checksum or Release API digest."
+          }
+          "public_release_exe=$exePath" >> $env:GITHUB_OUTPUT
+          Write-Output "public_release_asset=$fileName"
+          Write-Output "public_release_sha256_verified=true"
+
+      - name: Windows x64 VM UI acceptance (public Release EXE)
+        if: matrix.target == 'windows'
+        shell: pwsh
+        run: |
+          ./scripts/windows_vm_ui_acceptance.ps1 `
+            -ExecutablePath "${{ steps.public-release.outputs.public_release_exe }}" `
+            -ReportPath (Join-Path $PWD "dist/windows/windows-release-ui-acceptance.txt") `
+            -ScreenshotPrefix (Join-Path $PWD "dist/windows/windows-release-wizard") `
+            -RunPersistenceProbe
 
       - name: Build, verify, and launch macOS app
         if: matrix.target == 'macos'
@@ -136,6 +176,9 @@ jobs:
             dist/windows/windows-ui-acceptance.txt
             dist/windows/windows-ui-wizard-before.png
             dist/windows/windows-ui-wizard-after.png
+            dist/windows/windows-release-ui-acceptance.txt
+            dist/windows/windows-release-wizard-before.png
+            dist/windows/windows-release-wizard-after.png
           if-no-files-found: warn
 
       - name: Upload macOS candidate

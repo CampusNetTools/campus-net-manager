@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ExecutablePath,
     [string]$ReportPath = "dist/windows/windows-ui-acceptance.txt",
-    [string]$ScreenshotPrefix = "dist/windows/windows-ui-wizard"
+    [string]$ScreenshotPrefix = "dist/windows/windows-ui-wizard",
+    [switch]$RunPersistenceProbe
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,6 +33,9 @@ public static class CampusNetUiWindow {
 
 $report = [System.Collections.Generic.List[string]]::new()
 $process = $null
+$probeConfigPath = $null
+$probeProfileName = "Codex VM acceptance"
+$probeConfigSeeded = $false
 
 function Add-Report([string]$Line) {
     $report.Add($Line)
@@ -121,6 +125,36 @@ function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [strin
     throw "Timed out waiting for visible UI window: $Description (process IDs: $($processIds -join ','))."
 }
 
+function Assert-PersistedProbeConfig([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Persistence probe config was not written: $Path"
+    }
+    try {
+        $config = Get-Content -LiteralPath $Path -Raw -Encoding utf8 | ConvertFrom-Json
+    }
+    catch {
+        throw "Persistence probe config is not valid JSON."
+    }
+    if ($config.active_profile -ne $probeProfileName -or
+        $config.auto_update_check -ne $false) {
+        throw "Persistence probe profile or local-only setting was not preserved."
+    }
+    $profiles = @($config.profiles | Where-Object { $_.name -eq $probeProfileName })
+    if ($profiles.Count -ne 1 -or $profiles[0].auth_url -ne "http://127.0.0.1:9/" -or
+        $profiles[0].username -or $profiles[0].password) {
+        throw "Persistence probe profile is missing, altered, or contains credential values."
+    }
+}
+
+function Stop-ApplicationProcessTree([int]$RootProcessId) {
+    $remainingIds = @(Get-ApplicationProcessIds -RootProcessId $RootProcessId)
+    foreach ($remainingId in $remainingIds | Where-Object { $_ -ne $RootProcessId }) {
+        Stop-Process -Id $remainingId -Force -ErrorAction SilentlyContinue
+    }
+    Stop-Process -Id $RootProcessId -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+}
+
 function Click-WizardPlanA($Window) {
     $handle = [IntPtr]$Window.Current.NativeWindowHandle
     if ($handle -eq [IntPtr]::Zero) {
@@ -167,6 +201,33 @@ try {
     Add-Report "os=$([Environment]::OSVersion.VersionString)"
     Add-Report "executable=$([IO.Path]::GetFileName($resolvedExe))"
 
+    if ($RunPersistenceProbe) {
+        $probeConfigPath = Join-Path (Split-Path -Parent $resolvedExe) "config.json"
+        if (Test-Path -LiteralPath $probeConfigPath) {
+            throw "The isolated executable directory already contains config.json."
+        }
+        $seed = @{
+            profiles = @(@{
+                name = $probeProfileName
+                profile_type = "campus"
+                ssid = ""
+                username = ""
+                password = ""
+                login_type = "cmcc"
+                auth_url = "http://127.0.0.1:9/"
+                interval = 60
+            })
+            active_profile = $probeProfileName
+            auth_history = @("http://127.0.0.1:9/")
+            auto_update_check = $false
+            notifications = @{ enabled = $true }
+        }
+        $json = $seed | ConvertTo-Json -Depth 8 -Compress
+        [IO.File]::WriteAllText($probeConfigPath, $json, [Text.UTF8Encoding]::new($false))
+        $probeConfigSeeded = $true
+        Add-Report "persistence_probe=isolated empty profile with loopback-only auth endpoint"
+    }
+
     $process = Start-Process -FilePath $resolvedExe `
         -WorkingDirectory (Split-Path -Parent $resolvedExe) -PassThru
     Add-Report "root_process_id=$($process.Id)"
@@ -187,6 +248,10 @@ try {
         $window.Current.Name -eq "新手向导"
     }
     Add-Report "first_run_wizard=visible"
+    if ($RunPersistenceProbe) {
+        Assert-PersistedProbeConfig -Path $probeConfigPath
+        Add-Report "config_after_app_load=valid JSON, synthetic profile and local-only setting preserved"
+    }
 
     # Tk buttons are not represented as UIA controls on this hosted runner.
     # Use a bounded click on plan A's visible button and verify the new title.
@@ -198,6 +263,20 @@ try {
     Add-Report "plan_a_view=visible"
     Add-Report "network_settings_actions=not_invoked"
     Add-Report "hotspot_and_wifi_actions=not_invoked"
+    if ($RunPersistenceProbe) {
+        Stop-ApplicationProcessTree -RootProcessId $process.Id
+        $process = $null
+        $process = Start-Process -FilePath $resolvedExe `
+            -WorkingDirectory (Split-Path -Parent $resolvedExe) -PassThru
+        Add-Report "restart_root_process_id=$($process.Id)"
+        $restartWindow = Wait-ProcessWindow -RootProcessId $process.Id -Description "main window after config restart" -Predicate {
+            param($window)
+            $window.Current.Name.Contains("校园网连接管家")
+        }
+        Add-Report "main_window_after_config_restart=visible"
+        Assert-PersistedProbeConfig -Path $probeConfigPath
+        Add-Report "config_survives_process_restart=valid JSON, synthetic profile and local-only setting preserved"
+    }
     # On the A page, Tab focuses the hotspot action first. Do not send another
     # Space or Tab sequence: that could open Windows network settings.
     Add-Report "result=passed"
@@ -211,14 +290,24 @@ finally {
     if ($process) {
         # Also stop a surviving PyInstaller child if its bootloader parent has
         # already exited after spawning the GUI process.
-        $remainingIds = @(Get-ApplicationProcessIds -RootProcessId $process.Id)
-        foreach ($remainingId in $remainingIds | Where-Object { $_ -ne $process.Id }) {
-            Stop-Process -Id $remainingId -Force -ErrorAction SilentlyContinue
-        }
-        if (-not $process.HasExited) {
-            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-        }
+        Stop-ApplicationProcessTree -RootProcessId $process.Id
         Add-Report "process_cleanup=stopped"
+    }
+    if ($probeConfigSeeded -and $probeConfigPath) {
+        $probeDirectory = Split-Path -Parent $probeConfigPath
+        foreach ($generatedPath in @(
+            $probeConfigPath,
+            "$probeConfigPath.tmp",
+            (Join-Path $probeDirectory "keepalive.log"),
+            (Join-Path $probeDirectory "keepalive.lock"),
+            (Join-Path $probeDirectory "app.instance.lock"),
+            (Join-Path $probeDirectory "network_history.jsonl")
+        )) {
+            if (Test-Path -LiteralPath $generatedPath -PathType Leaf) {
+                Remove-Item -LiteralPath $generatedPath -Force
+            }
+        }
+        Add-Report "persistence_probe_cleanup=isolated test files removed"
     }
     $report | Set-Content -LiteralPath $ReportPath -Encoding utf8
 }
