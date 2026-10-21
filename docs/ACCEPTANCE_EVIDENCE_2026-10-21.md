@@ -46,6 +46,15 @@
 | 代理流程/真实网络 | 部分覆盖 | 本轮 VM 未触发 GUI 代理/共享或系统网络操作。PR CI 全套测试通过，其中回环代理、PAC/本机 setup page 组件用例已运行；这不是 Windows GUI 代理流程或真实网络路径验收。 hosted VM 不连接真实校园网、热点或手机网络。 |
 | Windows 实机 | 延后 | 本目标结束后交给用户指定的 Windows AI 按本机说明执行。 |
 
+## 本轮补充复核
+
+- 当前本地分支 `codex/windows-vm-ui-acceptance` 与远端一致，HEAD 为 `ce7cc410d918c97e969dd5e7d360edf3c1a3c210`。PR #6 仍 open、未合并且 mergeable。对该 HEAD 的 Android APK (`39565615809`)、PR CI (`39565615855`) 和 Desktop candidate (`39565615829`) 均为 completed/success；本轮没有重启 workflow，也没有改应用源码。
+- PWA：新的在线标签仍可打开公开站点；Service Worker 控制页面，`campusnet-pwa-shell-v2` 仍存在且根页已缓存。再次对旧标签做离线主导航时，浏览器将导航转换成内部 `data:text/html` 的 `ERR_INTERNET_DISCONNECTED` 错误页；工具不允许把该内部 URL 导回站点，也不允许关闭该错误标签。随后新开在线标签并复核页面正常。该浏览器标签副作用不代表系统断网或线上站点故障；本次重测没有证明离线冷启动成功，没有更改 Mac 或 iPhone 网络设置。旧错误标签留在浏览器中，在线站点在新标签可用。
+- iPhone：本轮 `idevicepair validate` 返回 `SUCCESS`，`ideviceinfo -k AirplaneMode` 返回 `false`；`WiFiEnabled` 键未提供值。iPhone Mirroring 辅助功能树仅暴露窗口级元素，Safari 仍无可读的 iPhone 页面目标。前次镜像 UI 要求锁定 iPhone 才能连接；本轮未自动锁屏、未改 Wi-Fi/蜂窝/VPN/代理，也未运行离线启动或外网路径测试。
+- macOS：安装版 v5.6.0 进程仍在运行。本轮没有点击网络、隧道、共享、登录或升级控件；前面记录的向导 A/B/C 键盘导航有效。控件级主要流程仍受 Computer Use runtime 缺失、辅助功能只暴露窗口级元素影响；任何可能触发登录、共享或系统网络操作的控件均未盲点。
+- Android API 36 模拟器及 Windows x64 hosted VM 的完整范围沿用上表已成功记录的最新 Actions 证据；Android 真机硬件行为、Windows 用户实机不在本轮证据范围。没有执行商店发布或付费签名。
+- 本轮保留既有 `docs/PROJECT_CLOSURE_PLAN.md` 修改与 `交付物/`，未覆盖或清理；未对项目应用代码作改动。
+
 ## 本地回归修复
 
 - 修复 `tests/test_shared_proxy_loopback.py` 的本地模拟控制台线程在一次空闲 socket timeout 后退出的问题；新增空闲超过 timeout 后仍可回环访问的回归用例。
