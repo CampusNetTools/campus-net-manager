@@ -100,10 +100,11 @@ if [[ "$probe_enabled" == "true" ]]; then
   fi
   # This is a debuggable hosted emulator install. Keep the JSON outside the APK
   # and place it only in the app-private user_data_dir via run-as.
-  adb shell run-as "$package_name" sh -c \
-    'mkdir -p files/app && cat > files/app/acceptance-profile.json' < "$fixture_file"
-  adb shell run-as "$package_name" sh -c \
-    'cat > files/acceptance-profile.json' < "$fixture_file"
+  adb shell run-as "$package_name" mkdir -p files/app
+  adb shell run-as "$package_name" tee files/app/acceptance-profile.json \
+    < "$fixture_file" >/dev/null
+  adb shell run-as "$package_name" tee files/acceptance-profile.json \
+    < "$fixture_file" >/dev/null
   adb shell pm grant "$package_name" android.permission.POST_NOTIFICATIONS
   original_wifi="$(adb shell settings get global wifi_on 2>/dev/null | tr -d '\r')"
   if [[ "$original_wifi" != "0" && "$original_wifi" != "1" ]]; then

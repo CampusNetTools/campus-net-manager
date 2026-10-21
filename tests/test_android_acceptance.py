@@ -82,6 +82,19 @@ class AndroidAcceptanceProbeTests(unittest.TestCase):
         self.assertIn("_start_android_acceptance_guard", main)
         self.assertIn("CNM_ANDROID_FOREGROUND_SERVICE_START_REQUESTED", main)
 
+    def test_fixture_transfer_uses_direct_run_as_commands(self):
+        script = (ROOT / "scripts/android_emulator_smoke.sh").read_text(encoding="utf-8")
+        self.assertIn('adb shell run-as "$package_name" mkdir -p files/app', script)
+        self.assertIn(
+            'adb shell run-as "$package_name" tee files/app/acceptance-profile.json', script
+        )
+        self.assertIn(
+            'adb shell run-as "$package_name" tee files/acceptance-profile.json', script
+        )
+        self.assertNotIn(
+            'run-as "$package_name" sh -c \'mkdir -p files/app', script
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
