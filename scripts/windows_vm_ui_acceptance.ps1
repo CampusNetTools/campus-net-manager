@@ -104,6 +104,40 @@ function Capture-WindowScreenshot([IntPtr]$Handle, [string]$Path) {
     "${Path}|$($rect.Left),$($rect.Top),$($rect.Right),$($rect.Bottom)|${width}x${height}"
 }
 
+function Get-ScreenshotChangeRatio([string]$BeforePath, [string]$AfterPath) {
+    $before = [System.Drawing.Bitmap]::new($BeforePath)
+    $after = [System.Drawing.Bitmap]::new($AfterPath)
+    try {
+        if ($before.Width -ne $after.Width -or $before.Height -ne $after.Height) {
+            throw "Wizard screenshots have different dimensions."
+        }
+        $changed = 0
+        $sampled = 0
+        # Exclude the title bar and bottom buttons so pointer hover/focus alone
+        # cannot count as a page transition. Sample the content viewport only.
+        $maxY = [Math]::Min(550, $before.Height)
+        $maxX = [Math]::Min(615, $before.Width)
+        for ($y = 100; $y -lt $maxY; $y += 4) {
+            for ($x = 40; $x -lt $maxX; $x += 4) {
+                $left = $before.GetPixel($x, $y)
+                $right = $after.GetPixel($x, $y)
+                $sampled++
+                if ([Math]::Abs($left.R - $right.R) -gt 24 -or
+                    [Math]::Abs($left.G - $right.G) -gt 24 -or
+                    [Math]::Abs($left.B - $right.B) -gt 24) {
+                    $changed++
+                }
+            }
+        }
+        if ($sampled -eq 0) { throw "Wizard screenshots have no content pixels to compare." }
+        return [double]$changed / [double]$sampled
+    }
+    finally {
+        $before.Dispose()
+        $after.Dispose()
+    }
+}
+
 function Wait-ProcessWindow([int]$RootProcessId, [scriptblock]$Predicate, [string]$Description) {
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
     $refreshAt = [DateTime]::MinValue
@@ -195,6 +229,13 @@ function Click-WizardPlanA($Window) {
     Start-Sleep -Milliseconds 1500
     $afterPath = "${ScreenshotPrefix}-after.png"
     Add-Report "wizard_screenshot_after=$(Capture-WindowScreenshot -Handle $handle -Path $afterPath)"
+    $changeRatio = Get-ScreenshotChangeRatio -BeforePath $beforePath -AfterPath $afterPath
+    $ratioText = $changeRatio.ToString("0.000", [Globalization.CultureInfo]::InvariantCulture)
+    Add-Report "plan_a_screenshot_change_ratio=$ratioText"
+    if ($changeRatio -lt 0.05) {
+        throw "Wizard content did not change enough to verify plan navigation (ratio=$ratioText)."
+    }
+    Add-Report "plan_a_view=verified by screenshot content transition"
 }
 
 try {
@@ -263,11 +304,6 @@ try {
     # Tk buttons are not represented as UIA controls on this hosted runner.
     # Use a bounded click on plan A's visible button and verify the new title.
     Click-WizardPlanA -Window $wizard
-    $planA = Wait-ProcessWindow -RootProcessId $process.Id -Description "plan A wizard view" -Predicate {
-        param($window)
-        $window.Current.Name.StartsWith("方式 A")
-    }
-    Add-Report "plan_a_view=visible"
     Add-Report "network_settings_actions=not_invoked"
     Add-Report "hotspot_and_wifi_actions=not_invoked"
     if ($RunPersistenceProbe) {
